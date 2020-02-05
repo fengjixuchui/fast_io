@@ -40,13 +40,13 @@ concept character_input_stream_impl = requires(T& in)
 {
 	get(in);
 };
-*/
+
 template<typename T>
 concept character_output_stream_impl = requires(T& out,typename T::char_type ch)
 {
 	put(out,ch);
 };
-
+*/
 template<typename T>
 concept random_access_stream_impl = requires(T& t)
 {
@@ -63,11 +63,19 @@ concept buffer_input_stream_impl = std::ranges::contiguous_range<T>&&requires(T&
 };
 
 template<typename T>
-concept buffer_output_stream_impl = requires(T& out,std::size_t n)
+concept reserve_output_stream_impl = requires(T& out,std::size_t n)
 {
-	oreserve(out,n);
-	orelease(out,n);
+	{out.ptest(n)};
+	{out.pbump(out.preserve(n))};
 };
+
+template<typename T>
+concept buffer_output_stream_impl = reserve_output_stream_impl<T>&&requires(T& out)
+{
+	{out.pspan()};
+	{out.pbase()};
+}
+
 template<typename T>
 concept zero_copy_input_stream_impl = requires(T& in)
 {
@@ -149,12 +157,24 @@ concept receiveable=input_stream<input>&&requires(input& in,T&& t)
 	receive_define(in,std::forward<T>(t));
 };
 
+template<typename T>
+concept print_length_restricted=requires(T&& t,char8_t* p)
+{
+	{print_define_max_length(t)}->std::convertible_to<std::size_t>;
+	{print_define_to_iterator(t,p)}->std::same_as<char8_t*>;
+};
+
+template<typename T>
+concept print_length_precise=print_length_restricted<T>&&requires(T&& t)
+{
+	{print_define_length(t)}->std::convertible_to<std::size_t>;
+};
 
 template<typename output,typename T>
-concept printable=output_stream<output>&&requires(output& out,T&& t)
+concept printable=output_stream<output>&&(print_length_restricted<T>||requires(output& out,T&& t)
 {
 	print_define(out,std::forward<T>(t));
-};
+});
 
 template<typename output,typename T>
 concept printlnable=output_stream<output>&&requires(output& out,T&& t)

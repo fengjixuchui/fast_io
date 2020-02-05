@@ -348,6 +348,26 @@ public:
 	{
 		return oh;
 	}
+	inline auto pbase()
+	{
+		return obuffer.beg;
+	}
+	inline std::span<char_type*,char_type*> pspan()
+	{
+		return {obuffer.iter,obuffer.end};
+	}
+	inline auto pbump(char_type* it)
+	{
+		obuffer.iter=it;
+	}
+	inline bool ptest(std::size_t n)
+	{
+		return obuffer.end-obuffer.iter<n;
+	}
+	inline bool preserve(std::size_t)
+	{
+		return obuffer.iter;
+	}
 };
 
 namespace details
