@@ -536,9 +536,9 @@ inline constexpr void obuf_write(T& ob,Iter cbegin,Iter cend)
 			ob.obuffer.curr+=diff;
 			return;
 		}
-		if constexpr(punning)
+/*		if constexpr(punning)
 			std::memcpy(ob.obuffer.curr,cbegin,n);
-		else
+		else*/
 			std::copy_n(cbegin,n,ob.obuffer.curr);		
 		cbegin+=n;
 		write(ob.native_handle(),ob.obuffer.beg,ob.obuffer.end);

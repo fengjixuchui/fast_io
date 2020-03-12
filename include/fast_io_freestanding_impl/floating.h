@@ -201,7 +201,8 @@ inline constexpr bool scan_define(input& in,T &t)
 {
 	if(!skip_space(in))
 		return false;
-	t=static_cast<std::remove_cvref_t<T>>(details::ryu::input_floating<double>(in));
+	auto igen{igenerator(in)};
+	t=static_cast<std::remove_cvref_t<T>>(details::ryu::input_floating<double>(begin(igen),end(igen)));
 	return true;
 }
 

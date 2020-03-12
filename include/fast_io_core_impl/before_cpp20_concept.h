@@ -61,7 +61,7 @@ inline constexpr U big_endian(U u)
 template<std::input_iterator input_iter,std::integral count_type,std::input_or_output_iterator output_iter>
 inline constexpr output_iter my_copy_n(input_iter first,count_type count,output_iter result)
 {
-#ifdef __cpp_lib_is_constant_evaluated
+#if __cpp_lib_is_constant_evaluated>=201811L
 	if (std::is_constant_evaluated())
 		return std::copy_n(first,count,result);
 	else
@@ -104,7 +104,7 @@ inline constexpr input_iter my_copy(input_iter first,input_iter second,output_it
 template<std::input_or_output_iterator output_iter,std::integral count_type,typename T>
 inline constexpr output_iter my_fill_n(output_iter first,count_type count,T const& value)
 {
-#ifdef __cpp_lib_is_constant_evaluated
+#if __cpp_lib_is_constant_evaluated>=201811L
 	if (std::is_constant_evaluated())
 		return std::fill_n(first,count,value);
 	else

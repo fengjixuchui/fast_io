@@ -7,7 +7,7 @@ namespace details
 {
 
 template<bool inherit=false>
-inline void* create_file_a_impl(char const* lpFileName,
+inline void* create_file_a_impld(wchar_t const* lpFileName,
 std::uint32_t dwDesiredAccess,
 std::uint32_t dwShareMode,
 std::uint32_t dwCreationDisposition,
@@ -20,7 +20,7 @@ std::uint32_t dwFlagsAndAttributes)
 			.nLength=sizeof(win32::security_attributes),
 			.bInheritHandle = true
 		};
-		auto handle(win32::CreateFileA(lpFileName,
+		auto handle(win32::CreateFileW(lpFileName,
 		dwDesiredAccess,
 		dwShareMode,
 		std::addressof(sec_attr),
@@ -37,7 +37,7 @@ std::uint32_t dwFlagsAndAttributes)
 	}
 	else
 	{
-		auto handle(win32::CreateFileA(lpFileName,
+		auto handle(win32::CreateFileW(lpFileName,
 		dwDesiredAccess,
 		dwShareMode,
 		nullptr,
@@ -51,6 +51,24 @@ std::uint32_t dwFlagsAndAttributes)
 			fast_terminate();
 #endif
 		return handle;
+	}
+}
+
+template<bool inherit=false,typename... Args>
+requires (sizeof...(Args)==4)
+inline void* create_file_a_impl(std::string_view path,Args&& ...args)
+{
+	if(path.size()<511)[[likely]]
+	{
+		std::array<wchar_t,512> buffer;
+		*code_cvt_from_utf8_to_utf16(path.data(),path.data()+path.size(),buffer.data())=0;
+		return create_file_a_impld<inherit>(buffer.data(),std::forward<Args>(args)...);
+	}
+	else
+	{
+		details::temp_unique_arr_ptr<wchar_t> buffer(path.size()+1);
+		*code_cvt_from_utf8_to_utf16(path.data(),path.data()+path.size(),buffer.ptr)=0;
+		return create_file_a_impld<inherit>(buffer.ptr,std::forward<Args>(args)...);
 	}
 }
 
@@ -218,6 +236,10 @@ public:
 	{
 		return handle;
 	}
+	explicit constexpr operator basic_nt_io_observer<char_type>() const noexcept
+	{
+		return basic_nt_io_observer<char_type>{handle};
+	}
 };
 
 template<std::integral ch_type>
@@ -227,14 +249,14 @@ public:
 	using native_handle_type = void*;
 	using char_type = ch_type;
 protected:
-	void close_impl()
+	void close_impl() noexcept
 	{
 		if(this->native_handle())
 			fast_io::win32::CloseHandle(this->native_handle());
 	}
 public:
-	explicit constexpr basic_win32_io_handle()=default;
-	explicit constexpr basic_win32_io_handle(native_handle_type handle):
+	explicit constexpr basic_win32_io_handle() noexcept =default;
+	explicit constexpr basic_win32_io_handle(native_handle_type handle) noexcept:
 		basic_win32_io_observer<ch_type>{handle}{}
 	explicit basic_win32_io_handle(std::uint32_t dw):
 		basic_win32_io_observer<ch_type>{fast_io::win32::GetStdHandle(dw)}
@@ -385,7 +407,7 @@ public:
 	template<open_mode om,perms pm>
 	basic_win32_file(std::string_view filename,open_interface_t<om>,perms_interface_t<pm>):
 				basic_win32_io_handle<char_type>(
-				details::create_file_a_impl<(om&open_mode::inherit)!=open_mode::none>(filename.data(),
+				details::create_file_a_impl<(om&open_mode::inherit)!=open_mode::none>(filename,
 				details::win32_file_openmode<om,pm>::mode.dwDesiredAccess,
 				details::win32_file_openmode<om,pm>::mode.dwShareMode,
 				details::win32_file_openmode<om,pm>::mode.dwCreationDisposition,
@@ -397,7 +419,7 @@ public:
 	}
 	template<open_mode om>
 	basic_win32_file(std::string_view filename,open_interface_t<om>):basic_win32_io_handle<char_type>(
-				details::create_file_a_impl<(om&open_mode::inherit)!=open_mode::none>(filename.data(),
+				details::create_file_a_impl<(om&open_mode::inherit)!=open_mode::none>(filename,
 				details::win32_file_openmode_single<om>::mode.dwDesiredAccess,
 				details::win32_file_openmode_single<om>::mode.dwShareMode,
 				details::win32_file_openmode_single<om>::mode.dwCreationDisposition,
@@ -408,7 +430,7 @@ public:
 	}
 	template<open_mode om>
 	basic_win32_file(std::string_view filename,open_interface_t<om>,perms p):basic_win32_io_handle<char_type>(
-				details::create_file_a_impl<(om&open_mode::inherit)!=open_mode::none>(filename.data(),
+				details::create_file_a_impl<(om&open_mode::inherit)!=open_mode::none>(filename,
 				details::win32_file_openmode_single<om>::mode.dwDesiredAccess,
 				details::win32_file_openmode_single<om>::mode.dwShareMode,
 				details::win32_file_openmode_single<om>::mode.dwCreationDisposition,
@@ -423,7 +445,7 @@ public:
 		if((om&open_mode::inherit)==open_mode::none)
 		{
 			native_handle()=details::create_file_a_impl
-			(filename.data(),
+			(filename,
 			mode.dwDesiredAccess,
 			mode.dwShareMode,
 			mode.dwCreationDisposition,
@@ -432,7 +454,7 @@ public:
 		else
 		{
 			native_handle()=details::create_file_a_impl<true>
-				(filename.data(),
+				(filename,
 				mode.dwDesiredAccess,
 				mode.dwShareMode,
 				mode.dwCreationDisposition,

@@ -31,7 +31,7 @@ template<typename T>
 template<typename T>
 [[nodiscard]] inline constexpr auto oreserve(basic_ostring<T>& ob,std::size_t size) -> typename basic_ostring<T>::char_type*
 {
-	if(ob.str().size()+size<=ob.str().capacity())
+	if(ob.str().size()+size<=ob.str().capacity())[[likely]]
 	{
 		ob.str().append(size,0);
 		return std::to_address(ob.str().end());

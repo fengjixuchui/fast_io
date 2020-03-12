@@ -19,6 +19,8 @@
 #include"fast_io_freestanding_impl/dynamic.h"
 #include"fast_io_freestanding_impl/send_receive.h"
 #include"fast_io_freestanding_impl/natural.h"
+#include"fast_io_freestanding_impl/memptr.h"
+#include"fast_io_freestanding_impl/code_cvt/utf.h"
 //#include"fast_io_freestanding_impl/ucs.h"
 #ifdef __cpp_coroutines
 #include<coroutine>		//coroutine is freestanding

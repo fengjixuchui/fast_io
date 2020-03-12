@@ -132,7 +132,7 @@ __kernel_entry NTSYSCALLAPI NTSTATUS NtWriteFile(
 );
 */
 	return (get_nt_module_handle<std::uint32_t __stdcall(void*,void*,pio_apc_routine,void*,io_status_block*,
-				void*,std::uint32_t,void*,std::uint32_t*)>("NtWriteFile"))(std::forward<Args>(args)...);
+				void const*,std::uint32_t,void*,std::uint32_t*)>("NtWriteFile"))(std::forward<Args>(args)...);
 }
 
 template<typename... Args>
