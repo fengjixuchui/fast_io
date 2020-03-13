@@ -26,4 +26,6 @@ add_executable(hw "./0001.helloworld/hw.cc")
 add_executable(hw_u8 "./0001.helloworld/hw_u8.cc")
 if (WIN32)
 add_executable(hello_world_win32_box "./0001.helloworld/hello_world_win32_box.cc")
+
+add_executable(nt "./0023.nt/ntfile.cc")
 endif (WIN32)

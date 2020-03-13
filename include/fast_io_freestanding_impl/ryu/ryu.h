@@ -1,5 +1,7 @@
 #pragma once
+#include"floating_traits.h"
 #include"fixed_table.h"
 #include"dbl_table.h"
 #include"fixed.h"
-#include"id.h"
+#include"tos.h"
+#include"sto.h"

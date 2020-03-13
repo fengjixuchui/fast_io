@@ -65,7 +65,7 @@ struct unicode_string
 {
 std::uint16_t Length;
 std::uint16_t MaximumLength;
-wchar_t const*  Buffer;
+wchar_t*  Buffer;
 };
 
 struct object_attributes
@@ -94,8 +94,8 @@ inline auto nt_create_file(Args&& ...args)
 {
 /*
 __kernel_entry NTSYSCALLAPI NTSTATUS NtCreateFile(
-PHANDLE(void*)            FileHandle,
-ACCESS_MASK(std::uint32_t*)        DesiredAccess,
+PHANDLE(void**)            FileHandle,
+ACCESS_MASK(std::uint32_t)        DesiredAccess,
 POBJECT_ATTRIBUTES(object_attributes*) ObjectAttributes,
 PIO_STATUS_BLOCK(io_status_block*)   IoStatusBlock,
 PLARGE_INTEGER(std::int64_t*)     AllocationSize,
@@ -107,7 +107,7 @@ PVOID(void*)              EaBuffer,
 ULONG(std::uint32_t)              EaLength
 );
 */
-	return (get_nt_module_handle<std::uint32_t __stdcall(void*,std::uint32_t*,object_attributes*,io_status_block*,std::uint64_t*,
+	return (get_nt_module_handle<std::uint32_t __stdcall(void**,std::uint32_t,object_attributes*,io_status_block*,std::int64_t*,
 				std::uint32_t,std::uint32_t,std::uint32_t,std::uint32_t,void*,std::uint32_t)>("NtCreateFile"))(std::forward<Args>(args)...);
 }
 
@@ -132,7 +132,7 @@ __kernel_entry NTSYSCALLAPI NTSTATUS NtWriteFile(
 );
 */
 	return (get_nt_module_handle<std::uint32_t __stdcall(void*,void*,pio_apc_routine,void*,io_status_block*,
-				void const*,std::uint32_t,void*,std::uint32_t*)>("NtWriteFile"))(std::forward<Args>(args)...);
+				void const*,std::uint32_t,std::int64_t*,std::uint32_t*)>("NtWriteFile"))(std::forward<Args>(args)...);
 }
 
 template<typename... Args>
@@ -153,7 +153,7 @@ __kernel_entry NTSYSCALLAPI NTSTATUS NtReadFile(
 );
 */
 	return (get_nt_module_handle<std::uint32_t __stdcall(void*,void*,pio_apc_routine,void*,io_status_block*,
-				void*,std::uint32_t,void*,std::uint32_t*)>("NtReadFile"))(std::forward<Args>(args)...);
+				void*,std::uint32_t,std::int64_t*,std::uint32_t*)>("NtReadFile"))(std::forward<Args>(args)...);
 }
 
 

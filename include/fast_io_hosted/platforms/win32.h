@@ -94,6 +94,60 @@ inline constexpr win32_open_mode calculate_win32_open_mode(open_mode value)
 /*
 Referenced partially from ReactOS
 https://github.com/changloong/msvcrt/blob/master/io/wopen.c
+
+
+
+https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
+
+CREATE_ALWAYS
+2
+Creates a new file, always.
+If the specified file exists and is writable, the function overwrites the file, the function succeeds, and last-error code is set to ERROR_ALREADY_EXISTS (183).
+
+If the specified file does not exist and is a valid path, a new file is created, the function succeeds, and the last-error code is set to zero.
+
+For more information, see the Remarks section of this topic.
+
+CREATE_NEW
+1
+Creates a new file, only if it does not already exist.
+If the specified file exists, the function fails and the last-error code is set to ERROR_FILE_EXISTS (80).
+
+If the specified file does not exist and is a valid path to a writable location, a new file is created.
+
+OPEN_ALWAYS
+4
+Opens a file, always.
+If the specified file exists, the function succeeds and the last-error code is set to ERROR_ALREADY_EXISTS (183).
+
+If the specified file does not exist and is a valid path to a writable location, the function creates a file and the last-error code is set to zero.
+
+OPEN_EXISTING
+3
+Opens a file or device, only if it exists.
+If the specified file or device does not exist, the function fails and the last-error code is set to ERROR_FILE_NOT_FOUND (2).
+
+For more information about devices, see the Remarks section.
+
+TRUNCATE_EXISTING
+5
+Opens a file and truncates it so that its size is zero bytes, only if it exists.
+If the specified file does not exist, the function fails and the last-error code is set to ERROR_FILE_NOT_FOUND (2).
+
+The calling process must open the file with the GENERIC_WRITE bit set as part of the dwDesiredAccess parameter.
+
+
+
+File access
+mode string	Meaning	Explanation	Action if file
+already exists	Action if file
+does not exist
+"r"	read	Open a file for reading	read from start	failure to open
+"w"	write	Create a file for writing	destroy contents	create new
+"a"	append	Append to a file	write to end	create new
+"r+"	read extended	Open a file for read/write	read from start	error
+"w+"	write extended	Create a file for read/write	destroy contents	create new
+"a+"	append extended	Open a file for read/write	write to end	create new
 */
 	if((value&open_mode::excl)!=open_mode::none)
 	{
@@ -108,8 +162,8 @@ https://github.com/changloong/msvcrt/blob/master/io/wopen.c
 	else if ((value&open_mode::trunc)!=open_mode::none)
 	{
 		if((value&open_mode::creat)!=open_mode::none)
-			mode.dwCreationDisposition=1;//CREATE_NEW
-		else if((value&open_mode::in)==open_mode::none)
+			mode.dwCreationDisposition=2;// CREATE_ALWAYS
+		else if((value&open_mode::in)!=open_mode::none)
 			mode.dwCreationDisposition=5;//TRUNCATE_EXISTING
 		else
 		{
@@ -187,7 +241,6 @@ https://github.com/changloong/msvcrt/blob/master/io/wopen.c
 		mode.dwFlagsAndAttributes|=0x01000000;					//FILE_FLAG_POSIX_SEMANTICS
 	if((value&open_mode::session_aware)!=open_mode::none)
 		mode.dwFlagsAndAttributes|=0x00800000;					//FILE_FLAG_SESSION_AWARE
-
 	return mode;
 }
 
@@ -307,7 +360,7 @@ public:
 };
 
 template<std::integral ch_type>
-inline auto redirect_handle(basic_win32_io_observer<ch_type>& hd)
+inline constexpr auto redirect_handle(basic_win32_io_observer<ch_type>& hd)
 {
 	return hd.native_handle();
 }

@@ -22,7 +22,7 @@
 #include"fast_io_freestanding_impl/memptr.h"
 #include"fast_io_freestanding_impl/code_cvt/utf.h"
 //#include"fast_io_freestanding_impl/ucs.h"
-#ifdef __cpp_coroutines
+#if __cpp_coroutines >= 201902
 #include<coroutine>		//coroutine is freestanding
 #include"fast_io_freestanding_impl/generator.h"
 #endif

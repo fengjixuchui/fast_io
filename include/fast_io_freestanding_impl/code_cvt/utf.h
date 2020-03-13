@@ -6,7 +6,6 @@
 #include <emmintrin.h>
 #include <immintrin.h>
 #include <xmmintrin.h>
-//#include <intrin.h>
 #endif
 /*
 CppCon 2018: Bob Steagall “Fast Conversion From UTF-8 with C++, DFAs, and SSE Intrinsics”
@@ -24,12 +23,12 @@ namespace details::utf
 #ifdef __SSE__
 template<std::integral T,std::integral U>
 requires (sizeof(T)==1)&&(sizeof(U)==2||sizeof(U)==4)
-inline void convert_ascii_with_sse(T const* pSrc, U*& pDst) noexcept
+inline void convert_ascii_with_sse(T*& pSrc, U*& pDst) noexcept
 {
+	uint16_t mask;
 	if constexpr(sizeof(U)==2)
 	{
     	__m128i     chunk, half;
-		uint32_t     mask, incr;
 
 		chunk = _mm_loadu_si128((__m128i const*) pSrc);     //- Load the register with 8-bit bytes
 		mask  = _mm_movemask_epi8(chunk);                   //- Determine which octets have high bit set
@@ -40,28 +39,10 @@ inline void convert_ascii_with_sse(T const* pSrc, U*& pDst) noexcept
 		half = _mm_unpackhi_epi8(chunk, _mm_set1_epi8(0));  //- Unpack upper half into 16-bit words
 		_mm_storeu_si128((__m128i*) (pDst + 8), half);      //- Write to memory
 
-		//- If no bits were set in the mask, then all 16 code units were ASCII, and therefore
-		//  both pointers are advanced by 16.
-		//
-		if (mask == 0)
-		{
-			pSrc += 16;
-			pDst += 16;
-		}
-
-		//- Otherwise, the number of trailing (low-order) zero bits in the mask indicates the number
-		//  of ASCII code units starting from the lowest byte address.
-		else
-		{
-			incr  = std::countr_zero(mask);
-			pSrc += incr;
-			pDst += incr;
-		}
 	}
 	else
 	{
 		__m128i     chunk, half, qrtr, zero;
-		uint32_t     mask, incr;
 
 		zero  = _mm_set1_epi8(0);                           //- Zero out the interleave register
 		chunk = _mm_loadu_si128((__m128i const*) pSrc);     //- Load a register with 8-bit bytes
@@ -78,25 +59,10 @@ inline void convert_ascii_with_sse(T const* pSrc, U*& pDst) noexcept
 		_mm_storeu_si128((__m128i*) (pDst + 8), qrtr);      //- Write to memory
 		qrtr = _mm_unpackhi_epi16(half, zero);              //- Unpack words 12-15 into 32-bit dwords
 		_mm_storeu_si128((__m128i*) (pDst + 12), qrtr);     //- Write to memory
-
-		//- If no bits were set in the mask, then all 16 code units were ASCII, and therefore
-		//  both pointers are advanced by 16.
-		//
-		if (mask == 0)
-		{
-			pSrc += 16;
-			pDst += 16;
-		}
-
-		//- Otherwise, the number of trailing (low-order) zero bits in the mask indicates the number
-		//  of ASCII code units starting from the lowest byte address.
-		else
-		{
-			incr  = std::countr_zero(mask);
-			pSrc += incr;
-			pDst += incr;
-		}
 	}
+	auto const incr{std::countr_zero(mask)};
+	pSrc += incr;
+	pDst += incr;
 }
 #endif
 
@@ -204,15 +170,17 @@ Assume little endian first until I create a good interface
 template<std::contiguous_iterator from_iter,std::contiguous_iterator to_iter>
 requires (std::integral<std::iter_value_t<from_iter>>&&sizeof(std::iter_value_t<from_iter>)==1&&
 sizeof(std::iter_value_t<to_iter>)==2&&std::unsigned_integral<std::iter_value_t<to_iter>>)
-inline constexpr to_iter code_cvt_from_utf8_to_utf16(from_iter pSrc,from_iter pSrcEnd,to_iter pDst)
+inline constexpr to_iter code_cvt_from_utf8_to_utf16(from_iter p_src_iter,from_iter p_src_end,to_iter p_dst)
 {
+	auto pSrc(std::to_address(p_src_iter));
+	auto pSrcEnd(std::to_address(p_src_end));
+	auto pDst(std::to_address(p_dst));
     char32_t cdpt;
 #ifdef __SSE__
 #if __cpp_lib_is_constant_evaluated>=201811L
 	if (!std::is_constant_evaluated())
 	{
-		auto psde{pSrcEnd - sizeof(__m128i)};
-		while (pSrc < psde)
+		while (pSrc + sizeof(__m128i)< pSrcEnd)
 		{
 		if (*pSrc < 0x80)
 			details::utf::convert_ascii_with_sse(pSrc, pDst);
@@ -232,18 +200,18 @@ inline constexpr to_iter code_cvt_from_utf8_to_utf16(from_iter pSrc,from_iter pS
 	if (*pSrc < 0x80)
 	{
 	    *pDst = *pSrc;
-			++pDst;
-			++pSrc;
+		++pDst;
+		++pSrc;
 	}
 	else
 	{
 	    if (details::utf::advance_with_big_table(pSrc, pSrcEnd, cdpt) != 12)[[likely]]
-		details::utf::get_code_units(cdpt, pDst);
+			details::utf::get_code_units(cdpt, pDst);
 	    else
-		throw std::range_error("illegal utf8");
+			throw std::range_error("illegal utf8");
 	}
     }
-    return pDst;
+    return (pDst-std::to_address(p_dst))+p_dst;
 }
 template<output_stream output,std::integral ch_type>
 requires ((std::same_as<typename output::char_type,char16_t>||

@@ -10,14 +10,20 @@ class temp_unique_arr_ptr
 {
 public:
 	T* ptr{};
-	constexpr temp_unique_arr_ptr(std::size_t size):ptr(new T[size]){}
+#if __cpp_constexpr_dynamic_alloc >= 201907L
+	constexpr
+#endif
+	temp_unique_arr_ptr(std::size_t size):ptr(new T[size]){}
 	temp_unique_arr_ptr(temp_unique_arr_ptr const&)=delete;
 	temp_unique_arr_ptr& operator=(temp_unique_arr_ptr const&)=delete;
 	constexpr temp_unique_arr_ptr(temp_unique_arr_ptr&& bmv) noexcept:ptr(bmv.ptr)
 	{
 		bmv.ptr=nullptr;
 	}
-	constexpr temp_unique_arr_ptr& operator=(temp_unique_arr_ptr&& bmv) noexcept
+#if __cpp_constexpr_dynamic_alloc >= 201907L
+	constexpr
+#endif
+	temp_unique_arr_ptr& operator=(temp_unique_arr_ptr&& bmv) noexcept
 	{
 		if(bmv.ptr==ptr)
 			return *this;
@@ -26,7 +32,10 @@ public:
 		bmv.ptr=nullptr;
 		return *this;
 	}
-	constexpr ~temp_unique_arr_ptr()
+#if __cpp_constexpr_dynamic_alloc >= 201907L
+	constexpr
+#endif
+	~temp_unique_arr_ptr()
 	{
 		delete[] ptr;
 	}

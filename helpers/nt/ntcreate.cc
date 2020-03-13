@@ -16,7 +16,7 @@ try
 	{
 	fast_io::u8obuf_file obf("nt_error_message.h");
 	for(std::size_t i{};i<lines.size();i+=6)
-		print(obf,u8"case ",lines.at(i),u8":\treturn u8R\"([nt:",lines.at(i),u8"]",lines.at(i+4),u8")\";\n");
+		print(obf,u8"case ",lines.at(i),u8":\treturn u8R\"(nt[",lines.at(i),u8"(",lines.at(i+2),u8")]",lines.at(i+4),u8")\";\n");
 	print(obf,u8"default:return u8\"[nt:unknown]\";\n");
 	}
 }
