@@ -189,7 +189,11 @@ inline constexpr to_iter code_cvt_from_utf8_to_utf16(from_iter p_src_iter,from_i
 			if (details::utf::advance_with_big_table(pSrc, pSrcEnd, cdpt) != 12)[[likely]]
 				details::utf::get_code_units(cdpt, pDst);
 			else
+#ifdef __cpp_exceptions
 				throw std::range_error("illegal utf8");
+#else
+				fast_terminate();
+#endif
 		}
 		}
 	}
@@ -208,7 +212,11 @@ inline constexpr to_iter code_cvt_from_utf8_to_utf16(from_iter p_src_iter,from_i
 	    if (details::utf::advance_with_big_table(pSrc, pSrcEnd, cdpt) != 12)[[likely]]
 			details::utf::get_code_units(cdpt, pDst);
 	    else
+#ifdef __cpp_exceptions
 			throw std::range_error("illegal utf8");
+#else
+			fast_terminate();
+#endif
 	}
     }
     return (pDst-std::to_address(p_dst))+p_dst;

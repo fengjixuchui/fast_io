@@ -101,9 +101,16 @@ inline constexpr T mul_shift(T m, std::array<T,2> const& mul, std::size_t j)
 	return low((mul_extend(m,mul.back())+high(mul_extend(m,mul.front())))>>(j-muldiff));
 }
 
-template<typename T>
-requires (std::same_as<std::uint64_t,T>||std::same_as<fast_io::uint128_t,T>)
-inline constexpr std::array<T,3> mul_shift_all(T m, std::array<T,2> const& mul,std::size_t j,std::uint32_t mmshift)
+template<std::unsigned_integral T,std::size_t muldiff=sizeof(T)*8>
+requires std::same_as<T,std::uint32_t>
+inline constexpr T mul_shift(T m, std::uint64_t mul, std::size_t j)
+{
+	return (static_cast<std::uint64_t>(m)*mul)>>(j-muldiff);
+}
+
+template<typename T,typename P>
+requires (std::same_as<std::uint32_t,T>||std::same_as<std::uint64_t,T>||std::same_as<fast_io::uint128_t,T>)
+inline constexpr std::array<T,3> mul_shift_all(T m, P& mul,std::size_t j,std::uint32_t mmshift)
 {
 	auto const m4(m<<2);
 	return {mul_shift(m4,mul,j),mul_shift(m4+2,mul,j),mul_shift(m4-1-mmshift,mul,j)};
@@ -170,8 +177,8 @@ inline constexpr Iter output_exp(T exp,Iter result)
 	return my_copy_n(jiaendu::static_tables<char_type>::table2[unsigned_exp].data(),2,result);
 }
 
-template<std::size_t precision,bool scientific = false,bool uppercase_e=false,std::random_access_iterator Iter,std::floating_point F>
-inline constexpr auto output_fixed(Iter result, F d)
+template<char32_t dec,bool scientific = false,bool uppercase_e=false,std::random_access_iterator Iter,std::floating_point F>
+inline constexpr auto output_fixed(Iter result, F d,std::size_t precision)
 {
 	using floating_trait = floating_traits<F>;
 	using mantissa_type = typename floating_trait::mantissa_type;
@@ -196,9 +203,9 @@ inline constexpr auto output_fixed(Iter result, F d)
 		}
 		*result=0x30;
 		++result;
-		if constexpr(precision!=0)
+		if (precision!=0)
 		{
-			*result=0x2E;
+			*result=dec;
 			++result;
 			result=my_fill_n(result,precision,0x30);
 			if constexpr(scientific)
@@ -220,7 +227,7 @@ inline constexpr auto output_fixed(Iter result, F d)
 	bool const negative_r2_e(r2.e<0);
 	if constexpr(scientific)
 	{
-		constexpr std::size_t scientific_precision(precision+1);
+		std::size_t const scientific_precision(precision+1);
 		exponent_type digits(0),printed_digits(0),available_digits(0);
 		signed_exponent_type exp(0);
 		if(-52<=r2.e)
@@ -233,7 +240,7 @@ inline constexpr auto output_fixed(Iter result, F d)
 				digits=mul_shift_mod_1e9(r2.m<<8,fixed_pow10<>::split[idx_offset+i],p10bitsmr2e);
 				if(printed_digits)
 				{
-					if constexpr(precision<9)
+					if (precision<9)
 					{
 						available_digits=9;
 						break;
@@ -243,7 +250,7 @@ inline constexpr auto output_fixed(Iter result, F d)
 						available_digits=9;
 						break;
 					}
-					my_fill(result,output_base_number_impl<10,false>(result+9,digits),0x30);
+					my_fill(result,output_base_number_impl<10,false,false,dec>(result+9,digits),0x30);
 					result+=9;
 					printed_digits+=9;
 				}
@@ -253,8 +260,8 @@ inline constexpr auto output_fixed(Iter result, F d)
 					exp = static_cast<signed_exponent_type>(i*9 + available_digits - 1);
 					if(scientific_precision < available_digits)
 						break;
-					if constexpr (precision!=0)
-						output_base_number_impl<10,false,true>(result+=available_digits+1,digits);
+					if (precision!=0)
+						output_base_number_impl<10,false,true,dec>(result+=available_digits+1,digits);
 					else
 					{
 						*result=static_cast<char_type>(0x30+digits);
@@ -279,7 +286,7 @@ inline constexpr auto output_fixed(Iter result, F d)
 				digits=(idxp1<=p)?0:mul_shift_mod_1e9(r2.m<<8,fixed_pow10<>::split_2[p],j);
 				if(printed_digits)
 				{
-					if constexpr(precision<9)
+					if (precision<9)
 					{
 						available_digits=9;
 						break;
@@ -289,7 +296,7 @@ inline constexpr auto output_fixed(Iter result, F d)
 						available_digits=9;
 						break;
 					}
-					my_fill(result,output_base_number_impl<10,false>(result+9,digits),0x30);
+					my_fill(result,output_base_number_impl<10,false,false,dec>(result+9,digits),0x30);
 					result+=9;
 					printed_digits+=9;
 				}
@@ -299,8 +306,8 @@ inline constexpr auto output_fixed(Iter result, F d)
 					exp = static_cast<signed_exponent_type> (available_digits -(i + 1) * 9 - 1);
 					if (scientific_precision<available_digits)
 						break;
-					if constexpr (precision!=0)
-						output_base_number_impl<10,false,true>(result+=available_digits+1,digits);
+					if (precision!=0)
+						output_base_number_impl<10,false,true,dec>(result+=available_digits+1,digits);
 					else
 					{
 						*result=static_cast<char_type>(0x30+digits);
@@ -337,7 +344,7 @@ inline constexpr auto output_fixed(Iter result, F d)
 		{
 			if(digits)
 			{
-				my_fill(result,output_base_number_impl<10,false>(result+maximum,digits),0x30);
+				my_fill(result,output_base_number_impl<10,false,false,dec>(result+maximum,digits),0x30);
 				result+=maximum;
 			}
 			else
@@ -345,9 +352,9 @@ inline constexpr auto output_fixed(Iter result, F d)
 		}
 		else
 		{
-			if constexpr(precision!=0)
+			if (precision!=0)
 			{
-				my_fill(result,output_base_number_impl<10,false,true>(result+maximum+1,digits),0x30);
+				my_fill(result,output_base_number_impl<10,false,true,dec>(result+maximum+1,digits),0x30);
 				result+=maximum+1;
 			}
 			else
@@ -368,7 +375,7 @@ inline constexpr auto output_fixed(Iter result, F d)
 					++exp;
 					break;
 				}
-				if constexpr(precision==0)
+				if (precision==0)
 				{
 					if (c == 0x39)
 					{
@@ -386,7 +393,7 @@ inline constexpr auto output_fixed(Iter result, F d)
 				}
 				else
 				{
-					if (c == 0x2E)
+					if (c == dec)
 						continue;
 					else if (c == 0x39)
 					{
@@ -423,12 +430,12 @@ inline constexpr auto output_fixed(Iter result, F d)
 				exponent_type digits(mul_shift_mod_1e9(r2.m<<8,fixed_pow10<>::split[fixed_pow10<>::offset[idx]+i],p10bitsmr2e));
 				if(nonzero)
 				{
-					my_fill(result,output_base_number_impl<10,false>(result+9,digits),0x30);
+					my_fill(result,output_base_number_impl<10,false,false,dec>(result+9,digits),0x30);
 					result+=9;
 				}
 				else if(digits)
 				{
-					output_base_number_impl<10,false>(result+=chars_len<10,true>(digits),digits);
+					output_base_number_impl<10,false,false,dec>(result+=chars_len<10,true>(digits),digits);
 					nonzero = true;
 				}
 			}
@@ -438,16 +445,16 @@ inline constexpr auto output_fixed(Iter result, F d)
 			*result=0x30;
 			++result;
 		}
-		if constexpr(precision!=0)
+		if (precision!=0)
 		{
-			*result=0x2E;
+			*result=dec;
 			++result;
 		}
 		if(negative_r2_e)
 		{
 			auto abs_e2(-r2.e);
 			exponent_type const idx(static_cast<exponent_type>(abs_e2)>>4);
-			constexpr std::size_t blocks(precision/9+1);
+			std::size_t const blocks(precision/9+1);
 			std::size_t round_up(0);
 			std::size_t i(0);
 			auto const mb2_idx(fixed_pow10<>::min_block_2[idx]);
@@ -471,7 +478,7 @@ inline constexpr auto output_fixed(Iter result, F d)
 				}
 				if(i+1<blocks)
 				{
-					my_fill(result,output_base_number_impl<10,false>(result+9,digits),0x30);
+					my_fill(result,output_base_number_impl<10,false,false,dec>(result+9,digits),0x30);
 					result+=9;
 				}
 				else
@@ -495,7 +502,7 @@ inline constexpr auto output_fixed(Iter result, F d)
 					}
 					if(maximum)
 					{
-						my_fill(result,output_base_number_impl<10,false>(result+maximum,digits),0x30);
+						my_fill(result,output_base_number_impl<10,false,false,dec>(result+maximum,digits),0x30);
 						result+=maximum;
 					}
 					break;
@@ -504,7 +511,7 @@ inline constexpr auto output_fixed(Iter result, F d)
 			if(round_up)
 			{
 				std::size_t round_index(result-start);
-				if constexpr(precision!=0)
+				if (precision!=0)
 				{
 					std::size_t dot_index(0);
 					while(round_index--)
@@ -516,12 +523,12 @@ inline constexpr auto output_fixed(Iter result, F d)
 							if(dot_index)
 							{
 								start[dot_index] = 0x30;
-								start[dot_index+1] = 0x2E;
+								start[dot_index+1] = dec;
 							}
 							*result=0x30;
 							return ++result;
 						}
-						if (c == 0x2E)
+						if (c == dec)
 						{
 							dot_index = round_index;
 							continue;
@@ -540,7 +547,7 @@ inline constexpr auto output_fixed(Iter result, F d)
 					if(dot_index)
 					{
 						start[dot_index] = 0x30;
-						start[dot_index+1] = 0x2E;
+						start[dot_index+1] = dec;
 					}
 				}
 				else

@@ -37,8 +37,8 @@ using u8inative_file = input_file_wrapper<u8native_file>;
 using u8onative_file = output_file_wrapper<u8native_file>;
 using u8ionative_file = io_file_wrapper<u8native_file>;
 
-using u8sync_file = basic_sync<basic_file_wrapper<native_file,open_mode::app|open_mode::binary>,basic_ostring<std::u8string>>;
-using u8fsync_file = basic_fsync<basic_file_wrapper<native_file,open_mode::app|open_mode::binary>,basic_ostring<std::u8string>>;
+using u8sync_file = basic_sync<basic_file_wrapper<u8native_file,open_mode::app|open_mode::binary>,basic_ostring<std::u8string>>;
+using u8fsync_file = basic_fsync<basic_file_wrapper<u8native_file,open_mode::app|open_mode::binary>,basic_ostring<std::u8string>>;
 
 using u8sync_file_mutex = basic_iomutex<u8sync_file>;
 using u8fsync_file_mutex = basic_iomutex<u8fsync_file>;
@@ -53,4 +53,25 @@ using u8iobuf_file_mutex = basic_iomutex<u8iobuf_file>;
 
 using u8dynamic_buf = basic_iobuf<u8dynamic_stream>;
 
+using wpipe = io_wrapper<wnative_pipe>;
+
+using winative_file = input_file_wrapper<wnative_file>;
+using wonative_file = output_file_wrapper<wnative_file>;
+using wionative_file = io_file_wrapper<wnative_file>;
+
+using wsync_file = basic_sync<basic_file_wrapper<wnative_file,open_mode::app|open_mode::binary>,basic_ostring<std::wstring>>;
+using wfsync_file = basic_fsync<basic_file_wrapper<wnative_file,open_mode::app|open_mode::binary>,basic_ostring<std::wstring>>;
+
+using wsync_file_mutex = basic_iomutex<wsync_file>;
+using wfsync_file_mutex = basic_iomutex<wfsync_file>;
+
+using wibuf_file = basic_ibuf<winative_file>;
+using wobuf_file = basic_obuf<wonative_file>;
+using wiobuf_file = basic_iobuf<wionative_file>;
+
+using wibuf_file_mutex = basic_iomutex<wibuf_file>;
+using wobuf_file_mutex = basic_iomutex<wobuf_file>;
+using wiobuf_file_mutex = basic_iomutex<wiobuf_file>;
+
+using wdynamic_buf = basic_iobuf<wdynamic_stream>;
 }

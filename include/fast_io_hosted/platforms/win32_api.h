@@ -128,7 +128,13 @@ process_information* lpProcessInformation);
 int __stdcall GetHandleInformation(void*,std::uint32_t*);
 int __stdcall SetHandleInformation(void*,std::uint32_t,std::uint32_t);
 int __stdcall GetFileSizeEx(void*,std::uint64_t*);
-
+/*
+struct win32_memory_range_entry
+{
+void*  VirtualAddress;
+std::size_t NumberOfBytes;
+};
+int __stdcall PrefetchVirtualMemory(void*,std::size_t,win32_memory_range_entry*,std::uint32_t flags);*/
 }
 
 

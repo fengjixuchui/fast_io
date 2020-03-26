@@ -7,7 +7,7 @@ namespace stream_view_details
 {
 
 template<typename T>
-class streambuf_pub:public T
+struct streambuf_pub:public T
 {
 public:
 	using T::showmanyc;
@@ -23,10 +23,6 @@ public:
 	using T::overflow;
 	using T::pbump;
 	using T::setp;
-
-	template<typename... Args>
-	requires std::constructible_from<T,Args...>
-	streambuf_pub(Args&& ...args):T(std::forward<Args>(args)...){}
 };
 
 }
@@ -40,7 +36,7 @@ public:
 	using traits_type = typename T::traits_type;
 //be aware of type confusion security vulnerability
 	streambuf_view(T* bufpointer):
-		rdb(static_cast<stream_view_details::streambuf_pub<T>*>(bufpointer)){}
+		rdb(bit_cast<stream_view_details::streambuf_pub<T>*>(bufpointer)){}
 	inline T* rdbuf() const
 	{
 		return rdb;
@@ -101,9 +97,9 @@ inline void write(streambuf_view<T>& t,Iter begin,Iter end)
 }
 
 template<typename T>
-inline void flush(streambuf_view<T>& t)
+inline const void flush(streambuf_view<T>& t)
 {
-	t.native_handle()->overflow();
+//	t.native_handle()->overflow();
 }
 
 template<typename T>
@@ -126,18 +122,5 @@ inline void orelease(streambuf_view<T>& t,std::size_t size)
 template<stream_view_details::streambuf_concept_impl streambf>
 streambuf_view(streambf*) -> streambuf_view<streambf>;
 
-template<typename T>
-inline auto oreserve(stream_view<T>& t,std::size_t size) -> typename T::char_type*
-{
-	streambuf_view osv(t.native_handle().rdbuf());
-	return oreserve(osv,size);
-}
-
-template<typename T>
-inline void orelease(stream_view<T>& t,std::size_t size)
-{
-	streambuf_view osv(t.native_handle().rdbuf());
-	orelease(osv,size);
-}
 
 }

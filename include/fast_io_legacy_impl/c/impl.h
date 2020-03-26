@@ -5,6 +5,12 @@
 namespace fast_io
 {
 
+struct c_file_cookie_t
+{
+explicit constexpr c_file_cookie_t()=default;
+};
+inline constexpr c_file_cookie_t c_file_cookie{};
+
 namespace details
 {
 template<open_mode om>
@@ -12,6 +18,7 @@ struct c_open_mode
 {
 inline static constexpr std::string_view value=to_c_mode(om);
 };
+
 }
 template<std::integral ch_type>
 class basic_c_io_observer_unlocked
@@ -48,7 +55,7 @@ public:
 #else
 			fast_terminate();
 #endif
-		return static_cast<basic_posix_io_observer<char_type>>(fd);
+		return basic_posix_io_observer<char_type>{fd};
 	}
 #if defined(__WINNT__) || defined(_MSC_VER)
 	explicit operator basic_win32_io_observer<char_type>() const
@@ -70,24 +77,8 @@ inline auto redirect_handle(basic_c_io_observer_unlocked<ch_type>& h)
 
 using c_io_observer_unlocked = basic_c_io_observer_unlocked<char>;
 
-/*
-#ifdef _MSC_VER
-
-struct _iobuf
-{
-char *_ptr;
-int _cnt;
-char *_base;
-int _flag;
-int _file;
-int _charbuf;
-int _bufsiz;
-char *_tmpfname;
-};
-#endif
-*/
-template<std::contiguous_iterator Iter>
-inline Iter read(c_io_observer_unlocked& cfhd,Iter begin,Iter end)
+template<std::integral T,std::contiguous_iterator Iter>
+inline Iter read(basic_c_io_observer_unlocked<T> cfhd,Iter begin,Iter end)
 {
 	std::size_t const count(end-begin);
 	std::size_t const r(
@@ -109,8 +100,8 @@ inline Iter read(c_io_observer_unlocked& cfhd,Iter begin,Iter end)
 #endif
 }
 
-template<std::contiguous_iterator Iter>
-inline void write(c_io_observer_unlocked& cfhd,Iter begin,Iter end)
+template<std::integral T,std::contiguous_iterator Iter>
+inline void write(basic_c_io_observer_unlocked<T> cfhd,Iter begin,Iter end)
 {
 	std::size_t const count(end-begin);
 	if(
@@ -128,65 +119,9 @@ inline void write(c_io_observer_unlocked& cfhd,Iter begin,Iter end)
 		fast_terminate();
 #endif
 }
-/*
-template<bool err=false>
-inline auto get(c_io_observer_unlocked& cfhd)
-{
-	auto ch(
-#ifdef _MSC_VER
-	_fgetc_nolock
-#elif defined(_POSIX_SOURCE)
-	fgetc_unlocked
-#else
-	fgetc
-#endif
-	(cfhd.native_handle()));
-	if(ch==EOF)
-	{
-		if(
-#ifdef _POSIX_SOURCE
-	feof_unlocked
-#else
-	feof
-#endif
-(cfhd.native_handle()))
-		{
-			if constexpr(err)
-				return std::pair<typename c_io_observer_unlocked::char_type,bool>{0,true};
-			else
-				throw eof();
-		}
-		throw std::system_error(errno,std::system_category());
-	}
-	if constexpr(err)
-		return std::pair<typename c_io_observer_unlocked::char_type,bool>
-		{
-			std::char_traits<typename c_io_observer_unlocked::char_type>::to_char_type(ch),false
-		};
-	else
-		return std::char_traits<typename c_io_observer_unlocked::char_type>::to_char_type(ch);
-}
-*/
-inline void put(c_io_observer_unlocked& cfhd,typename c_io_observer_unlocked::char_type ch)
-{
-	if(
-#if defined(_MSC_VER)
-		_fputc_nolock
-#elif defined(_POSIX_SOURCE)
-		fputc_unlocked
-#else
-		fputc
-#endif
-	(static_cast<char>(ch),cfhd.native_handle())==EOF)
 
-#ifdef __cpp_exceptions
-		throw std::system_error(errno,std::system_category());
-#else
-		fast_terminate();
-#endif
-}
-
-inline void flush(c_io_observer_unlocked& cfhd)
+template<std::integral T>
+inline void flush(basic_c_io_observer_unlocked<T>& cfhd)
 {
 	if(
 #if defined(_MSC_VER)
@@ -204,8 +139,8 @@ inline void flush(c_io_observer_unlocked& cfhd)
 #endif
 }
 
-template<typename T,std::integral U>
-inline void seek(c_io_observer_unlocked& cfhd,seek_type_t<T>,U i,seekdir s=seekdir::beg)
+template<std::integral ch_type,typename T,std::integral U>
+inline auto seek(basic_c_io_observer_unlocked<ch_type> cfhd,seek_type_t<T>,U i,seekdir s=seekdir::beg)
 {
 	if(
 #if defined(__WINNT__) || defined(_MSC_VER)
@@ -217,50 +152,21 @@ inline void seek(c_io_observer_unlocked& cfhd,seek_type_t<T>,U i,seekdir s=seekd
 #endif
 	(cfhd.native_handle(),seek_precondition<long,T,char>(i),static_cast<int>(s)))
 		throw std::system_error(errno,std::system_category()); 
-}
-
-template<std::integral U>
-inline void seek(c_io_observer_unlocked& cfhd,U i,seekdir s=seekdir::beg)
-{
-	seek(cfhd,seek_type<char>,i,s);
-}
-
-
-
-//Exploiting the library internal implementation for performance since the stdio.h performance is SO TERRIBLE
-#ifdef __MINGW32__
-//cannot convert to char8_t due to strict aliasing rule violation
-inline char* oreserve(c_io_observer_unlocked& cfhd,std::size_t n)
-{
-	auto& h(*cfhd.native_handle());
-	if((h._cnt-=n)<=0) [[unlikely]]
-	{
-		h._cnt+=n;
-		return nullptr;
-	}
-	return h._ptr+=n;
-}
-
-inline void orelease(c_io_observer_unlocked& cfhd,std::size_t n)
-{
-	auto& h(*(_iobuf*)cfhd.native_handle());
-	h._cnt+=n;
-	h._ptr-=n;
-}
-#elif defined(__GNU_LIBRARY__)
-inline char* oreserve(c_io_observer_unlocked& cfhd,std::size_t n)
-{
-	auto& h(*cfhd.native_handle());
-	if(h._IO_write_end<=h._IO_write_ptr+n)
-		return nullptr;
-	return h._IO_write_ptr+=n;
-}
-
-inline void orelease(c_io_observer_unlocked& cfhd,std::size_t n)
-{
-	cfhd.native_handle()->_IO_write_ptr-=n;
-}
+	auto val(std::ftell(cfhd.native_handle()));
+	if(val<0)
+#ifdef __cpp_exceptions
+		throw std::system_error(errno,std::system_category());
+#else
+		fast_terminate();
 #endif
+	return val;
+}
+
+template<std::integral ch_type,std::integral U>
+inline auto seek(basic_c_io_observer_unlocked<ch_type> cfhd,U i,seekdir s=seekdir::beg)
+{
+	return seek(cfhd,seek_type<char>,i,s);
+}
 
 class c_io_lock_guard;
 
@@ -299,7 +205,7 @@ public:
 #else
 			fast_terminate();
 #endif
-		return static_cast<basic_posix_io_observer<char_type>>(fd);
+		return basic_posix_io_observer<char_type>{fd};
 	}
 #if defined(__WINNT__) || defined(_MSC_VER)
 	explicit operator basic_win32_io_observer<char_type>() const
@@ -309,16 +215,15 @@ public:
 #endif
 };
 
-using c_io_observer=basic_c_io_observer<char>;
-
-inline auto mutex(c_io_observer& h)
+template<std::integral T>
+inline auto mutex(basic_c_io_observer<T>& h)
 {
 	return h.native_handle();
 }
-
-inline auto unlocked_handle(c_io_observer& h)
+template<std::integral T>
+inline basic_c_io_observer_unlocked<T> unlocked_handle(basic_c_io_observer<T>& h)
 {
-	return c_io_observer_unlocked{h.native_handle()};
+	return {h.native_handle()};
 }
 
 class c_io_lock_guard
@@ -346,8 +251,8 @@ public:
 };
 
 
-template<std::contiguous_iterator Iter>
-inline Iter read(c_io_observer& cfhd,Iter begin,Iter end)
+template<std::integral T,std::contiguous_iterator Iter>
+inline Iter read(basic_c_io_observer<T>& cfhd,Iter begin,Iter end)
 {
 	std::size_t const count(end-begin);
 	std::size_t const r(std::fread(std::to_address(begin),sizeof(*begin),count,cfhd.native_handle()));
@@ -360,8 +265,8 @@ inline Iter read(c_io_observer& cfhd,Iter begin,Iter end)
 #endif
 }
 
-template<std::contiguous_iterator Iter>
-inline void write(c_io_observer& cfhd,Iter begin,Iter end)
+template<std::integral T,std::contiguous_iterator Iter>
+inline void write(basic_c_io_observer<T>& cfhd,Iter begin,Iter end)
 {
 	std::size_t const count(end-begin);
 	if(std::fwrite(std::to_address(begin),sizeof(*begin),count,cfhd.native_handle())<count)
@@ -372,18 +277,8 @@ inline void write(c_io_observer& cfhd,Iter begin,Iter end)
 #endif
 }
 
-
-inline void put(c_io_observer& cfhd,typename c_io_observer::char_type ch)
-{
-	if(std::fputc(ch,cfhd.native_handle())==EOF)
-#ifdef __cpp_exceptions
-		throw std::system_error(errno,std::system_category());
-#else
-		fast_terminate();
-#endif
-}
-
-inline void flush(c_io_observer& cfhd)
+template<std::integral T>
+inline void flush(basic_c_io_observer<T>& cfhd)
 {
 	if(std::fflush(cfhd.native_handle()))
 #ifdef __cpp_exceptions
@@ -393,10 +288,10 @@ inline void flush(c_io_observer& cfhd)
 #endif
 }
 
-template<typename T,std::integral U>
-inline auto seek(c_io_observer& cfhd,seek_type_t<T>,U i,seekdir s=seekdir::beg)
+template<typename P,typename T,std::integral U>
+inline auto seek(basic_c_io_observer<P>& cfhd,seek_type_t<T>,U i,seekdir s=seekdir::beg)
 {
-	if(std::fseek(cfhd.native_handle(),seek_precondition<long,T,typename c_io_observer::char_type>(i),static_cast<int>(s)))
+	if(std::fseek(cfhd.native_handle(),seek_precondition<long,T,typename basic_c_io_observer<P>::char_type>(i),static_cast<int>(s)))
 #ifdef __cpp_exceptions
 		throw std::system_error(errno,std::system_category());
 #else
@@ -412,10 +307,10 @@ inline auto seek(c_io_observer& cfhd,seek_type_t<T>,U i,seekdir s=seekdir::beg)
 	return val;
 }
 
-template<std::integral U>
-inline auto seek(c_io_observer& cfhd,U i,seekdir s=seekdir::beg)
+template<typename P,std::integral U>
+inline auto seek(basic_c_io_observer<P>& cfhd,U i,seekdir s=seekdir::beg)
 {
-	return seek(cfhd,seek_type<typename c_io_observer::char_type>,i,s);
+	return seek(cfhd,seek_type<typename basic_c_io_observer<P>::char_type>,i,s);
 }
 namespace details
 {
@@ -456,10 +351,7 @@ public:
 };
 
 
-template<typename T,
-	bool buffer=true,
-	bool use_fwide=false>
-requires (!use_fwide||std::same_as<typename T::native_handle,wchar_t>)
+template<typename T>
 class basic_c_file_impl:public T
 {
 public:
@@ -500,27 +392,23 @@ public:
 			fast_terminate();
 #endif
 		posix_handle.detach();
-
-		if(native_handle()==nullptr)
-#ifdef __cpp_exceptions
-			throw std::system_error(errno,std::system_category());
-#else
-			fast_terminate();
-#endif
-		if constexpr(use_fwide)
+		if constexpr(std::same_as<wchar_t,typename T::char_type>)
 		{
-			if(fwide(this->native_handle(),1)<=0)
-#ifdef __cpp_exceptions
+//			fwide(this->native_handle(),1);
+		}
+		else if constexpr(!std::same_as<char,typename T::char_type>)
+		{
+		//close buffer for non char and wchar_t types like libstdc++ does. All these hacks just violate strict-aliasing rule
+			if(setvbuf(this->native_handle(),nullptr,_IONBF,0))
 			{
+#ifdef __cpp_exceptions
 				std::fclose(this->native_handle());
-				throw std::system_error(std::make_error_code(std::errc::io_error));
-			}
+				throw std::system_error(errno,std::generic_category());
 #else
 				fast_terminate();
 #endif
+			}
 		}
-		if constexpr(!buffer)
-			std::setbuf(native_handle(),nullptr);
 	}
 
 	basic_c_file_impl(basic_posix_io_handle<char_type>&& posix_handle,open_mode om):
@@ -560,6 +448,221 @@ public:
 	basic_c_file_impl(std::string_view file,std::string_view mode,Args&& ...args):
 		basic_c_file_impl(basic_posix_file<typename T::char_type>(file,mode,std::forward<Args>(args)...),mode)
 	{}
+	template<stream stm,typename... Args>
+	requires (std::same_as<typename T::char_type,char>&&std::same_as<typename stm::char_type,char>)
+	basic_c_file_impl(c_file_cookie_t,std::string_view mode,std::in_place_type_t<stm>,Args&& ...args)
+#if defined(_GNU_SOURCE)
+//musl libc also supports this I think
+//https://gitlab.com/bminor/musl/-/blob/061843340fbf2493bb615e20e66f60c5d1ef0455/src/stdio/fopencookie.c
+	{
+		cookie_io_functions_t io_funcs{.close=[](void* cookie) noexcept->int
+		{
+			delete bit_cast<stm*>(cookie);
+			return 0;
+		}};
+		if constexpr(input_stream<stm>)
+			io_funcs.read=[](void* cookie,char* buf,std::size_t size) noexcept->std::ptrdiff_t
+			{
+				try
+				{
+					return read(*bit_cast<stm*>(cookie),buf,buf+size)-buf;
+				}
+				catch(std::system_error const& err)
+				{
+					if(err.code().category()==std::generic_category())
+						errno=err.code().value();
+					else
+						errno=EIO;
+					return -1;
+				}
+				catch(...)
+				{
+					errno=EIO;
+					return -1;
+				}
+			};
+		if constexpr(output_stream<stm>)
+		{
+			io_funcs.write=[](void* cookie,char const* buf,std::size_t size) noexcept->std::ptrdiff_t
+			{
+				try
+				{
+					if constexpr(std::same_as<decltype(write(*bit_cast<stm*>(cookie),buf,buf+size)),void>)
+					{
+						write(*bit_cast<stm*>(cookie),buf,buf+size);
+						return static_cast<std::ptrdiff_t>(size);
+					}
+					else
+						return write(*bit_cast<stm*>(cookie),buf,buf+size)-buf;
+				}
+				catch(std::system_error const& err)
+				{
+					if(err.code().category()==std::generic_category())
+						errno=err.code().value();
+					else
+						errno=EIO;
+					return -1;
+				}
+				catch(...)
+				{
+					errno=EIO;
+					return -1;
+				}
+			};
+		}
+		if constexpr(random_access_stream<stm>)
+		{
+			io_funcs.seek=[](void *cookie, off64_t *offset, int whence) noexcept->int
+			{
+				try
+				{
+					*offset=seek(*bit_cast<stm*>(cookie),*offset,static_cast<fast_io::seekdir>(whence));
+					return 0;
+				}
+				catch(std::system_error const& err)
+				{
+					if(err.code().category()==std::generic_category())
+						errno=err.code().value();
+					else
+						errno=EIO;
+					return -1;
+				}
+				catch(...)
+				{
+					errno=EIO;
+					return -1;
+				}
+			};
+		}
+		std::unique_ptr<stm> up{std::make_unique<stm>(std::forward<Args>(args)...)};
+		if(!(this->native_handle()=fopencookie(up.get(),mode.data(),io_funcs)))[[unlikely]]
+			throw std::system_error(errno,std::generic_category());
+		up.release();
+	}
+/*
+#elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__)) || defined (__BIONIC__)
+Todo
+	{
+
+	}
+*/
+#else
+//not supported platform like windows MSVCRT. We throw std::errc::operation_not_supported
+
+	{
+#ifdef __cpp_exceptions
+		throw std::system_error(std::make_error_code(std::errc::operation_not_supported));
+#else
+		fast_terminate();
+#endif
+	}
+#endif
+
+
+	template<stream stm>
+	requires (std::same_as<typename T::char_type,char>&&std::same_as<typename stm::char_type,char>)
+	basic_c_file_impl(c_file_cookie_t,std::string_view mode,std::reference_wrapper<stm> reff)
+#if defined(_GNU_SOURCE)
+//musl libc also supports this I think
+//https://gitlab.com/bminor/musl/-/blob/061843340fbf2493bb615e20e66f60c5d1ef0455/src/stdio/fopencookie.c
+	{
+		cookie_io_functions_t io_funcs{};
+		if constexpr(input_stream<stm>)
+			io_funcs.read=[](void* cookie,char* buf,std::size_t size) noexcept->std::ptrdiff_t
+			{
+				try
+				{
+					return read(*bit_cast<stm*>(cookie),buf,buf+size)-buf;
+				}
+				catch(std::system_error const& err)
+				{
+					if(err.code().category()==std::generic_category())
+						errno=err.code().value();
+					else
+						errno=EIO;
+					return -1;
+				}
+				catch(...)
+				{
+					errno=EIO;
+					return -1;
+				}
+			};
+		if constexpr(output_stream<stm>)
+		{
+			io_funcs.write=[](void* cookie,char const* buf,std::size_t size) noexcept->std::ptrdiff_t
+			{
+				try
+				{
+					if constexpr(std::same_as<decltype(write(*bit_cast<stm*>(cookie),buf,buf+size)),void>)
+					{
+						write(*bit_cast<stm*>(cookie),buf,buf+size);
+						return static_cast<std::ptrdiff_t>(size);
+					}
+					else
+						return write(*bit_cast<stm*>(cookie),buf,buf+size)-buf;
+				}
+				catch(std::system_error const& err)
+				{
+					if(err.code().category()==std::generic_category())
+						errno=err.code().value();
+					else
+						errno=EIO;
+					return -1;
+				}
+				catch(...)
+				{
+					errno=EIO;
+					return -1;
+				}
+			};
+		}
+		if constexpr(random_access_stream<stm>)
+		{
+			io_funcs.seek=[](void *cookie, off64_t *offset, int whence) noexcept->int
+			{
+				try
+				{
+					*offset=seek(*bit_cast<stm*>(cookie),*offset,static_cast<fast_io::seekdir>(whence));
+					return 0;
+				}
+				catch(std::system_error const& err)
+				{
+					if(err.code().category()==std::generic_category())
+						errno=err.code().value();
+					else
+						errno=EIO;
+					return -1;
+				}
+				catch(...)
+				{
+					errno=EIO;
+					return -1;
+				}
+			};
+		}
+		if(!(this->native_handle()=fopencookie(std::addressof(reff.get()),mode.data(),io_funcs)))[[unlikely]]
+			throw std::system_error(errno,std::generic_category());
+	}
+/*
+#elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__)) || defined (__BIONIC__)
+Todo
+	{
+
+	}
+*/
+#else
+//not supported platform like windows MSVCRT. We throw std::errc::operation_not_supported
+
+	{
+#ifdef __cpp_exceptions
+		throw std::system_error(std::make_error_code(std::errc::operation_not_supported));
+#else
+		fast_terminate();
+#endif
+	}
+#endif
+
 	basic_c_file_impl(basic_c_file_impl const&)=delete;
 	basic_c_file_impl& operator=(basic_c_file_impl const&)=delete;
 	constexpr basic_c_file_impl(basic_c_file_impl&& b) noexcept :T(std::move(b)){}
@@ -605,10 +708,19 @@ inline auto redirect_handle(basic_c_io_observer<ch_type>& h)
 #endif
 }
 
+using c_io_observer_unlocked=basic_c_io_observer_unlocked<char>;
+using c_io_observer=basic_c_io_observer<char>;
 using c_io_handle_unlocked = basic_c_io_handle_unlocked<char>;
 using c_io_handle = basic_c_io_handle<char>;
 using c_file = basic_c_file<char>;
-using c_file_unlocked = basic_c_file<char>;
+using c_file_unlocked = basic_c_file_unlocked<char>;
+
+using wc_io_observer_unlocked=basic_c_io_observer_unlocked<wchar_t>;
+using wc_io_observer=basic_c_io_observer<wchar_t>;
+using wc_io_handle_unlocked = basic_c_io_handle_unlocked<wchar_t>;
+using wc_io_handle = basic_c_io_handle<wchar_t>;
+using wc_file = basic_c_file<wchar_t>;
+using wc_file_unlocked = basic_c_file_unlocked<wchar_t>;
 
 #ifdef __linux__
 template<std::integral ch_type>
@@ -624,3 +736,12 @@ inline auto zero_copy_out_handle(basic_c_io_observer_unlocked<ch_type>& h)
 #endif
 
 }
+#ifdef _MSC_VER
+#include"universal_crt.h"
+#elif defined(__WINNT__)
+#include"msvcrt.h"
+#elif defined(__GLIBC__)
+#include"glibc.h"
+#else
+#include"general.h"
+#endif

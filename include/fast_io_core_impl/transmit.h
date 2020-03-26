@@ -13,13 +13,13 @@ inline constexpr std::uintmax_t bufferred_transmit_impl(output& outp,input& inp)
 	{
 		do
 		{
-			auto b(begin(inp));
-			auto e(end(inp));
+			auto b{ibuffer_curr(inp)};
+			auto e{std::to_address(ibuffer_end(inp))};
 			std::size_t transmitted_this_round(static_cast<std::size_t>(e-b));
 			write(outp,b,e);
 			transmitted_bytes+=transmitted_this_round;
 		}
-		while(iflush(inp));
+		while(underflow(inp));
 		return transmitted_bytes;
 	}
 	else

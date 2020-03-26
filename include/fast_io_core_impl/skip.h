@@ -7,7 +7,7 @@ namespace details
 struct is_none_space
 {
 template<std::integral T>
-inline constexpr bool operator()(T ch)
+inline constexpr bool operator()(T ch) const
 {
 	std::make_unsigned_t<T> e(ch);
 	return 0x4<(e-0x9)&e!=0x20;
@@ -16,203 +16,108 @@ inline constexpr bool operator()(T ch)
 
 }
 
-template<buffer_input_stream input,typename UnaryPredicate>
+template<character_input_stream input,typename UnaryPredicate>
 [[nodiscard]] inline constexpr bool skip_until(input& in,UnaryPredicate pred)
 {
-	for(;;)
+	if constexpr(buffer_input_stream<input>)
 	{
-		for(auto i(begin(in)),e(end(in));i!=e;++i)
-			if(pred(*i))
-			{
-				in+=i-begin(in);
-				return true;
-			}
-		if(!iflush(in))
-			return false;
+		for(;;)
+		{
+//			decltype(auto) gbegin{ibuffer_curr(in)};
+			auto b{ibuffer_curr(in)};
+			auto e{ibuffer_end(in)};
+			for(;b!=e&&!pred(*b);++b);
+			ibuffer_set_curr(in,b);
+			if(b==e&&!underflow(in))[[unlikely]]
+				return false;
+			return true;
+		}
+	}
+	else
+	{
+		auto ig{igenerator(in)};
+		auto b{begin(ig)};
+		auto e{end(ig)};
+		for(;b!=e&&!pred(*b);++b);
+		return b!=e;
 	}
 }
 
-template<buffer_input_stream input>
+template<character_input_stream input>
+inline constexpr std::size_t discard(input& in)
+{
+	if constexpr(contiguous_input_stream<input>)
+	{
+		if(iempty(in))[[unlikely]]
+			return 0;
+		iremove_prefix(in,1);
+		return 1;
+	}
+	else
+	{
+		auto gen(igenerator(in));
+		auto b(begin(gen));
+		auto e(end(gen));
+		if(b==e)[[unlikely]]
+			return 0;
+		++b;
+		return 1;
+	}
+}
+
+
+template<character_input_stream input>
+inline constexpr std::size_t discard(input& in,std::size_t n)
+{
+	if constexpr(contiguous_input_stream<input>)
+	{
+		auto sz{isize(in)};
+		if(sz<n)[[unlikely]]
+			n=sz;
+		iremove_prefix(in,n);
+		return n;
+	}
+	else if constexpr(buffer_input_stream<input>)
+	{
+		std::size_t discarded{};
+		for(;;)
+		{
+			auto b{ibuffer_curr(in)};
+			auto e{ibuffer_end(in)};
+			if(e-b<n)
+			{
+				discarded+=e-b;
+				if(!underflow(in))[[unlikely]]
+					return discarded;
+			}
+			b+=n;
+			discarded+=n;
+			set_ibuffer_curr(in,b);
+		}
+		return discarded;
+	}
+	else
+	{
+		auto gen(igenerator(in));
+		auto b(begin(gen));
+		auto e(end(gen));
+		std::size_t discarded{};
+		for(;b!=e&&discarded!=n;++b)
+			++n;
+		return discarded;
+	}
+}
+
+template<character_input_stream input>
 [[nodiscard]] inline constexpr bool skip_space(input& in)
 {
 	return skip_until(in,details::is_none_space{});
 }
 
-template<std::size_t sign=false,std::uint8_t base=0xA,buffer_input_stream input>
+template<std::size_t sign=false,std::uint8_t base=0xA,character_input_stream input>
 [[nodiscard]] inline constexpr bool skip_none_numerical(input& in)
 {
 	return skip_until(in,details::is_numerical<sign,base>{});
 }
 
-template<std::size_t report_eof=0,buffer_input_stream bip>
-[[nodiscard]] inline constexpr auto front(bip& input)->std::conditional_t<report_eof==1,std::pair<typename bip::char_type,bool>,typename bip::char_type>
-{
-	if(begin(input)==end(input))
-	{
-		if(!iflush(input))
-		{
-			if constexpr(report_eof==1)
-				return {0,false};
-			else if constexpr(report_eof==2)
-				return 0;
-			else
-			{
-#ifdef __cpp_exceptions
-				throw eof();
-#else
-				fast_terminate();
-#endif
-			}
-		}
-	}
-	if constexpr(report_eof==1)
-		return {*begin(input),true};
-	else
-		return *begin(input);
-}
-
-template<std::size_t report_eof=0,buffer_input_stream bip>
-[[nodiscard]] inline constexpr auto get(bip& input)->std::conditional_t<report_eof==1,std::pair<typename bip::char_type,bool>,typename bip::char_type>
-{
-	if(begin(input)==end(input))
-	{
-		if(!iflush(input))
-		{
-			if constexpr(report_eof==1)
-				return {0,false};
-			else if constexpr(report_eof==2)
-				return 0;
-			else
-			{
-#ifdef __cpp_exceptions
-				throw eof();
-#else
-				fast_terminate();
-#endif
-			}
-		}
-	}
-	auto ch(*begin(input));
-	++input;
-	if constexpr(report_eof==1)
-		return {ch,true};
-	else
-		return ch;
-}
-
-template<std::size_t report_eof=0,buffer_input_stream bip>
-[[nodiscard]] inline constexpr auto next(bip& input)->std::conditional_t<report_eof==1,std::pair<typename bip::char_type,bool>,typename bip::char_type>
-{
-	if(begin(++input)==end(input))
-	{
-		if(!iflush(input))
-		{
-			if constexpr(report_eof==1)
-				return {0,false};
-			else if constexpr(report_eof==2)
-				return 0;
-			else
-			{
-#ifdef __cpp_exceptions
-				throw eof();
-#else
-				fast_terminate();
-#endif
-			}
-		}
-	}
-	if constexpr(report_eof==1)
-		return {*begin(input),true};
-	else
-		return *begin(input);
-}
-
-template<std::size_t report_eof=0,buffer_input_stream bip>
-[[nodiscard]] inline constexpr auto front_unsigned(bip& input)
-	->std::conditional_t<report_eof==1,std::pair<std::make_unsigned_t<typename bip::char_type>,bool>,std::make_unsigned_t<typename bip::char_type>>
-{
-	using unsigned_char_type = std::make_unsigned_t<typename bip::char_type>;
-	if(begin(input)==end(input))
-	{
-		if(!iflush(input))
-		{
-			if constexpr(report_eof==1)
-				return {0x0,false};
-			else if constexpr(report_eof==2)
-				return 0x0;
-			else
-			{
-#ifdef __cpp_exceptions
-				throw eof();
-#else
-				fast_terminate();
-#endif
-			}
-		}
-	}
-	if constexpr(report_eof==1)
-		return {static_cast<unsigned_char_type>(*begin(input)),true};
-	else
-		return static_cast<unsigned_char_type>(*begin(input));
-}
-
-template<std::size_t report_eof=0,buffer_input_stream bip>
-[[nodiscard]] inline constexpr auto get_unsigned(bip& input)
-	->std::conditional_t<report_eof==1,std::pair<std::make_unsigned_t<typename bip::char_type>,bool>,std::make_unsigned_t<typename bip::char_type>>
-{
-	using unsigned_char_type = std::make_unsigned_t<typename bip::char_type>;
-	if(begin(input)==end(input))
-	{
-		if(!iflush(input))
-		{
-			if constexpr(report_eof==1)
-				return {0x0,false};
-			else if constexpr(report_eof==2)
-				return 0x0;
-			else
-			{
-#ifdef __cpp_exceptions
-				throw eof();
-#else
-				fast_terminate();
-#endif
-			}
-		}
-	}
-	auto ch{static_cast<unsigned_char_type>(*begin(input))};
-	++input;
-	if constexpr(report_eof==1)
-		return {ch,true};
-	else
-		return ch;
-}
-
-template<std::size_t report_eof=0,buffer_input_stream bip>
-[[nodiscard]] inline constexpr auto next_unsigned(bip& input)
-	->std::conditional_t<report_eof==1,std::pair<std::make_unsigned_t<typename bip::char_type>,bool>,std::make_unsigned_t<typename bip::char_type>>
-{
-	using unsigned_char_type = std::make_unsigned_t<typename bip::char_type>;
-	if(begin(++input)==end(input))
-	{
-		if(!iflush(input))
-		{
-			if constexpr(report_eof==1)
-				return {0x0,false};
-			else if constexpr(report_eof==2)
-				return 0x0;
-			else
-			{
-#ifdef __cpp_exceptions
-				throw eof();
-#else
-				fast_terminate();
-#endif
-			}
-		}
-	}
-	if constexpr(report_eof==1)
-		return {static_cast<unsigned_char_type>(*begin(input)),true};
-	else
-		return static_cast<unsigned_char_type>(*begin(input));
-}
 }

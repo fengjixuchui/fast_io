@@ -4,101 +4,6 @@
 namespace fast_io
 {
 
-namespace details
-{
-template<typename T>
-class basic_istring_view_generator
-{
-public:
-	using string_view_type = T;
-	T* ptr_s={};
-};
-
-template<typename T>
-class basic_istring_view_iterator
-{
-public:
-	T* ptr_s={};
-	constexpr auto operator->() noexcept
-	{
-		return ptr_s->data();
-	}
-	constexpr auto& operator*() noexcept
-	{
-		return ptr_s->front();
-	}
-};
-
-template<typename T>
-inline constexpr basic_istring_view_iterator<T>& operator++(basic_istring_view_iterator<T>& gen) noexcept
-{
-	gen.ptr_s->remove_prefix(1);
-	return gen;
-}
-template<typename T>
-inline constexpr void operator++(basic_istring_view_iterator<T>& gen,int) noexcept
-{
-	gen.ptr_s->remove_prefix(1);
-}
-
-template<typename T>
-inline constexpr bool operator==(std::default_sentinel_t, basic_istring_view_iterator<T> const& b)
-{
-	return b.ptr_s->empty();
-}
-
-template<typename T>
-inline constexpr bool operator==(basic_istring_view_iterator<T> const& b, std::default_sentinel_t)
-{
-	return b.ptr_s->empty();
-}
-
-template<typename T>
-inline constexpr bool operator!=(std::default_sentinel_t s, basic_istring_view_iterator<T> const& b)
-{
-	return !(s==b);
-}
-
-template<typename T>
-inline constexpr bool operator!=(basic_istring_view_iterator<T> const& b, std::default_sentinel_t s)
-{
-	return !(s==b);
-}
-
-template<typename T>
-inline constexpr basic_istring_view_iterator<T> begin(basic_istring_view_generator<T>& gen)
-{
-	return {gen.ptr_s};
-}
-template<typename T>
-inline constexpr std::default_sentinel_t end(basic_istring_view_generator<T>& gen)
-{
-	return {};
-}
-template<typename T>
-inline constexpr basic_istring_view_iterator<T> cbegin(basic_istring_view_generator<T> const& gen)
-{
-	return {gen.ptr_s};
-}
-template<typename T>
-inline constexpr std::default_sentinel_t cend(basic_istring_view_generator<T> const& gen)
-{
-	return {};
-}
-template<typename T>
-inline constexpr basic_istring_view_iterator<T> begin(basic_istring_view_generator<T> const& gen)
-{
-	return {gen.ptr_s};
-}
-template<typename T>
-inline constexpr std::default_sentinel_t end(basic_istring_view_generator<T> const& gen)
-{
-	return {};
-}
-
-
-}
-
 template< typename T>
 class basic_istring_view
 {
@@ -117,48 +22,38 @@ public:
 };
 
 template<typename T>
-inline constexpr details::basic_istring_view_generator<T> igenerator(basic_istring_view<T>& isv) noexcept
+constexpr void iremove_prefix(basic_istring_view<T>& isv,std::size_t n)
 {
-	return {std::addressof(isv.str())};
+	isv.s.remove_prefix(n);
+}
+template<typename T>
+constexpr bool iempty(basic_istring_view<T>& isv)
+{
+	return isv.s.empty();
 }
 
 template<typename T>
-[[nodiscard]] inline constexpr auto begin(basic_istring_view<T>& isv)
+constexpr decltype(auto) ifront(basic_istring_view<T>& isv)
 {
-	return isv.str().begin();
+	return isv.s.front();
 }
 
 template<typename T>
-[[nodiscard]] inline constexpr auto end(basic_istring_view<T>& isv)
+constexpr decltype(auto) idata(basic_istring_view<T>& isv)
 {
-	return isv.str().end();
-}
-
-
-
-template<typename T>
-inline constexpr bool iflush(basic_istring_view<T>& is)
-{
-	return false;
+	return isv.s.data();
 }
 
 template<typename T>
-inline constexpr void iclear(basic_istring_view<T>& isv)
+constexpr decltype(auto) isize(basic_istring_view<T>& isv)
 {
-	return isv.str().clear();
-}
-
-template<typename T,std::integral I>
-inline constexpr void operator+=(basic_istring_view<T>& isv,I i)
-{
-	isv.str().remove_prefix(i);
+	return isv.s.size();
 }
 
 template<typename T>
-inline constexpr basic_istring_view<T>& operator++(basic_istring_view<T>& isv)
+constexpr void iclear(basic_istring_view<T>& isv)
 {
-	isv.str().remove_prefix(1);
-	return isv;
+	clear(isv.s);
 }
 
 template<typename T,std::contiguous_iterator Iter>
@@ -200,4 +95,179 @@ inline constexpr Iter read(basic_istring_view<T>& istrvw,Iter begin,Iter end)
 using u8istring_view = basic_istring_view<std::u8string_view>;
 using istring_view = basic_istring_view<std::string_view>;
 
+
+
+template<contiguous_input_stream T>
+class contiguous_input_stream_generator
+{
+public:
+	T* ptr_s={};
+};
+
+template<contiguous_input_stream T>
+class contiguous_input_stream_generator_iterator
+{
+public:
+	T* ptr_s={};
+	constexpr auto operator->() noexcept
+	{
+		return idata(*ptr_s);
+	}
+	constexpr auto& operator*() noexcept
+	{
+		return ifront(*ptr_s);
+	}
+};
+
+template<contiguous_input_stream T>
+inline constexpr contiguous_input_stream_generator_iterator<T>& operator++(contiguous_input_stream_generator_iterator<T>& gen) noexcept
+{
+	iremove_prefix(*gen.ptr_s,1);
+	return gen;
+}
+
+template<contiguous_input_stream T>
+inline constexpr void operator++(contiguous_input_stream_generator_iterator<T>& gen,int) noexcept
+{
+	iremove_prefix(*gen.ptr_s,1);
+}
+
+template<contiguous_input_stream T>
+inline constexpr bool operator==(std::default_sentinel_t, contiguous_input_stream_generator_iterator<T> const& b)
+{
+	return iempty(*b.ptr_s);
+}
+
+template<contiguous_input_stream T>
+inline constexpr bool operator==(contiguous_input_stream_generator_iterator<T> const& b, std::default_sentinel_t)
+{
+	return iempty(*b.ptr_s);
+}
+
+template<contiguous_input_stream T>
+inline constexpr bool operator!=(std::default_sentinel_t, contiguous_input_stream_generator_iterator<T> const& b)
+{
+	return !iempty(*b.ptr_s);
+}
+
+template<contiguous_input_stream T>
+inline constexpr bool operator!=(contiguous_input_stream_generator_iterator<T> const& b, std::default_sentinel_t)
+{
+	return !iempty(*b.ptr_s);
+}
+
+template<contiguous_input_stream T>
+inline constexpr contiguous_input_stream_generator_iterator<T> begin(contiguous_input_stream_generator<T>& gen)
+{
+	return {gen.ptr_s};
+}
+template<contiguous_input_stream T>
+inline constexpr std::default_sentinel_t end(contiguous_input_stream_generator<T>& gen)
+{
+	return {};
+}
+template<contiguous_input_stream T>
+inline constexpr contiguous_input_stream_generator_iterator<T> cbegin(contiguous_input_stream_generator<T> const& gen)
+{
+	return {gen.ptr_s};
+}
+template<contiguous_input_stream T>
+inline constexpr std::default_sentinel_t cend(contiguous_input_stream_generator<T> const& gen)
+{
+	return {};
+}
+template<contiguous_input_stream T>
+inline constexpr contiguous_input_stream_generator_iterator<T> begin(contiguous_input_stream_generator<T> const& gen)
+{
+	return {gen.ptr_s};
+}
+template<contiguous_input_stream T>
+inline constexpr std::default_sentinel_t end(contiguous_input_stream_generator<T> const& gen)
+{
+	return {};
+}
+
+template<contiguous_input_stream T>
+inline constexpr contiguous_input_stream_generator<T> igenerator(T& stm)
+{
+	return {std::addressof(stm)};
+}
+
+template<contiguous_input_stream T>
+inline constexpr auto ispan(T& stm)
+{
+	return std::span(idata(stm),isize(stm));
+}
+
+/*
+template<contiguous_input_stream T>
+inline constexpr auto ibuffer_cbegin(T& in)
+{
+	return data(in);
+}
+
+template<contiguous_input_stream T>
+inline constexpr bool underflow(T& in)
+{
+	return false;		//always eof
+}
+
+template<contiguous_input_stream T>
+struct contiguous_stream_gbegin_proxy_pointer
+{
+	T* ptr{};
+	inline constexpr contiguous_stream_gbegin_proxy_pointer& operator=(T::char_type const* p)
+	{
+		iremove_prefix(*ptr,p-idata(*ptr));
+		return *this;
+	}
+	inline constexpr contiguous_stream_gbegin_proxy_pointer& operator++()
+	{
+		iremove_prefix(*ptr,1);
+		return *this;
+	}
+	inline constexpr void operator++(int) noexcept
+	{
+		iremove_prefix(*ptr,1);
+	}
+	inline constexpr decltype(auto) operator*() noexcept
+	{
+		return ifront(*ptr);
+	}
+	inline constexpr auto operator->() noexcept
+	{
+		return idata(*ptr);
+	}
+};
+
+template<contiguous_input_stream T>
+struct contiguous_stream_gend_proxy_pointer
+{
+	T* ptr{};
+
+	inline constexpr contiguous_stream_gend_proxy_pointer& operator=(T::char_type const* p)
+	{
+		iremove_prefix(*ptr,p-idata(*ptr));
+		return *this;
+	}
+};
+
+template<contiguous_input_stream T>
+inline constexpr auto to_address(contiguous_stream_proxy_pointer<T> p)
+{
+	return idata(p.ptr);
+}
+
+template<contiguous_input_stream T>
+inline constexpr contiguous_stream_gbegin_proxy_pointer<T> ibuffer_gbegin(T& in)
+{
+	return {std::addressof(in)};
+}
+
+template<contiguous_input_stream T>
+inline constexpr contiguous_stream_gend_proxy_pointer ibuffer_gend(T& in)
+{
+	return {std::addressof(in)};
+}
+*/
 }

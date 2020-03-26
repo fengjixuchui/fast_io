@@ -23,26 +23,20 @@ public:
 };
 
 template<typename T>
-[[nodiscard]] inline constexpr std::size_t osize(basic_ostring<T>& ob)
-{
-	return ob.str().size();
-}
-
-template<typename T>
 [[nodiscard]] inline constexpr auto oreserve(basic_ostring<T>& ob,std::size_t size) -> typename basic_ostring<T>::char_type*
 {
 	if(ob.str().size()+size<=ob.str().capacity())[[likely]]
 	{
 		ob.str().append(size,0);
-		return std::to_address(ob.str().end());
+		return std::to_address(ob.str().end()-size);
 	}
 	return nullptr;
 }
 
 template<typename T>
-inline constexpr void orelease(basic_ostring<T>& ob,std::size_t size)
+inline constexpr void orelease(basic_ostring<T>& ob,typename T::char_type* ptr)
 {
-	ob.str().erase(ob.str().cend()-size,ob.str().cend());
+	ob.str().erase(ptr-ob.str.data()+ob.str().cbegin(),ob.str().cend());
 }
 
 template<typename T,std::contiguous_iterator Iter>

@@ -588,6 +588,11 @@ using u8posix_io_handle=basic_posix_io_handle<char8_t>;
 using u8posix_file=basic_posix_file<char8_t>;
 using u8posix_pipe=basic_posix_pipe<char8_t>;
 
+using wposix_io_observer=basic_posix_io_observer<wchar_t>;
+using wposix_io_handle=basic_posix_io_handle<wchar_t>;
+using wposix_file=basic_posix_file<wchar_t>;
+using wposix_pipe=basic_posix_pipe<wchar_t>;
+
 inline int constexpr posix_stdin_number = 0;
 inline int constexpr posix_stdout_number = 1;
 inline int constexpr posix_stderr_number = 2;

@@ -91,7 +91,7 @@ try
 		println(obuf_file,fast_io::int_hint(vec[i]));
 	}
 #endif
-#ifdef __GLIBCXX__
+#if defined(__GLIBCXX__) || defined(_MSC_VER)
 	{
 	fast_io::timer t("ostream_file");
 	fast_io::ostream_file osf("smfdb.txt");
@@ -107,8 +107,8 @@ try
 		for(std::size_t i(0);i!=N;++i)
 		{
 			auto [p,ec]=std::to_chars(arr.data(),arr.data()+arr.size(),vec[i]);
-			*p='\n';
-			send(obuf_file,arr.data(),++p);
+			*p=u8'\n';
+			write(obuf_file,arr.data(),++p);
 		}
 	}
 #endif

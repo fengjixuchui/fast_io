@@ -4,6 +4,7 @@
 #include<fstream>
 #include"../../include/fast_io.h"
 #include"../../include/fast_io_device.h"
+#include"../../include/fast_io_legacy.h"
 #include<exception>
 #include<memory>
 #include<cstdio>
@@ -44,6 +45,18 @@ try
 	fast_io::ibuf_file ibuf("obuf_filedb.txt");
 	for(std::size_t i(0);i!=N;++i)
 		scan(ibuf,v[i]);
+	}
+	{
+	fast_io::timer t("hacked c_file_unlocked");
+	fast_io::obuf_file obf("csful.txt");
+	fast_io::ibuf_file csfu("obuf_filedb.txt");
+//	std::array<char,65536> buffer;
+//	setvbuf(csfu.fp,buffer.data(),_IOFBF,buffer.size());
+	for(std::size_t i(0);i!=N;++i)
+	{
+		scan(csfu,v[i]);
+		println(obf,v[i]);
+	}
 	}
 /*	{
 	cqw::timer t("ibuf_mutex ryu");

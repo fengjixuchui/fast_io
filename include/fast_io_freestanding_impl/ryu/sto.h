@@ -3,7 +3,7 @@
 namespace fast_io::details::ryu
 {
 
-template<std::floating_point F,typename It_First,typename It_Second>
+template<char32_t decimal_point,std::floating_point F,typename It_First,typename It_Second>
 inline constexpr F input_floating(It_First iter,It_Second ed)
 {
 	using char_type = std::remove_cvref_t<decltype(*iter)>;
@@ -12,6 +12,7 @@ inline constexpr F input_floating(It_First iter,It_Second ed)
 	using exponent_type = typename floating_trait::exponent_type;
 	using unsigned_char_type = std::make_unsigned_t<char_type>;
 	using signed_exponent_type = std::make_signed_t<exponent_type>;
+	constexpr unsigned_char_type decimal_point_value_after_minus_zero{static_cast<unsigned_char_type>(static_cast<unsigned_char_type>(decimal_point)-u8'0')}; 
 	//.(46)-48: static_cast<unsigned_char_type>(-2)
 	//-(45)-48: static_cast<unsigned_char_type>(-3)
 	//'E'(69)-48: 21
@@ -40,7 +41,7 @@ inline constexpr F input_floating(It_First iter,It_Second ed)
 		unsigned_char_type const ch(*iter-u8'0');
 		if(0x9<ch)[[unlikely]]
 		{
-			if(ch==static_cast<unsigned_char_type>(-2))
+			if(ch==decimal_point_value_after_minus_zero)
 			{
 				if(dot_index!=-1)
 					throw std::runtime_error("malformed input");
@@ -57,12 +58,26 @@ inline constexpr F input_floating(It_First iter,It_Second ed)
 			++m10digits;
 		++index;
 	}
+	std::size_t extra_e10{};
 	if(m10digits==floating_trait::digits10)[[unlikely]]
+	{
+		if(dot_index==-1)
+		{
+			for(;iter!=ed&&*iter==u8'0';++iter)
+				++extra_e10;
+			if(iter!=ed&&*iter==decimal_point)
+				++iter;
+		}
+		for(;iter!=ed&&*iter==u8'0';++iter);
+		if(iter!=ed&&static_cast<unsigned_char_type>(*iter-u8'1')<9)[[unlikely]]
+		{
 #ifdef __cpp_exceptions
-		throw std::runtime_error("out of precision of ryu algorithm. To do with multiprecision");
+			throw std::runtime_error("out of precision of ryu algorithm. To do with multiprecision");
 #else
-		fast_terminate();
+			fast_terminate();
 #endif
+		}
+	}
 	signed_exponent_type e_index{-1};
 	bool exp_negative{};
 	exponent_type ue10{};
@@ -93,6 +108,9 @@ inline constexpr F input_floating(It_First iter,It_Second ed)
 			++index;
 		}
 	}
+	detect_overflow<10>(ue10,ue10digits);
+	if((ue10+=extra_e10)<extra_e10)[[unlikely]]
+		throw std::runtime_error("exp part integer overflow");
 	signed_exponent_type e10(static_cast<signed_exponent_type>(ue10));
 	if(exp_negative)
 		e10=-e10;

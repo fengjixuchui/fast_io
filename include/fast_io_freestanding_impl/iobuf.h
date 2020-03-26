@@ -19,7 +19,7 @@ struct io_aligned_allocator
 	}
 };
 
-template<typename CharT,std::size_t buffer_size = ((
+template<std::integral CharT,std::size_t buffer_size = ((
 #if defined(__WINNT__) || defined(_MSC_VER)
 1048576
 #else
@@ -49,7 +49,7 @@ public:
 	}
 	basic_buf_handler& operator=(basic_buf_handler&& m) noexcept
 	{
-		if(std::addressof(m)!=this)
+		if(std::addressof(m)!=this)[[likely]]
 		{
 			if(m.beg)
 				alloc.deallocate(beg,buffer_size);
@@ -66,13 +66,13 @@ public:
 	}
 	inline void release()
 	{
-		if(beg)
+		if(beg)[[likely]]
 			alloc.deallocate(beg,buffer_size);
 		end=curr=beg=nullptr;
 	}
 	~basic_buf_handler()
 	{
-		if(beg)
+		if(beg)[[likely]]
 			alloc.deallocate(beg,buffer_size);
 	}
 	Allocator get_allocator() const{ return alloc;}
@@ -97,9 +97,8 @@ public:
 		return ih;
 	}
 };
-
 template<input_stream Ihandler,typename Buf>
-[[nodiscard]] inline constexpr bool iflush(basic_ibuf<Ihandler,Buf>& ib)
+[[nodiscard]] inline constexpr bool underflow(basic_ibuf<Ihandler,Buf>& ib)
 {
 	if(ib.ibuffer.end==nullptr)
 		ib.ibuffer.init_space();
@@ -107,215 +106,57 @@ template<input_stream Ihandler,typename Buf>
 	ib.ibuffer.curr=ib.ibuffer.beg;
 	return ib.ibuffer.end!=ib.ibuffer.beg;
 }
-template<input_stream Ihandler,typename Buf>
-inline constexpr void iclear(basic_ibuf<Ihandler,Buf>& ib)
-{
-	ib.ibuffer.release();
-}
-
-namespace details
-{
-template<input_stream Ihandler,typename Buf>
-constexpr bool ireserve_internal(basic_ibuf<Ihandler,Buf>& ib,std::size_t n)
-{
-	if(Buf::size<=n)
-#ifdef __cpp_exceptions
-		throw std::system_error(EOPNOTSUPP,std::generic_category());
-#else
-		fast_terminate();
-#endif
-	if(ib.ibuffer.end==nullptr)
-		ib.ibuffer.init_space();
-	ib.ibuffer.curr=std::copy(ib.ibuffer.curr,ib.ibuffer.end,ib.ibuffer.beg);
-	for(auto b(ib.ibuffer.curr);;b=ib.ibuffer.end)
-	{
-		if(ib.ibuffer.beg+n<(ib.ibuffer.end=read(ib.ih,b,ib.ibuffer.beg+Buf::size)))
-			return true;
-		else if(ib.ibuffer.end==b)
-		{
-			if(b==ib.ibuffer.beg)
-				return false;
-			return true;	
-		}
-	}
-}
-}
 
 template<input_stream Ihandler,typename Buf>
-inline constexpr bool ireserve(basic_ibuf<Ihandler,Buf>& ib,std::size_t n)
+[[nodiscard]] inline constexpr auto ibuffer_begin(basic_ibuf<Ihandler,Buf>& ib)
 {
-	if(static_cast<std::size_t>(ib.ibuffer.end-ib.ibuffer.curr)<n)[[unlikely]]
-		return details::ireserve_internal(ib,n);
-	return true;
+	return ib.ibuffer.beg;
 }
-/*
 template<input_stream Ihandler,typename Buf>
-inline constexpr auto ibuffer_size(basic_ibuf<Ihandler,Buf>& ib)
-{
-	return Buf::size;
-}
-*/
-template<input_stream Ihandler,typename Buf>
-inline constexpr auto begin(basic_ibuf<Ihandler,Buf>& ib)
+[[nodiscard]] inline constexpr auto ibuffer_curr(basic_ibuf<Ihandler,Buf>& ib)
 {
 	return ib.ibuffer.curr;
 }
-
 template<input_stream Ihandler,typename Buf>
-inline constexpr auto end(basic_ibuf<Ihandler,Buf>& ib)
+[[nodiscard]] inline constexpr auto ibuffer_end(basic_ibuf<Ihandler,Buf>& ib)
 {
 	return ib.ibuffer.end;
 }
 
 template<input_stream Ihandler,typename Buf>
-inline constexpr basic_ibuf<Ihandler,Buf>& operator++(basic_ibuf<Ihandler,Buf>& ib)
+inline constexpr void ibuffer_set_curr(basic_ibuf<Ihandler,Buf>& ib,typename Ihandler::char_type* ptr)
 {
-	++ib.ibuffer.curr;
-	return ib;
+	ib.ibuffer.curr=ptr;
 }
 
-template<input_stream Ihandler,typename Buf,std::integral I>
-inline constexpr basic_ibuf<Ihandler,Buf>& operator+=(basic_ibuf<Ihandler,Buf>& ib,I n)
+
+template<buffer_output_stream Ihandler,typename Buf>
+inline constexpr decltype(auto) overflow(basic_ibuf<Ihandler,Buf>& ib,typename Ihandler::char_type ch)
 {
-	ib.ibuffer.curr+=n;
-	return ib;
+	return overflow(ib.oh,ch);
 }
 
-namespace details
+template<buffer_output_stream Ihandler,typename Buf>
+[[nodiscard]] inline constexpr decltype(auto) obuffer_begin(basic_ibuf<Ihandler,Buf>& ib)
 {
-
-template<input_stream Ihandler,typename Buf>
-class basic_ibuf_generator
-{
-public:
-	basic_ibuf<Ihandler,Buf>* ptr_s={};
-};
-
-template<input_stream Ihandler,typename Buf>
-class basic_ibuf_iterator
-{
-public:
-	basic_ibuf<Ihandler,Buf>* ptr_s={};
-	using iterator_category = std::input_iterator_tag;
-	constexpr auto operator->() noexcept
-	{
-		return ptr_s->ibuffer.curr;
-	}
-	constexpr auto& operator*() noexcept
-	{
-		return *ptr_s->ibuffer.curr;
-	}
-};
-
-template<input_stream Ihandler,typename Buf>
-constexpr void fresh_ibuf(basic_ibuf_iterator<Ihandler,Buf>& gen) noexcept
-{
-	auto& ib(gen.ptr_s->ibuffer);
-	if(ib.end==nullptr)
-		ib.init_space();
-	ib.end=read(gen.ptr_s->ih,ib.beg,ib.beg+Buf::size);
-	ib.curr=ib.beg;
-	if(ib.end==ib.beg)
-	{
-		gen.ptr_s=nullptr;
-		return;
-	}
-	++ib.curr;
+	return obuffer_begin(ib.oh);
 }
 
-template<input_stream Ihandler,typename Buf>
-inline constexpr basic_ibuf_iterator<Ihandler,Buf>& operator++(basic_ibuf_iterator<Ihandler,Buf>& gen)
+template<buffer_output_stream Ihandler,typename Buf>
+[[nodiscard]] inline constexpr decltype(auto) obuffer_curr(basic_ibuf<Ihandler,Buf>& ib)
 {
-	if(gen.ptr_s->ibuffer.curr==gen.ptr_s->ibuffer.end)[[unlikely]]
-	{
-		fresh_ibuf(gen);
-		return gen;
-	}
-	++gen.ptr_s->ibuffer.curr;
-	return gen;
+	return obuffer_curr(ib.oh);
+}
+template<buffer_output_stream Ihandler,typename Buf>
+[[nodiscard]] inline constexpr decltype(auto) obuffer_end(basic_ibuf<Ihandler,Buf>& ib)
+{
+	return obuffer_end(ib.oh);
 }
 
-template<input_stream Ihandler,typename Buf>
-inline constexpr void operator++(basic_ibuf_iterator<Ihandler,Buf>& gen,int)
+template<buffer_output_stream Ihandler,typename Buf>
+[[nodiscard]] inline constexpr decltype(auto) obuffer_set_curr(basic_ibuf<Ihandler,Buf>& ib,typename Ihandler::char_type* ptr)
 {
-	static_cast<void>(operator++(gen));
-}
-
-template<input_stream Ihandler,typename Buf>
-inline constexpr bool operator!=(std::default_sentinel_t, basic_ibuf_iterator<Ihandler,Buf> const& b)
-{
-	return b.ptr_s;
-}
-
-template<input_stream Ihandler,typename Buf>
-inline constexpr bool operator==(std::default_sentinel_t, basic_ibuf_generator<Ihandler,Buf> const& b)
-{
-	return !b.ptr_s;
-}
-
-template<input_stream Ihandler,typename Buf>
-inline constexpr bool operator!=(basic_ibuf_iterator<Ihandler,Buf> const& b, std::default_sentinel_t)
-{
-	return b.ptr_s;
-}
-
-template<input_stream Ihandler,typename Buf>
-inline constexpr bool operator==(basic_ibuf_iterator<Ihandler,Buf> const& b, std::default_sentinel_t)
-{
-	return !b.ptr_s;
-}
-
-template<input_stream Ihandler,typename Buf>
-inline constexpr basic_ibuf_iterator<Ihandler,Buf> begin(basic_ibuf_generator<Ihandler,Buf>& gen)
-{
-	return {gen.ptr_s};
-}
-template<input_stream Ihandler,typename Buf>
-inline constexpr std::default_sentinel_t end(basic_ibuf_generator<Ihandler,Buf>& gen)
-{
-	return {};
-}
-template<input_stream Ihandler,typename Buf>
-inline constexpr basic_ibuf_iterator<Ihandler,Buf> cbegin(basic_ibuf_generator<Ihandler,Buf> const& gen)
-{
-	return {gen.ptr_s};
-}
-template<input_stream Ihandler,typename Buf>
-inline constexpr std::default_sentinel_t cend(basic_ibuf_generator<Ihandler,Buf> const& gen)
-{
-	return {};
-}
-template<input_stream Ihandler,typename Buf>
-inline constexpr basic_ibuf_iterator<Ihandler,Buf> begin(basic_ibuf_generator<Ihandler,Buf> const& gen)
-{
-	return {gen.ptr_s};
-}
-template<input_stream Ihandler,typename Buf>
-inline constexpr std::default_sentinel_t end(basic_ibuf_generator<Ihandler,Buf> const& gen)
-{
-	return {};
-}
-
-template<input_stream Ihandler,typename Buf>
-inline constexpr details::basic_ibuf_generator<Ihandler,Buf> igenerator_prepare(basic_ibuf<Ihandler,Buf>& ib)
-{
-	if(ib.ibuffer.end==nullptr)
-		ib.ibuffer.init_space();
-	ib.ibuffer.end=read(ib.ih,ib.ibuffer.beg,ib.ibuffer.beg+Buf::size);
-	ib.ibuffer.curr=ib.ibuffer.beg;
-	if(ib.ibuffer.end==ib.ibuffer.beg)
-		return {};
-	return {std::addressof(ib)};
-}
-
-}
-
-template<input_stream Ihandler,typename Buf>
-inline constexpr details::basic_ibuf_generator<Ihandler,Buf> igenerator(basic_ibuf<Ihandler,Buf>& ib)
-{
-	if(ib.ibuffer.curr==ib.ibuffer.end)	[[unlikely]]
-		return details::igenerator_prepare(ib);
-	return {std::addressof(ib)};
+	return obuffer_set_curr(ib.oh,ptr);
 }
 
 template<output_stream Ihandler,typename Buf>
@@ -330,22 +171,10 @@ inline constexpr decltype(auto) write(basic_ibuf<Ihandler,Buf>& ib,Iter b,Iter e
 	return write(ib.native_handle(),b,e);
 }
 
-template<buffer_output_stream Ihandler,typename Buf,std::integral I>
-inline constexpr decltype(auto) oreserve(basic_ibuf<Ihandler,Buf>& ib,I i)
-{
-	return oreserve(ib.native_handle(),i);
-}
-
 template<redirect_stream Ihandler,typename Buf>
 inline constexpr decltype(auto) redirect_handle(basic_ibuf<Ihandler,Buf>& ib)
 {
 	return redirect_handle(ib.native_handle());
-}
-
-template<buffer_output_stream Ihandler,typename Buf,std::integral I>
-inline constexpr decltype(auto) orelease(basic_ibuf<Ihandler,Buf>& ib,I i)
-{
-	return orelease(ib.native_handle(),i);
 }
 
 template<typename T,typename Iter>
@@ -420,11 +249,10 @@ inline constexpr Iter read(basic_ibuf<Ihandler,Buf>& ib,Iter begin,Iter end)
 		return details::ibuf_read<Buf::size>(ib,begin,end);
 	else
 	{
-		auto b(reinterpret_cast<std::byte*>(std::to_address(begin)));
-		return begin+(details::ibuf_read<Buf::size,true>(ib,b,reinterpret_cast<std::byte*>(std::to_address(end)))-b)/sizeof(*begin);
+		auto b(reinterpret_cast<char const*>(std::to_address(begin)));
+		return begin+(details::ibuf_read<Buf::size,true>(ib,b,reinterpret_cast<char const*>(std::to_address(end)))-b)/sizeof(*begin);
 	}
 }
-
 
 template<input_stream Ihandler,std::integral ch_type,typename Buf>
 requires random_access_stream<Ihandler>
@@ -441,7 +269,6 @@ inline constexpr auto seek(basic_ibuf<Ihandler,Buf>& ib,std::intmax_t u=0,seekdi
 {
 	return seek(ib,seek_type<typename basic_ibuf<Ihandler,Buf>::char_type>,u,s);
 }
-
 
 template<zero_copy_input_stream Ihandler,typename Buf>
 inline constexpr decltype(auto) zero_copy_in_handle(basic_ibuf<Ihandler,Buf>& ib)
@@ -464,8 +291,8 @@ inline constexpr decltype(auto) memory_map_in_handle(basic_ibuf<Ihandler,Buf>& h
 template<output_stream Ohandler,typename Buf=basic_buf_handler<typename Ohandler::char_type>>
 class basic_obuf
 {
-	Ohandler oh;
 public:
+	Ohandler oh;
 	Buf obuffer;
 	inline constexpr void close_impl() noexcept
 	{
@@ -509,6 +336,74 @@ public:
 		return oh;
 	}
 };
+
+template<output_stream Ohandler,typename Buf>
+[[nodiscard]] inline constexpr auto obuffer_begin(basic_obuf<Ohandler,Buf>& ob)
+{
+	return ob.obuffer.beg;
+}
+
+template<output_stream Ohandler,typename Buf>
+[[nodiscard]] inline constexpr auto& obuffer_curr(basic_obuf<Ohandler,Buf>& ob)
+{
+	return ob.obuffer.curr;
+}
+
+template<output_stream Ohandler,typename Buf>
+[[nodiscard]] inline constexpr auto obuffer_end(basic_obuf<Ohandler,Buf>& ob)
+{
+	return ob.obuffer.end;
+}
+
+template<output_stream Ohandler,typename Buf>
+inline constexpr void obuffer_set_curr(basic_obuf<Ohandler,Buf>& ob,typename Ohandler::char_type* ptr)
+{
+	ob.obuffer.curr=ptr;
+}
+
+template<output_stream Ohandler,typename Buf>
+inline constexpr void overflow(basic_obuf<Ohandler,Buf>& ob,typename Ohandler::char_type ch)
+{
+	if(ob.obuffer.beg)	//cold buffer
+		write(ob.native_handle(),ob.obuffer.beg,ob.obuffer.end);
+	else
+	{
+		ob.obuffer.init_space();
+		ob.obuffer.end=ob.obuffer.beg+Buf::size;
+	}
+	*(ob.obuffer.curr=ob.obuffer.beg)=ch;
+	++ob.obuffer.curr;
+}
+
+template<buffer_input_stream Ohandler,typename Buf>
+[[nodiscard]] inline constexpr decltype(auto) underflow(basic_obuf<Ohandler,Buf>& ob)
+{
+	return underflow(ob.oh);
+}
+
+template<buffer_input_stream Ohandler,typename Buf>
+[[nodiscard]] inline constexpr decltype(auto) ibuffer_begin(basic_obuf<Ohandler,Buf>& ob)
+{
+	return ibuffer_begin(ob.oh);
+}
+
+template<buffer_input_stream Ohandler,typename Buf>
+[[nodiscard]] inline constexpr decltype(auto) ibuffer_curr(basic_obuf<Ohandler,Buf>& ob)
+{
+	return ibuffer_curr(ob.oh);
+}
+
+template<buffer_input_stream Ohandler,typename Buf>
+[[nodiscard]] inline constexpr decltype(auto) ibuffer_end(basic_obuf<Ohandler,Buf>& ob)
+{
+	return ibuffer_end(ob.oh);
+}
+
+template<buffer_input_stream Ohandler,typename Buf>
+inline constexpr decltype(auto) ibuffer_set_curr(basic_obuf<Ohandler,Buf>& ob,typename Ohandler::char_type* ptr)
+{
+	return ibuffer_set_curr(ob.oh,ptr);
+}
 
 namespace details
 {
@@ -573,94 +468,12 @@ inline constexpr void write(basic_obuf<Ohandler,Buf>& ob,Iter cbegini,Iter cendi
 {
 	using char_type = typename basic_obuf<Ohandler,Buf>::char_type;
 	if constexpr(std::same_as<char_type,typename std::iterator_traits<Iter>::value_type>)
-		details::obuf_write<true>(ob,std::to_address(cbegini),std::to_address(cendi));
+		details::obuf_write<false>(ob,std::to_address(cbegini),std::to_address(cendi));
 	else
-		details::obuf_write<true>(ob,reinterpret_cast<std::byte const*>(std::to_address(cbegini)),
-					reinterpret_cast<std::byte const*>(std::to_address(cendi)));
+		details::obuf_write<true>(ob,reinterpret_cast<char const*>(std::to_address(cbegini)),
+					reinterpret_cast<char const*>(std::to_address(cendi)));
 }
 
-/*template<output_stream Ohandler,typename Buf>
-inline constexpr void fill_nc(basic_obuf<Ohandler,Buf>& ob,std::size_t count,typename basic_obuf<Ohandler,Buf>::char_type const& ch)
-{
-	std::size_t const remain_space(static_cast<std::size_t>(ob.obuffer.end-ob.obuffer.curr));
-	if(remain_space<=count)
-	{
-		obuf_deal_with_cold_buffer(ob);
-		std::fill(ob.obuffer.curr,ob.obuffer.end,ch);
-		write(ob.native_handle(),ob.obuffer.beg,ob.obuffer.end);
-		count-=remain_space;
-		constexpr auto buffer_size(Buf::size);
-		std::size_t const times(count/buffer_size),remain(count%buffer_size);
-		if(times)
-		{
-			std::fill(ob.obuffer.beg,ob.obuffer.curr,ch);
-			for(std::size_t i(0);i!=times;++i)
-				write(ob.native_handle(),ob.obuffer.beg,ob.obuffer.end);
-		}
-		else
-		{
-			std::size_t cb(static_cast<std::size_t>(ob.obuffer.curr-ob.obuffer.beg));
-			if(remain<cb)
-				cb=remain;
-			std::fill_n(ob.obuffer.beg,cb,ch);
-		}
-		ob.obuffer.curr=ob.obuffer.beg+remain;
-		return;
-	}
-	ob.obuffer.curr=std::fill_n(ob.obuffer.curr,count,ch);
-}*/
-
-template<buffer_input_stream Ohandler,typename Buf>
-inline constexpr decltype(auto) iflush(basic_obuf<Ohandler,Buf>& out)
-{
-	return iflush(*out);
-}
-
-template<buffer_input_stream Ohandler,typename Buf>
-inline constexpr decltype(auto) begin(basic_obuf<Ohandler,Buf>& out)
-{
-	return begin(out.native_handle());
-}
-
-template<buffer_input_stream Ohandler,typename Buf>
-inline constexpr decltype(auto) end(basic_obuf<Ohandler,Buf>& out)
-{
-	return end(out.native_handle());
-}
-
-template<buffer_input_stream Ohandler,typename Buf>
-inline constexpr basic_obuf<Ohandler,Buf>& operator++(basic_obuf<Ohandler,Buf>& out)
-{
-	operator++(out.native_handle());
-	return out;
-}
-
-template<buffer_input_stream Ohandler,typename Buf,std::integral I>
-inline constexpr basic_obuf<Ohandler,Buf>& operator+=(basic_obuf<Ohandler,Buf>& out,I i)
-{
-	operator+=(out.native_handle(),i);
-	return out;
-}
-
-
-template<output_stream Ohandler,typename Buf>
-inline constexpr void put(basic_obuf<Ohandler,Buf>& ob,typename basic_obuf<Ohandler,Buf>::char_type ch)
-{
-	if(ob.obuffer.curr==ob.obuffer.end)[[unlikely]]		//buffer full
-	{
-		if(ob.obuffer.beg)	//cold buffer
-			write(ob.native_handle(),ob.obuffer.beg,ob.obuffer.end);
-		else
-		{
-			ob.obuffer.init_space();
-			ob.obuffer.end=ob.obuffer.beg+Buf::size;
-		}
-		ob.obuffer.curr=ob.obuffer.beg+1;
-		*ob.obuffer.beg=ch;
-		return;//no flow dependency any more
-	}
-	*ob.obuffer.curr++=ch;
-}
 template<output_stream Ohandler,typename Buf>
 inline constexpr void flush(basic_obuf<Ohandler,Buf>& ob)
 {
@@ -673,7 +486,7 @@ inline constexpr void flush(basic_obuf<Ohandler,Buf>& ob)
 
 template<output_stream Ohandler,typename Buf,typename... Args>
 requires random_access_stream<Ohandler>
-inline constexpr auto seek(basic_obuf<Ohandler,Buf>& ob,Args&& ...args)
+inline constexpr decltype(auto) seek(basic_obuf<Ohandler,Buf>& ob,Args&& ...args)
 {
 	if(ob.obuffer.beg!=ob.obuffer.curr)
 	{
@@ -684,23 +497,9 @@ inline constexpr auto seek(basic_obuf<Ohandler,Buf>& ob,Args&& ...args)
 }
 
 template<input_stream Ohandler,typename Buf,std::contiguous_iterator Iter>
-inline constexpr auto read(basic_obuf<Ohandler,Buf>& ob,Iter begin,Iter end)
+inline constexpr decltype(auto) read(basic_obuf<Ohandler,Buf>& ob,Iter begin,Iter end)
 {
 	return read(ob.native_handle(),begin,end);
-}
-
-template<output_stream Ohandler,typename Buf>
-[[nodiscard]] inline constexpr auto oreserve(basic_obuf<Ohandler,Buf>& ob,std::size_t size) -> decltype(ob.obuffer.curr)
-{
-	if(ob.obuffer.end<=ob.obuffer.curr+size)
-		return nullptr;
-	return ob.obuffer.curr+=size;
-}
-
-template<output_stream Ohandler,typename Buf>
-inline constexpr void orelease(basic_obuf<Ohandler,Buf>& ob,std::size_t size)
-{
-	ob.obuffer.curr-=size;
 }
 
 template<zero_copy_output_stream Ohandler,typename Buf>

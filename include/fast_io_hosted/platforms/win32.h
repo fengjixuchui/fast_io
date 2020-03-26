@@ -404,7 +404,7 @@ inline Iter read(basic_win32_io_observer<ch_type>& handle,Iter begin,Iter end)
 		fast_terminate();
 #endif
 	}
-	return begin+numberOfBytesRead;
+	return begin+(numberOfBytesRead/sizeof(*begin));
 }
 
 template<std::integral ch_type,std::contiguous_iterator Iter>
@@ -651,6 +651,11 @@ using u8win32_io_observer=basic_win32_io_observer<char8_t>;
 using u8win32_io_handle=basic_win32_io_handle<char8_t>;
 using u8win32_file=basic_win32_file<char8_t>;
 using u8win32_pipe=basic_win32_pipe<char8_t>;
+
+using wwin32_io_observer=basic_win32_io_observer<wchar_t>;
+using wwin32_io_handle=basic_win32_io_handle<wchar_t>;
+using wwin32_file=basic_win32_file<wchar_t>;
+using wwin32_pipe=basic_win32_pipe<wchar_t>;
 
 inline constexpr std::uint32_t win32_stdin_number(-10);
 inline constexpr std::uint32_t win32_stdout_number(-11);

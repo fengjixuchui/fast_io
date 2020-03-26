@@ -74,10 +74,10 @@ inline constexpr output_iter my_copy_n(input_iter first,count_type count,output_
 	std::contiguous_iterator<output_iter>&&
 	std::is_trivially_copyable_v<input_value_type>&&
 	std::is_trivially_copyable_v<output_value_type>&&
-	(std::same_as<input_value_type,output_value_type>||(std::integral<input_value_type>&&
-	std::integral<output_value_type>&&sizeof(std::is_trivially_copyable_v<input_value_type>)==sizeof(std::is_trivially_copyable_v<output_value_type>))))
+	(std::same_as<input_value_type,output_value_type>||
+	(std::integral<input_value_type>&&std::integral<output_value_type>&&
+	sizeof(input_value_type)==sizeof(output_value_type))))
 	{
-
 		std::memmove(std::to_address(result),std::to_address(first),sizeof(typename std::iterator_traits<input_iter>::value_type)*count);
 		return result+=count;
 	}

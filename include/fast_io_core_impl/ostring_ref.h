@@ -32,15 +32,15 @@ template<typename T>
 	if(ob.str().size()+size<=ob.str().capacity())
 	{
 		ob.str().append(size,0);
-		return std::to_address(ob.str().end());
+		return std::to_address(ob.str().end()-size);
 	}
 	return nullptr;
 }
 
 template<typename T>
-inline constexpr void orelease(basic_ostring_ref<T>& ob,std::size_t size)
+inline constexpr void orelease(basic_ostring_ref<T>& ob,typename T::char_type* ptr)
 {
-	ob.str().erase(ob.str().cend()-size,ob.str().cend());
+	ob.str().erase(ptr-ob.str.data()+ob.str().cbegin(),ob.str().cend());
 }
 
 template<typename T,std::contiguous_iterator Iter>

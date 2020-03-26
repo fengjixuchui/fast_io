@@ -4,6 +4,7 @@
 #include<fstream>
 #include"../../include/fast_io.h"
 #include"../../include/fast_io_device.h"
+#include"../../include/fast_io_legacy.h"
 //#include"../../include/fast_io_crypto.h"
 #include<exception>
 #include<memory>
@@ -15,85 +16,46 @@ try
 {
 	std::size_t constexpr N(10000000);
 	std::vector<std::size_t> v(N);
-	std::vector<std::ptrdiff_t> v2(N);
-
 	{
 	fast_io::timer t("std::FILE*");
-	std::unique_ptr<std::FILE,decltype(fclose)*> fp(std::fopen("cfilestar.txt","rb"),fclose);
+	std::unique_ptr<std::FILE,decltype(fclose)*> fp(std::fopen("filebuf_io_observer.txt","rb"),fclose);
 	for(std::size_t i(0);i!=N;++i)
 		auto const ret(fscanf(fp.get(),"%zu",v.data()+i));
 	}
-/*	{
-	cqw::timer t("std::FILE* with 1048576 buffer size + _IOFBF (Full buffering) tag");
-	std::unique_ptr<std::FILE,decltype(fclose)*> fp(std::fopen("cfilestar.txt",u8"rb"),fclose);
-	auto buffer(std::make_unique<char[]>(1048576));
-	setvbuf(fp.get(),buffer.get(),_IOFBF,1048576);
-	for(std::size_t i(0);i!=N;++i)
-		auto const ret(fscanf(fp.get(),u8"%zu",v.data()+i));
-	}*/
 	{
 	fast_io::timer t("std::ifstream");
-	std::ifstream fin("cfilestar.txt",std::ifstream::binary);
+	std::ifstream fin("filebuf_io_observer.txt",std::ifstream::binary);
 	for(std::size_t i(0);i!=N;++i)
 		fin>>v[i];
 	}
-/*	{
-	cqw::timer t("stream_view for std::ifstream");
-	fast_io::stream_view<std::ifstream> view("cfilestar.txt",std::ifstream::binary);
-	for(std::size_t i(0);i!=N;++i)
-		scan(view,v[i]);
-	}*/
-/*	{
-	cqw::timer t("streambuf_view for std::ifstream");
-	std::ifstream fin("cfilestar.txt",std::ifstream::binary);
-	fast_io::streambuf_view view(fin.rdbuf());
-	for(std::size_t i(0);i!=N;++i)
-		scan(view,v[i]);
-	}*/
 	
 	{
 	fast_io::timer t("ibuf");
-	fast_io::ibuf_file ibuf_file("cfilestar.txt");
-	for(std::size_t i(0);i!=N;++i)
-	{
-		scan(ibuf_file,v[i]);
-	}
-	}
-	{
-	fast_io::timer t("ibuf_sign");
-	fast_io::ibuf_file ibuf_file("cfilestar.txt");
-	for(std::size_t i(0);i!=N;++i)
-	{
-		scan(ibuf_file,v2[i]);
-	}
-	}
-
-	{
-	fast_io::timer t("ibuf_mutex");
-	fast_io::ibuf_file_mutex ibuf_file("cfilestar.txt");
+	fast_io::ibuf_file ibuf_file("filebuf_io_observer.txt");
 	for(std::size_t i(0);i!=N;++i)
 		scan(ibuf_file,v[i]);
 	}
 /*	{
-	cqw::timer t("ibuf text");
-	fast_io::text_view<fast_io::ibuf> view("obuf_text.txt");
+	fast_io::timer t("cful");
+	fast_io::c_file_unlocked cfu("filebuf_io_observer.txt",fast_io::open_interface<fast_io::open_mode::binary|fast_io::open_mode::in>);
 	for(std::size_t i(0);i!=N;++i)
-		scan(view,v[i]);
-	}
-	{
-	cqw::timer t("dynamic_buf inative_file");
-	fast_io::dynamic_buf ibuf(std::in_place_type<fast_io::inative_file>,u8"cfilestar.txt");
-	for(std::size_t i(0);i!=N;++i)
-		scan(ibuf,v[i]);
-	}
-	{
-	cqw::timer t("speck128/128");
-	fast_io::crypto::basic_ictr<fast_io::ibuf, fast_io::crypto::speck::speck_enc_128_128> enc_stream(
-		std::array<uint8_t, 16>{'8',u8'3',u8'3',u8'4',u8';',u8'2',u8'3',u8'4',u8'a',u8'2',u8'c',u8'4',u8']',u8'0',u8'3',u8'4'},
-		std::array<uint8_t, 8>{'1',u8'2',u8'3',u8'4',u8'1',u8'2',u8'3',u8'4'},u8"speck.txt");
-	for(auto & e : v)
-		scan(enc_stream,e);
+		scan(cfu,v[i]);
 	}*/
+
+	{
+	fast_io::timer t("ibuf_mutex");
+	fast_io::ibuf_file_mutex ibuf_file("filebuf_io_observer.txt");
+	for(std::size_t i(0);i!=N;++i)
+		scan(ibuf_file,v[i]);
+	}
+
+	{
+	fast_io::timer t("filebuf");
+	std::ifstream fin("filebuf_io_observer.txt",std::ifstream::binary);
+	fast_io::filebuf_io_observer fiob(fin.rdbuf());
+	for(std::size_t i(0);i!=N;++i)
+		scan(fiob,v[i]);
+	}
 }
 catch(std::exception const& e)
 {

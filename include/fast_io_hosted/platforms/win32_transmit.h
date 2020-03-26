@@ -134,6 +134,9 @@ inline std::pair<bool,std::uintmax_t> memory_map_transmit_impl(output& outp,inpu
 	if(!map_view_handle_temp)
 		return {};
 	unique_win32_map_view map_view_handle(map_view_handle_temp);
+/*	win32::win32_memory_range_entry entry{map_view_handle_temp,to_mapped_size};
+	if(!fast_io::win32::PrefetchVirtualMemory(win32::GetCurrentProcess(),1,std::addressof(entry),0))
+		return {};*/
 	write(outp,reinterpret_cast<std::byte const*>(map_view_handle_temp),//std::byte can alias. Not UB
 		reinterpret_cast<std::byte const*>(map_view_handle_temp)+to_mapped_size);
 	return {true,to_mapped_size};

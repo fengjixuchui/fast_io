@@ -12,7 +12,7 @@ inline constexpr unrep<mantissaType,exponentType> init_repm2(mantissaType const&
 		static_cast<exponentType>(exponent-static_cast<exponentType>(floating_traits<floating>::bias+floating_traits<floating>::mantissa_bits+2))};
 }
 
-template<bool uppercase_e=false,std::size_t mode=0,bool int_hint=false,std::random_access_iterator Iter,std::floating_point F>
+template<char8_t decimal_point,bool uppercase_e=false,std::size_t mode=0,bool int_hint=false,std::random_access_iterator Iter,std::floating_point F>
 inline constexpr Iter output_shortest(Iter result, F d)
 {
 	using char_type = std::remove_reference_t<decltype(*result)>;
@@ -68,7 +68,7 @@ inline constexpr Iter output_shortest(Iter result, F d)
 						mantissa_type m1(v2%static_cast<mantissa_type>(10000));
 						mantissa_type v3(v2/static_cast<mantissa_type>(10000));
 						if(m1)[[likely]]//This must be fixed form
-							result+=jiaendu::output_unsigned(v2,result);
+							result+=jiaendu::output_unsigned(result,v2);
 						else
 						{
 							for(;;)
@@ -90,9 +90,9 @@ inline constexpr Iter output_shortest(Iter result, F d)
 								}
 								else
 								{
-									jiaendu::output_unsigned(v3,result+1);
+									jiaendu::output_unsigned(result+1,v3);
 									*result=result[1];
-									result[1]=u8'.';
+									result[1]=decimal_point;
 									result+=v3_len+1;
 								}
 								if constexpr(uppercase_e)
@@ -105,7 +105,7 @@ inline constexpr Iter output_shortest(Iter result, F d)
 							}
 							else
 							{
-								jiaendu::output_unsigned(v2,result);
+								jiaendu::output_unsigned(result,v2);
 								result+=v2_len;
 							}
 						}
@@ -117,7 +117,7 @@ inline constexpr Iter output_shortest(Iter result, F d)
 					}
 				}
 				else if constexpr(mode==1)		//fixed
-					result+=jiaendu::output_unsigned(v2,result);
+					result+=jiaendu::output_unsigned(result,v2);
 				else	//scientific
 				{
 					auto const v2_len(chars_len<10,true>(v2));
@@ -128,7 +128,7 @@ inline constexpr Iter output_shortest(Iter result, F d)
 							break;
 						v2=d;
 					}
-					result+=output_unsigned_point(v2);
+					result+=details::jiaendu::output_unsigned_point<decimal_point>(v2,result);
 					if constexpr(uppercase_e)
 						my_copy_n(u8"E+",2,result);
 					else
@@ -275,7 +275,7 @@ inline constexpr Iter output_shortest(Iter result, F d)
 		*result=0x2d;
 		++result;
 	}
-	if constexpr(mode==0) //shortest
+	if constexpr(mode==0) //general
 	{
 		std::int32_t olength(static_cast<std::int32_t>(chars_len<10,true>(v.front())));	
 		std::int32_t const real_exp(static_cast<std::int32_t>(e10 + removed + olength - 1));
@@ -297,13 +297,13 @@ inline constexpr Iter output_shortest(Iter result, F d)
 		std::uint32_t scientific_length(olength==1?olength+3:olength+5);
 		if(scientific_length<fixed_length)
 		{
-			result+=details::jiaendu::output_unsigned_point(v.front(),result);
+			result+=details::jiaendu::output_unsigned_point<decimal_point>(v.front(),result);
 			return output_exp<uppercase_e>(static_cast<std::int32_t>(real_exp),result);
 		}
 		switch(this_case)
 		{
 		case 1:
-			jiaendu::output_unsigned(v.front(),result);
+			jiaendu::output_unsigned(result,v.front());
 			result+=olength;
 			return my_fill_n(result,real_exp+1-olength,0x30);
 		case 2:
@@ -312,22 +312,31 @@ inline constexpr Iter output_shortest(Iter result, F d)
 			auto eposition(real_exp+1);
 			if(olength==eposition)
 			{
-				jiaendu::output_unsigned(a,result);
+				jiaendu::output_unsigned(result,a);
 				result+=olength;
 			}
 			else
 			{
-				jiaendu::output_unsigned(a,result+1);
+				jiaendu::output_unsigned(result+1,a);
 				my_copy_n(result+1,eposition,result);
-				result[eposition]=u8'.';
+				result[eposition]=decimal_point;
 				result+=olength+1;
 			}
 			return result;
 		}
 		default:
-			result=my_copy_n(u8"0.",2,result);
+			if constexpr(decimal_point==u8'.')
+				result=my_copy_n(u8"0.",2,result);
+			else if constexpr(decimal_point==u8',')
+				result=my_copy_n(u8"0,",2,result);
+			else
+			{
+				*result=u8'0';		//to do with UTF32 decimal points
+				*++result=decimal_point;
+				++result;
+			}
 			result=my_fill_n(result,static_cast<exponent_type>(-real_exp-1),0x30);
-			jiaendu::output_unsigned(v.front(),result);
+			jiaendu::output_unsigned(result,v.front());
 			result+=olength;
 			return result;
 		}
@@ -338,7 +347,7 @@ inline constexpr Iter output_shortest(Iter result, F d)
 		std::int32_t const real_exp(static_cast<std::int32_t>(e10 + removed + olength - 1));
 		if(olength<=real_exp)
 		{
-			jiaendu::output_unsigned(v.front(),result);
+			jiaendu::output_unsigned(result,v.front());
 			result+=olength;
 			return my_fill_n(result,real_exp+1-olength,0x30);	
 		}
@@ -348,23 +357,32 @@ inline constexpr Iter output_shortest(Iter result, F d)
 			auto eposition(real_exp+1);
 			if(olength==eposition)
 			{
-				jiaendu::output_unsigned(a,result);
+				jiaendu::output_unsigned(result,a);
 				result+=olength;
 			}
 			else
 			{
-				jiaendu::output_unsigned(a,result+1);
+				jiaendu::output_unsigned(result+1,a);
 				my_copy_n(result+1,eposition,result);
-				result[eposition]=u8'.';
+				result[eposition]=decimal_point;
 				result+=olength+1;
 			}
 			return result;
 		}
 		else
 		{
-			result=my_copy_n(u8"0.",2,result);
+			if constexpr(decimal_point==u8'.')
+				result=my_copy_n(u8"0.",2,result);
+			else if constexpr(decimal_point==u8',')
+				result=my_copy_n(u8"0,",2,result);
+			else
+			{
+				*result=u8'0';
+				*++result=decimal_point;
+				++result;
+			}
 			result=my_fill_n(result,static_cast<exponent_type>(-real_exp-1),0x30);
-			jiaendu::output_unsigned(v.front(),result);
+			jiaendu::output_unsigned(result,v.front());
 			result+=olength;
 			return result;
 		}
@@ -375,16 +393,16 @@ inline constexpr Iter output_shortest(Iter result, F d)
 		std::int32_t real_exp(static_cast<std::int32_t>(e10 + removed - 1));
 		if(a<10)
 		{
-			std::size_t olength(details::jiaendu::output_unsigned(a,result));
+			std::size_t olength(details::jiaendu::output_unsigned(result,a));
 			real_exp+=olength;
 			result+=olength;
 		}
 		else
 		{
-			std::size_t olength(details::jiaendu::output_unsigned(a,result+1));
+			std::size_t olength(details::jiaendu::output_unsigned(result+1,a));
 			real_exp+=static_cast<std::int32_t>(olength);
 			*result=result[1];
-			result[1]=u8'.';
+			result[1]=decimal_point;
 			result+=olength+1;
 		}
 		return output_exp<uppercase_e>(static_cast<std::int32_t>(real_exp),result);

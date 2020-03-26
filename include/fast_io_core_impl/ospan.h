@@ -89,8 +89,8 @@ template<typename T>
 
 namespace fast_io
 {
-	using ospan = basic_ospan<std::span<char>>;
-	using u8ospan = basic_ospan<std::span<char>>;
+using ospan = basic_ospan<std::span<char>>;
+using u8ospan = basic_ospan<std::span<char8_t>>;
 }
 
 #endif

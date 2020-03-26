@@ -16,7 +16,7 @@ private:
 		try
 		{
 			fm.close();
-			if(valid(hd))
+			if(hd)
 				truncate(hd,current_position);
 		}
 		catch(...)

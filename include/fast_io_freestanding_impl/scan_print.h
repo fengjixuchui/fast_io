@@ -5,10 +5,7 @@ namespace fast_io
 inline namespace print_scan_details
 {
 template<typename output,typename T>
-concept weak_printable=output_stream<output>&&requires(basic_ostring<std::basic_string<typename output::char_type>>& ostr,T const& t)
-{
-	print_define(ostr,t);
-};
+concept weak_printable=output_stream<output>&&general_printable<basic_ostring<std::basic_string<typename output::char_type>>,T>;
 
 template<typename output,typename T>
 concept weak_sendable=output_stream<output>&&requires(basic_ostring<std::basic_string<typename output::char_type>>& ostr,T const& t)
@@ -22,7 +19,7 @@ inline constexpr void buffer_print(output &out,Args&& ...args)
 	if constexpr((weak_printable<output,Args>||...))
 	{
 		basic_ostring<std::basic_string<typename output::char_type>> ostr;
-		(print_define(ostr,std::forward<Args>(args)),...);
+		(print_control(ostr,std::forward<Args>(args)),...);
 		write(out,ostr.str().cbegin(),ostr.str().cend());
 	}
 	else if constexpr(output_stream<output>)
@@ -35,7 +32,7 @@ inline constexpr void buffer_println(output &out,Args&& ...args)
 	if constexpr((weak_printable<output,Args>||...))
 	{
 		basic_ostring<std::basic_string<typename output::char_type>> ostr;
-		(print_define(ostr,std::forward<Args>(args)),...);
+		(print_control(ostr,std::forward<Args>(args)),...);
 		put(ostr,0xA);
 		write(out,ostr.str().cbegin(),ostr.str().cend());
 	}

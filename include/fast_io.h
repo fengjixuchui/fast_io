@@ -44,31 +44,31 @@ Also, it allows you for copying some other languages' code into C++
 template<typename T,typename... Args>
 requires (!fast_io::output_stream<T>)&&requires(T&& t,Args&& ...args)
 {
-	print(fast_io::out,std::forward<T>(t),std::forward<Args>(args)...);
+	fast_io::print(fast_io::out,std::forward<T>(t),std::forward<Args>(args)...);
 }
 inline constexpr void print(T&& t,Args&& ...args)
 {
-	print(fast_io::out,std::forward<T>(t),std::forward<Args>(args)...);
+	fast_io::print(fast_io::out,std::forward<T>(t),std::forward<Args>(args)...);
 }
 
 template<typename T,typename... Args>
 requires (!fast_io::output_stream<T>)&&requires(T&& t,Args&& ...args)
 {
-	println(fast_io::out,std::forward<T>(t),std::forward<Args>(args)...);
+	fast_io::println(fast_io::out,std::forward<T>(t),std::forward<Args>(args)...);
 }
 inline constexpr void println(T&& t,Args&& ...args)
 {
-	println(fast_io::out,std::forward<T>(t),std::forward<Args>(args)...);
+	fast_io::println(fast_io::out,std::forward<T>(t),std::forward<Args>(args)...);
 }
 
 template<typename... Args>
 requires requires(Args&& ...args)
 {
-	fprint(fast_io::out,std::forward<Args>(args)...);
+	fast_io::fprint(fast_io::out,std::forward<Args>(args)...);
 }
 inline constexpr void fprint(Args&& ...args)
 {
-	fprint(fast_io::out,std::forward<Args>(args)...);
+	fast_io::fprint(fast_io::out,std::forward<Args>(args)...);
 }
 
 
@@ -78,31 +78,31 @@ inline constexpr void fprint(Args&& ...args)
 template<typename T,typename... Args>
 requires (!fast_io::output_stream<T>)&&requires(T&& t,Args&& ...args)
 {
-	print(fast_io::out,std::forward<T>(t),std::forward<Args>(args)...);
+	fast_io::print(fast_io::out,std::forward<T>(t),std::forward<Args>(args)...);
 }
 inline constexpr void debug_print(T&& t,Args&& ...args)
 {
-	print(fast_io::out,std::forward<T>(t),std::forward<Args>(args)...);
+	fast_io::print(fast_io::out,std::forward<T>(t),std::forward<Args>(args)...);
 }
 
 template<typename T,typename... Args>
 requires (!fast_io::output_stream<T>)&&requires(T&& t,Args&& ...args)
 {
-	println(fast_io::out,std::forward<T>(t),std::forward<Args>(args)...);
+	fast_io::println(fast_io::out,std::forward<T>(t),std::forward<Args>(args)...);
 }
 inline constexpr void debug_println(T&& t,Args&& ...args)
 {
-	println(fast_io::out,std::forward<T>(t),std::forward<Args>(args)...);
+	fast_io::println(fast_io::out,std::forward<T>(t),std::forward<Args>(args)...);
 }
 
 template<typename... Args>
 requires requires(Args&& ...args)
 {
-	fprint(fast_io::out,std::forward<Args>(args)...);
+	fast_io::fprint(fast_io::out,std::forward<Args>(args)...);
 }
 inline constexpr void debug_fprint(Args&& ...args)
 {
-	fprint(fast_io::out,std::forward<Args>(args)...);
+	fast_io::fprint(fast_io::out,std::forward<Args>(args)...);
 }
 
 #endif
