@@ -31,13 +31,13 @@ template<typename T>
 template<typename T>
 [[nodiscard]] inline constexpr auto oreserve(basic_ospan<T>& ob,std::size_t size)
 {
-	return ob.internal_pointer+=size;
+	return ob.internal_pointer;
 }
 
 template<typename T>
-inline constexpr void orelease(basic_ospan<T>& ob,std::size_t size)
+inline constexpr void orelease(basic_ospan<T>& ob,typename T::pointer ptr)
 {
-	ob.internal_pointer-=size;
+	ob.internal_pointer=ptr;
 }
 
 template<typename T,std::contiguous_iterator Iter>

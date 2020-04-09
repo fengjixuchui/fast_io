@@ -38,6 +38,9 @@ using wnative_io_handle = wwin32_io_handle;
 using wnative_file = wwin32_file;
 using wnative_pipe = wwin32_pipe;
 using native_file_map = win32_file_map;
+template<std::integral ch_type>
+using basic_native_io_observer = basic_win32_io_observer<ch_type>;
+
 
 #else
 inline constexpr auto native_stdin_number(posix_stdin_number);
@@ -57,6 +60,10 @@ using wnative_io_handle = wposix_io_handle;
 using wnative_file = wposix_file;
 using wnative_pipe = wposix_pipe;
 using native_file_map = posix_file_map;
+
+template<std::integral ch_type>
+using basic_native_io_observer = basic_posix_io_observer<ch_type>;
+
 #endif
 
 

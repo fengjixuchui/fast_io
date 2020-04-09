@@ -208,9 +208,9 @@ inline std::size_t output_unsigned(Iter str,U value)
 			{
 				auto wstr(str);
 				memcpy(wstr,static_tables<ch_type>::table5[v2].data(),bytes4);
-				str += static_offset<>::offset[v2];
+				wstr += static_offset<>::offset[v2];
 				memcpy(wstr,static_tables<ch_type>::table4[remains0].data(),bytes4);
-				str += 4;
+				wstr += 4;
 				return static_cast<std::size_t>(wstr - str);
 			}
 		}

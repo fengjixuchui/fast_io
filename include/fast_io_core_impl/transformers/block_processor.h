@@ -50,7 +50,7 @@ public:
 			write(out,ret);
 		}
 	}
-	template<input_stream input, std::contiguous_iterator Iter>
+	template<buffer_input_stream input, std::contiguous_iterator Iter>
 	requires (sizeof(typename input::char_type)==1)
 	Iter read_proxy(input& in,Iter b, Iter e)
 	{

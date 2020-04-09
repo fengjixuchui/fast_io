@@ -57,9 +57,11 @@
 #include"fast_io_core_impl/tie.h"
 #include"fast_io_core_impl/transmit.h"
 #include"fast_io_core_impl/random_access_transmit.h"
+#include"fast_io_core_impl/transmit_once.h"
 #include"fast_io_core_impl/unsigned_extension.h"
 #include"fast_io_core_impl/wrapper.h"
 #include"fast_io_core_impl/flush.h"
+#include"fast_io_core_impl/read_write_all.h"
 
 // Transformers
 #include"fast_io_core_impl/transformers/transformers.h"

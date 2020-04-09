@@ -139,8 +139,8 @@ inline constexpr auto transmit_impl(output& outp,input& inp,Args&& ...args)
 		{
 			if constexpr(buffer_input_stream<input>)
 			{
-				write(outp,begin(inp),end(inp));
-				iclear(inp);
+				write(outp,ibuffer_curr(inp),ibuffer_end(inp));
+				ibuffer_set_curr(inp,ibuffer_end(inp));
 			}
 			if constexpr(buffer_output_stream<output>)
 				flush(outp);

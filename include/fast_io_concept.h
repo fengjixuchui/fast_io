@@ -124,6 +124,20 @@ concept memory_map_output_stream_impl = requires(T& out)
 	memory_map_out_handle(out);
 };
 
+template<typename T,typename U>
+concept async_input_stream_impl =
+	requires(T& in,typename T::char_type* iter,U&& func)
+{
+	async_read(in,iter,iter,func);
+};
+
+template<typename T,typename U>
+concept async_output_stream_impl =
+	requires(T& out,typename T::char_type* iter,U&& func)
+{
+	async_write(out,iter,iter,func);
+};
+
 /*
 
 template<typename T>

@@ -87,7 +87,7 @@ inline constexpr std::size_t print_reserve_size
 	if constexpr(fm==manip::floating_formats::general||fm==manip::floating_formats::scientific)
 		return 30;
 	else if constexpr(fm==manip::floating_formats::fixed)
-		return 325;
+		return 350;
 }
 
 template<std::random_access_iterator raiter,manip::floating_formats fm,std::floating_point T,bool uppercase,char32_t dec,typename U>

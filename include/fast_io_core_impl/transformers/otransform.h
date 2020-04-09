@@ -186,74 +186,68 @@ inline constexpr void flush(otransform<Ohandler,func,ch_type,sz,rac>& ob)
 	}
 }
 
-template<buffer_input_stream Ohandler,typename func,std::integral ch_type,std::size_t sz,bool rac>
-inline constexpr decltype(auto) iflush(otransform<Ohandler,func,ch_type,sz,rac>& out)
+template<buffer_output_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
+inline constexpr auto obuffer_begin(otransform<input,func,ch_type,sz,rac>& ib) noexcept
 {
-	return iflush(*out);
+	return ib.buffer.data();
 }
 
-template<buffer_input_stream Ohandler,typename func,std::integral ch_type,std::size_t sz,bool rac>
-inline constexpr void iclear(otransform<Ohandler,func,ch_type,sz,rac>& out)
+template<buffer_output_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
+inline constexpr auto obuffer_curr(otransform<input,func,ch_type,sz,rac>& ib) noexcept
 {
-	iclear(*out);
+	return ib.buffer.data()+ib.position; 
 }
 
-template<buffer_input_stream Ohandler,typename func,std::integral ch_type,std::size_t sz,bool rac>
-inline constexpr decltype(auto) begin(otransform<Ohandler,func,ch_type,sz,rac>& out)
+template<buffer_output_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
+inline constexpr auto obuffer_end(otransform<input,func,ch_type,sz,rac>& ib) noexcept
 {
-	return begin(out.native_handle());
+	return ib.buffer.data()+sz;
 }
 
-template<buffer_input_stream Ohandler,typename func,std::integral ch_type,std::size_t sz,bool rac>
-inline constexpr decltype(auto) end(otransform<Ohandler,func,ch_type,sz,rac>& out)
+template<buffer_output_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
+inline constexpr void obuffer_set_curr(otransform<input,func,ch_type,sz,rac>& ib,ch_type* ptr) noexcept
 {
-	return end(out.native_handle());
+	ib.position=ptr-ib.buffer.data();
 }
 
-template<buffer_input_stream Ohandler,typename func,std::integral ch_type,std::size_t sz,bool rac>
-inline constexpr otransform<Ohandler,func>& operator++(otransform<Ohandler,func,ch_type,sz,rac>& out)
+template<buffer_output_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
+inline constexpr void overflow(otransform<input,func,ch_type,sz,rac>& ob,typename input::char_type ch)
 {
-	operator++(out.native_handle());
-	return out;
+	ob.handle.second.write_proxy(ob.handle.first,ob.buffer.data(),ob.buffer.data()+ob.buffer.size());
+	ob.position=1;
+	ob.buffer.front()=ch;
 }
 
-template<buffer_input_stream Ohandler,typename func,std::integral ch_type,std::size_t sz,bool rac,std::integral I>
-inline constexpr otransform<Ohandler,func>& operator+=(otransform<Ohandler,func,ch_type,sz,rac>& out,I i)
+template<buffer_input_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
+inline constexpr decltype(auto) ibuffer_begin(otransform<input,func,ch_type,sz,rac>& ib)
 {
-	operator+=(out.native_handle(),i);
-	return out;
+	return ibuffer_begin(ib.handle.first);
 }
 
-template<output_stream Ohandler,typename func,std::integral ch_type,std::size_t sz,bool rac,std::integral I>
-[[nodiscard]] inline constexpr auto oreserve(otransform<Ohandler,func,ch_type,sz,rac>& ob,I i) -> decltype(ob.buffer.data())
+template<buffer_input_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
+inline constexpr decltype(auto) ibuffer_curr(otransform<input,func,ch_type,sz,rac>& ib)
 {
-	if(ob.buffer.size()<=(ob.position+=i))[[unlikely]]
-	{
-		ob.position-=i;
-		return nullptr;
-	}
-	return ob.buffer.data()+ob.position;
+	return ibuffer_curr(ib.handle.first);
 }
 
-template<output_stream Ohandler,typename func,std::integral ch_type,std::size_t sz,bool rac,std::integral I>
-inline constexpr void orelease(otransform<Ohandler,func,ch_type,sz,rac>& ob,I i)
+template<buffer_input_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
+inline constexpr decltype(auto) ibuffer_end(otransform<input,func,ch_type,sz,rac>& ib)
 {
-	ob.position-=i;
+	return ibuffer_end(ib.handle.first);
 }
 
-template<output_stream Ohandler,typename func,std::integral ch_type,std::size_t sz,bool rac>
-inline constexpr void put(otransform<Ohandler,func,ch_type,sz,rac>& ob,typename otransform<Ohandler,func,ch_type,sz,rac>::char_type ch)
+template<buffer_input_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac,typename U>
+inline constexpr void ibuffer_set_curr(otransform<input,func,ch_type,sz,rac>& ib,U ptr)
 {
-	if(ob.position==ob.buffer.size())[[unlikely]]		//buffer full
-	{
-		ob.handle.second.write_proxy(ob.handle.first,ob.buffer.data(),ob.buffer.data()+ob.buffer.size());
-		ob.position=1;
-		ob.buffer.front()=ch;
-		return;//no flow dependency any more
-	}
-	ob.buffer[ob.position]=ch;
-	++ob.position;
+	ibuffer_set_curr(ib.handle.first,ib.position);
 }
+
+template<buffer_input_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
+inline constexpr bool underflow(otransform<input,func,ch_type,sz,rac>& ib)
+{
+	return underflow(ib.handle.first);
+}
+
 
 template<output_stream output,typename func,std::integral ch_type,std::size_t sz,bool rac,typename... Args>
 requires (random_access_stream<output>&&rac)

@@ -4,7 +4,7 @@ namespace fast_io
 {
 
 
-template<buffer_input_stream input,typename func,std::integral ch_type = typename input::char_type,std::size_t buffer_size=4096,bool randomaccess=false>
+template<input_stream input,typename func,std::integral ch_type = typename input::char_type,std::size_t buffer_size=4096,bool randomaccess=false>
 class itransform
 {
 public:
@@ -42,25 +42,10 @@ public:
 	itransform_function_default_construct(Args&& ...args):itransform<input,func>(std::piecewise_construct,
 				std::forward_as_tuple(std::forward<Args>(args)...),std::forward_as_tuple()){}
 };
-namespace details
-{
 
-template<typename T,std::contiguous_iterator Iter>
-inline constexpr Iter itransform_read(T& ob,Iter cbegin,Iter cend)
+template<buffer_input_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac,std::contiguous_iterator Iter>
+inline constexpr auto read(itransform<input,func,ch_type,sz,rac>& ob,Iter cbegin,Iter cend)
 {
-/*	std::size_t diff(cend-cbegin);
-	if(ob.buffer.size()<=ob.position+diff)[[unlikely]]
-	{
-		cbegin=std::copy_n(cbegin,ob.buffer.size()-ob.position,ob.buffer.data()+ob.position);
-		for(ob.handle.second(ob.handle.first,ob.buffer.data(),ob.buffer.data()+ob.buffer.size());
-			(cbegin=std::copy_n(cbegin,ob.buffer.size(),ob.buffer.data()))!=cend;
-			ob.handle.second(ob.handle.first,ob.buffer.data(),ob.buffer.data()+ob.buffer.size()));
-
-		return;
-	}
-	std::copy_n(cbegin,diff,ob.buffer.data()+ob.position);
-	ob.position+=diff;*/
-//Todo
 	// empty ob first
 	std::size_t remain_length(ob.position_end - ob.position);
 	std::size_t available_length(cend - cbegin);
@@ -87,14 +72,6 @@ inline constexpr Iter itransform_read(T& ob,Iter cbegin,Iter cend)
 	return cbegin;
 }
 
-}
-
-template<buffer_input_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac,std::contiguous_iterator Iter>
-inline constexpr auto read(itransform<input,func,ch_type,sz,rac>& in,Iter cbegini,Iter cendi)
-{
-	return details::itransform_read(in,cbegini,cendi);
-}
-
 template<output_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac,std::contiguous_iterator Iter>
 inline constexpr auto write(itransform<input,func,ch_type,sz,rac>& ob,Iter cbegini,Iter cendi)
 {
@@ -108,76 +85,66 @@ inline constexpr void flush(itransform<input,func,ch_type,sz,rac>& ob)
 }
 
 template<buffer_input_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
-inline constexpr void iclear(itransform<input,func,ch_type,sz,rac>& in)
+inline constexpr auto ibuffer_begin(itransform<input,func,ch_type,sz,rac>& ib) noexcept
 {
-	in.position={};
+	return ib.buffer.data();
 }
 
 template<buffer_input_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
-inline constexpr bool iflush(itransform<input,func,ch_type,sz,rac>& in)
+inline constexpr auto ibuffer_curr(itransform<input,func,ch_type,sz,rac>& ib) noexcept
 {
-	in.position_end=in.handle.second.read_proxy(in.handle.first,in.buffer.data(),in.buffer.data()+in.buffer.size())-in.buffer.data();
-	in.position={};
-	return in.position_end;
-}
-
-/*
-template<output_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
-inline generator<ch_type> igenerator(itransform<input,func,ch_type,sz,rac>& in)
-{
-	for(;;)
-	{
-		for(;in.position!=in.position_end;++in.position)
-			co_yield in.buffer[in.position];
-		in.position_end=in.handle.second.read_proxy(in.handle.first,in.buffer.data(),in.buffer.data()+in.buffer.size())-in.buffer.data();
-		in.position={};
-		if(!in.position_end)
-			break;
-	}
-}
-*/
-template<buffer_input_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
-inline constexpr auto begin(itransform<input,func,ch_type,sz,rac>& in)
-{
-	return in.buffer.data()+in.position;
+	return ib.buffer.data()+ib.position; 
 }
 
 template<buffer_input_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
-inline constexpr auto end(itransform<input,func,ch_type,sz,rac>& in)
+inline constexpr auto ibuffer_end(itransform<input,func,ch_type,sz,rac>& ib) noexcept
 {
-	return in.buffer.data()+in.position_end;
+	return ib.buffer.data()+ib.position_end;
 }
 
 template<buffer_input_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
-inline constexpr otransform<input,func>& operator++(itransform<input,func,ch_type,sz,rac>& in)
+inline constexpr void ibuffer_set_curr(itransform<input,func,ch_type,sz,rac>& ib,ch_type* ptr) noexcept
 {
-	++in.position;
-	return in;
+	ib.position=ptr-ib.buffer.data();
 }
 
-template<buffer_input_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac,std::integral I>
-inline constexpr otransform<input,func>& operator+=(itransform<input,func,ch_type,sz,rac>& in,I i)
+template<buffer_input_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
+inline constexpr bool underflow(itransform<input,func,ch_type,sz,rac>& ob)
 {
-	in.position+=i;
-	return in;
+	//itransform_underflow_impl
+	ob.position_end = ob.handle.second.read_proxy(ob.handle.first, ob.buffer.data(), ob.buffer.data() + ob.buffer.size())-ob.buffer.data();
+	ob.position=0;
+	return ob.position_end;
 }
 
-template<output_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac,std::integral I>
-[[nodiscard]] inline constexpr auto oreserve(itransform<input,func,ch_type,sz,rac>& ob,I i)
+template<buffer_output_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
+inline constexpr decltype(auto) obuffer_begin(itransform<input,func,ch_type,sz,rac>& ib)
 {
-	return oreserve(ob.handle.first,i);
+	return obuffer_begin(ib.handle.first);
 }
 
-template<buffer_output_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac,std::integral I>
-inline constexpr void orelease(itransform<input,func,ch_type,sz,rac>& ob,I i)
+template<buffer_output_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
+inline constexpr decltype(auto) obuffer_curr(itransform<input,func,ch_type,sz,rac>& ib)
 {
-	orelease(ob.handle.first,i);
+	return obuffer_curr(ib.handle.first);
 }
 
-template<character_output_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
-inline constexpr void put(itransform<input,func,ch_type,sz,rac>& ob,typename itransform<input,func,ch_type,sz,rac>::char_type ch)
+template<buffer_output_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
+inline constexpr decltype(auto) obuffer_end(itransform<input,func,ch_type,sz,rac>& ib)
 {
-	put(ob.handle.first,ch);
+	return obuffer_end(ib.handle.first);
+}
+
+template<buffer_output_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac,typename U>
+inline constexpr void obuffer_set_curr(itransform<input,func,ch_type,sz,rac>& ib,U ptr)
+{
+	obuffer_set_curr(ib.handle.first,ib.position);
+}
+
+template<buffer_output_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
+inline constexpr void overflow(itransform<input,func,ch_type,sz,rac>& ib,typename input::char_type ch)
+{
+	overflow(ib.handle.first,ch);
 }
 
 template<buffer_input_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac,typename... Args>
@@ -188,39 +155,6 @@ inline constexpr auto seek(itransform<input,func,ch_type,sz,rac>& in,Args&& ...a
 	return in.seek_proxy(in.handle.first,std::forward<Args>(args)...);
 }
 
-namespace details
-{
-template<buffer_input_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
-constexpr bool itransform_ireserve_internal(itransform<input,func,ch_type,sz,rac>& ib,std::size_t n)
-{
-	if(ib.buffer.size()<=n)
-#ifdef __cpp_exceptions
-		throw std::system_error(EOPNOTSUPP,std::generic_category());
-#else
-		fast_terminate();
-#endif
-	ib.position=std::copy(ib.data()+ib.position,ib.data()+ib.position_end,ib.data())-ib.data();
-	for(auto b(ib.position);;b=ib.position_end)
-	{
-		if(n<=(ib.position=ib.handle.second.read_proxy(ib.handle.first,ib.buffer.data(),ib.buffer.data()+ib.buffer.size())-ib.buffer.data()))
-			return true;
-		else if(!ib.position)
-		{
-			if(!b)
-				return false;
-			return true;	
-		}
-	}
-}
-}
-
-template<buffer_input_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
-inline constexpr bool ireserve(itransform<input,func,ch_type,sz,rac>& ib,std::size_t n)
-{
-	if((sz-ib.position)<n)[[unlikely]]
-		return details::itransform_ireserve_internal(ib,n);
-	return true;
-}
 template<redirect_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
 inline constexpr decltype(auto) redirect_handle(itransform<input,func,ch_type,sz,rac>& t)
 {

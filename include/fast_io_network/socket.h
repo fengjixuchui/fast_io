@@ -135,6 +135,28 @@ struct address_info
 	socklen_t storage_size=sizeof(socket_address_storage);
 };
 
+template<fast_io::output_stream output>
+inline void print_define(output& out,address_info const& a)
+{
+	if(a.storage_size==4)
+	{
+		std::array<std::uint8_t, 4> storage;
+		memcpy(storage.data(),std::addressof(a.storage),4);
+		print(out,storage.front(),u8":",storage[1],u8":",storage[2],u8":",storage.back());
+	}
+	else if(a.storage_size==16)
+	{
+		std::array<std::uint16_t, 8> storage;
+		memcpy(storage.data(),std::addressof(a.storage),16);
+		print(out,u8"[",hex(storage.front()),u8":",hex(storage[1]),u8":",
+			hex(storage[2]),u8":",hex(storage[3]),u8":",
+			hex(storage[4]),u8":",hex(storage[5]),u8":",
+			hex(storage[6]),u8":",hex(storage[7]),u8"]");
+	}
+	else [[unlikely]]
+		print(out,u8"unknown");
+}
+
 template<bool async=false>
 class basic_connected_socket:public basic_socket<async>
 {
@@ -142,6 +164,7 @@ public:
 	template<typename ...Args>
 	requires std::constructible_from<basic_socket<async>,Args...>
 	basic_connected_socket(Args&& ...args):basic_socket<async>(std::forward<Args>(args)...){}
+	using basic_socket<async>::native_handle;
 };
 
 template<bool async,std::contiguous_iterator Iter>
@@ -154,11 +177,11 @@ inline Iter write(basic_connected_socket<async>& soc,Iter begin,Iter end)
 {
 	return begin+(sock::details::send(soc.native_handle(),std::to_address(begin),static_cast<int>((end-begin)*sizeof(*begin)),0)/sizeof(*begin));
 }
-#if !(defined(__WINNT__) && defined(_MSC_VER))
+#if !(defined(__WINNT__) || defined(_MSC_VER))
 template<bool async>
 inline auto redirect_handle(basic_connected_socket<async>& soc)
 {
-	return bit_cast<void*>(soc.native_handle());
+	return soc.native_handle();
 }
 #endif
 template<bool async=false>

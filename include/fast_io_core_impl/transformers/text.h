@@ -32,64 +32,57 @@ inline constexpr Iter write_proxy(output& out,Iter begin,Iter end)
 	write(out,begin,end);
 	return end;
 }
-template<buffer_input_stream input,std::contiguous_iterator Iter>
-inline constexpr Iter read_proxy(input& in,Iter b,Iter e)
-{
-	for(;b!=e;++b)
-	{
-		auto ch(ifront<1>(in));
-		if(!ch.second)
-			break;
-		if(ch==u8'\r')
-		{
-			if(!ireserve(in,2)||begin(in)+1==end(in))
-				return b;
-			if(begin(in)[1]==u8'\n')
-			{
-				*b=u8'\n';
-				in+=2;
-				continue;
-			}
-		}
-		*b=ch.first;
-		++in;
-	}
-	return read(in,begin,end);
-}
 };
-/*
+
 template<bool sys=false>
 class text_to_binary
 {
-	std::conditional_t<!sys||operating_system::native==operating_system::win32,bool,void> last_is_carriage{};
 public:
-template<buffer_output_stream output,std::contiguous_iterator Iter>
-inline constexpr void operator()(output& out,Iter begin,Iter end)
+template<character_input_stream input,std::contiguous_iterator Iter>
+inline constexpr Iter read_proxy(input& inp,Iter ib,Iter ie)
 {
 	if constexpr(!sys||operating_system::native==operating_system::win32)
 	{
-		if(begin==end)
-			return;
-		if(last_is_carriage&&*begin!=u8'\n')
-			put(out,'\r');
-		last_is_carriage={};
-		for(auto iter(begin);iter!=end;++iter)
-			if(*iter==u8'\r')
+		auto ig{igenerator(inp)};
+		auto b{begin(ig)};
+		auto e{end(ig)};
+		for(;b!=e&&ib!=ie;++b)
+		{
+			if(*b==u8'\r')[[unlikely]]
 			{
-				write(out,begin,iter);
-				put(out,u8'\r');
-				begin=iter;
+				if(++b==e)[[unlikely]]
+				{
+					*ib=u8'\r';
+					return ++ib;
+				}
+				else if(*b==u8'\n')
+					*ib=u8'\n';
+				else
+				{
+					*ib=u8'\r';
+					if(++ib==ie)[[unlikely]]
+						return ie;
+					*ib=*b;
+				}
 			}
-
+			else
+				*ib=*b;
+			++ib;
+		}
+		return ib;
 	}
 	else
-		write(out,begin,end);
+		return read(inp,ib,ie);
 }
 };
-*/
+
 template<buffer_output_stream T,std::integral ch_type=typename T::char_type,std::size_t sz=4096>
 using obinary_to_text=otransform_function_default_construct<T,binary_to_text<false>,ch_type,sz>;
 template<buffer_output_stream T,std::integral ch_type=typename T::char_type,std::size_t sz=4096>
 using obinary_to_native_text=otransform_function_default_construct<T,binary_to_text<true>,ch_type,sz>;
 
+template<buffer_input_stream T,std::integral ch_type=typename T::char_type,std::size_t sz=4096>
+using itext_to_binary=itransform_function_default_construct<T,text_to_binary<false>,ch_type,sz>;
+template<buffer_input_stream T,std::integral ch_type=typename T::char_type,std::size_t sz=4096>
+using inative_text_to_binary=itransform_function_default_construct<T,text_to_binary<true>,ch_type,sz>;
 }

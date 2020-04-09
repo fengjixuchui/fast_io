@@ -120,4 +120,42 @@ template<std::size_t sign=false,std::uint8_t base=0xA,character_input_stream inp
 	return skip_until(in,details::is_numerical<sign,base>{});
 }
 
+template<character_input_stream input>
+[[nodiscard]] inline constexpr std::size_t skip_line(input& in)
+{
+	if constexpr(buffer_input_stream<input>)
+	{
+		std::size_t skipped{};
+		for(;;)
+		{
+			auto b{ibuffer_curr(in)};
+			auto e{ibuffer_end(in)};
+			for(;b!=e&&*b!=u8'\n';++b)
+				++skipped;
+			if(b!=e)
+			{
+				ibuffer_set_curr(in,b+1);
+				return skipped;
+			}
+			else
+			{
+				if(!underflow(in))[[unlikely]]
+					return skipped;
+			}
+		}
+	}
+	else
+	{
+		auto ig{igenerator(in)};
+		auto b{begin(ig)};
+		auto e{end(ig)};
+		std::size_t n{};
+		for(;b!=e&&*b!=u8'\n';++b)
+			++n;
+		if(b!=e)[[likely]]
+			++b;
+		return n;
+	}
+}
+
 }

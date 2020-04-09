@@ -6,7 +6,7 @@ namespace fast_io
 namespace details
 {
 
-template<char8_t base,bool uppercase,bool point=false,char32_t dec,std::random_access_iterator Iter,typename U>
+template<char8_t base,bool uppercase,bool point=false,char32_t dec=u8'.',std::random_access_iterator Iter,typename U>
 requires (!std::signed_integral<U>)
 inline constexpr auto output_base_number_impl(Iter iter,U a)
 {
