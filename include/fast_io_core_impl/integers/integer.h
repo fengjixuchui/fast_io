@@ -19,8 +19,8 @@ inline constexpr std::size_t print_reserve_size(print_reserve_type_t<int_type>)
 		return details::cal_max_uint_size<std::make_unsigned_t<int_type>>()+1;
 }
 
-template<std::random_access_iterator caiter,std::integral int_type>
-inline constexpr caiter print_reserve_define(print_reserve_type_t<int_type>,caiter iter,int_type i)
+template<std::random_access_iterator caiter,std::integral int_type,typename U>
+inline constexpr caiter print_reserve_define(print_reserve_type_t<int_type>,caiter iter,U i)
 {
 	if (std::is_constant_evaluated())
 	{

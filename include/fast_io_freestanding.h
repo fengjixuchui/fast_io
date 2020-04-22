@@ -20,6 +20,7 @@
 #include"fast_io_freestanding_impl/send_receive.h"
 #include"fast_io_freestanding_impl/natural.h"
 #include"fast_io_freestanding_impl/memptr.h"
+#include"fast_io_freestanding_impl/reserve_read_write.h"
 #include"fast_io_freestanding_impl/code_cvt/utf.h"
 //#include"fast_io_freestanding_impl/ucs.h"
 #if __cpp_coroutines >= 201902

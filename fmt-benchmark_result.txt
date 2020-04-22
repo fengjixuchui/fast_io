@@ -1,0 +1,66 @@
+
+
+
+fmt int-benchmark
+
+
+cqwrteur@Home-Server:~/format-benchmark/build$ ./int-benchmark
+ 1  27422
+ 2 247633
+ 3 449843
+ 4 247585
+ 5  24802
+ 6   2431
+ 7    263
+ 8     18
+ 9      3
+10      0
+2020-04-19 03:38:10
+Running ./int-benchmark
+Run on (32 X 3500 MHz CPU s)
+CPU Caches:
+  L1 Data 32 KiB (x16)
+  L1 Instruction 32 KiB (x16)
+  L2 Unified 512 KiB (x16)
+  L3 Unified 16384 KiB (x4)
+Load Average: 2.16, 1.84, 1.72
+***WARNING*** CPU scaling is enabled, the benchmark real time measurements may be noisy and will incur extra overhead.
+-------------------------------------------------------------------------------
+Benchmark                     Time             CPU   Iterations UserCounters...
+-------------------------------------------------------------------------------
+sprintf                60485763 ns     60474022 ns           11 items_per_second=16.536M/s
+ostringstream          51180157 ns     51171861 ns           14 items_per_second=19.542M/s
+to_string              11014153 ns     11011117 ns           64 items_per_second=90.8173M/s
+format                 37004954 ns     36998384 ns           19 items_per_second=27.0282M/s
+format_to              23252236 ns     23247699 ns           30 items_per_second=43.015M/s
+format_to_compile      10718580 ns     10716635 ns           65 items_per_second=93.3129M/s
+format_int              7867424 ns      7866027 ns           89 items_per_second=127.129M/s
+lexical_cast           28524279 ns     28517046 ns           25 items_per_second=35.0667M/s
+boost_format          249655844 ns    249592177 ns            3 items_per_second=4.00654M/s
+boost_karma_generate    8663729 ns      8661537 ns           81 items_per_second=115.453M/s
+voigt_itostr           14439111 ns     14436228 ns           49 items_per_second=69.2702M/s
+decimal_from            9162319 ns      9160592 ns           76 items_per_second=109.163M/s
+stout_ltoa             18511214 ns     18507607 ns           38 items_per_second=54.0318M/s
+fast_io_ospan_res       6871917 ns      6870708 ns          102 items_per_second=145.545M/s
+fast_io_concat          7967591 ns      7966162 ns           88 items_per_second=125.531M/s
+
+
+
+2020-04-19 03:39:11
+Running ./double-benchmark
+Run on (32 X 3500 MHz CPU s)
+CPU Caches:
+  L1 Data 32 KiB (x16)
+  L1 Instruction 32 KiB (x16)
+  L2 Unified 512 KiB (x16)
+  L3 Unified 16384 KiB (x4)
+Load Average: 1.78, 1.81, 1.72
+***WARNING*** CPU scaling is enabled, the benchmark real time measurements may be noisy and will incur extra overhead.
+---------------------------------------------------------
+Benchmark               Time             CPU   Iterations
+---------------------------------------------------------
+sprintf            550514 ns       550435 ns         1273
+format_to          116631 ns       116611 ns         6009
+dtoa_milo           75115 ns        75103 ns         9299
+fast_io_ospan       19955 ns        19950 ns        33426
+fast_io_concat      43292 ns        43286 ns        16414

@@ -15,7 +15,7 @@ template<typename T>
 inline constexpr manip::dot<manip::fixed<T const>> fixed(T const &f){return {{f}};}
 
 template<bool uppercase=false,typename T>
-inline constexpr manip::dot<manip::general<uppercase,T const>> scientific(T const &f){return {{f}};}
+inline constexpr manip::dot<manip::scientific<uppercase,T const>> scientific(T const &f){return {{f}};}
 
 template<bool uppercase=false,typename T>
 inline constexpr manip::dot<manip::scientific_precision<uppercase,T const>> scientific(T const &f,std::size_t precision){return {{f,precision}};}

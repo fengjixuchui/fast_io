@@ -312,8 +312,7 @@ public:
 	explicit constexpr basic_win32_io_handle(native_handle_type handle) noexcept:
 		basic_win32_io_observer<ch_type>{handle}{}
 	explicit basic_win32_io_handle(std::uint32_t dw):
-		basic_win32_io_observer<ch_type>{fast_io::win32::GetStdHandle(dw)}
-	{}
+		basic_win32_io_observer<ch_type>{fast_io::win32::GetStdHandle(dw)}{}
 	basic_win32_io_handle(basic_win32_io_handle const& other)
 	{
 		auto const current_process(win32::GetCurrentProcess());
@@ -360,13 +359,13 @@ public:
 };
 
 template<std::integral ch_type>
-inline constexpr auto redirect_handle(basic_win32_io_observer<ch_type>& hd)
+inline constexpr auto redirect_handle(basic_win32_io_observer<ch_type> hd)
 {
 	return hd.native_handle();
 }
 
 template<std::integral ch_type,typename T,std::integral U>
-inline std::common_type_t<std::int64_t, std::size_t> seek(basic_win32_io_observer<ch_type>& handle,seek_type_t<T>,U i=0,seekdir s=seekdir::cur)
+inline std::common_type_t<std::int64_t, std::size_t> seek(basic_win32_io_observer<ch_type> handle,seek_type_t<T>,U i=0,seekdir s=seekdir::cur)
 {
 	std::int64_t distance_to_move_high{};
 	std::int64_t seekposition{seek_precondition<std::int64_t,T,ch_type>(i)};
@@ -380,13 +379,13 @@ inline std::common_type_t<std::int64_t, std::size_t> seek(basic_win32_io_observe
 }
 
 template<std::integral ch_type,std::integral U>
-inline auto seek(basic_win32_io_observer<ch_type>& handle,U i=0,seekdir s=seekdir::cur)
+inline auto seek(basic_win32_io_observer<ch_type> handle,U i=0,seekdir s=seekdir::cur)
 {
 	return seek(handle,seek_type<ch_type>,i,s);
 }
 
 template<std::integral ch_type,std::contiguous_iterator Iter>
-inline Iter read(basic_win32_io_observer<ch_type>& handle,Iter begin,Iter end)
+inline Iter read(basic_win32_io_observer<ch_type> handle,Iter begin,Iter end)
 {
 	std::uint32_t numberOfBytesRead{};
 	std::size_t to_read((end-begin)*sizeof(*begin));
@@ -408,7 +407,7 @@ inline Iter read(basic_win32_io_observer<ch_type>& handle,Iter begin,Iter end)
 }
 
 template<std::integral ch_type,std::contiguous_iterator Iter>
-inline Iter write(basic_win32_io_observer<ch_type>& handle,Iter cbegin,Iter cend)
+inline Iter write(basic_win32_io_observer<ch_type> handle,Iter cbegin,Iter cend)
 {
 	std::size_t to_write((cend-cbegin)*sizeof(*cbegin));
 	if constexpr(4<sizeof(std::size_t))
@@ -425,17 +424,23 @@ inline Iter write(basic_win32_io_observer<ch_type>& handle,Iter cbegin,Iter cend
 }
 /*
 template<std::integral ch_type>
-inline auto memory_map_in_handle(basic_win32_io_observer<ch_type>& handle)
+inline auto memory_map_in_handle(basic_win32_io_observer<ch_type> handle)
 {
 	return handle.native_handle();
 }
 */
 template<std::integral ch_type>
-inline constexpr void flush(basic_win32_io_observer<ch_type>&){}
+inline constexpr void flush(basic_win32_io_observer<ch_type>){}
 
 template<std::integral ch_type>
 class basic_win32_file:public basic_win32_io_handle<ch_type>
 {
+	void seek_end_local()
+	{
+		basic_win32_file<ch_type> local{this->native_handle()};
+		seek(*this,0,seekdir::end);
+		local.detach();
+	};
 public:
 	using char_type=ch_type;
 	using native_handle_type = basic_win32_io_handle<ch_type>::native_handle_type;
@@ -468,7 +473,7 @@ public:
 				)
 	{
 		if constexpr ((om&open_mode::ate)!=open_mode::none)
-			seek(*this,0,seekdir::end);
+			seek_end_local();
 	}
 	template<open_mode om>
 	basic_win32_file(std::string_view filename,open_interface_t<om>):basic_win32_io_handle<char_type>(
@@ -479,7 +484,7 @@ public:
 				details::win32_file_openmode_single<om>::mode.dwFlagsAndAttributes))
 	{
 		if constexpr ((om&open_mode::ate)!=open_mode::none)
-			seek(*this,0,seekdir::end);
+			seek_end_local();
 	}
 	template<open_mode om>
 	basic_win32_file(std::string_view filename,open_interface_t<om>,perms p):basic_win32_io_handle<char_type>(
@@ -490,7 +495,7 @@ public:
 				details::dw_flag_attribute_with_perms(details::win32_file_openmode_single<om>::mode.dwFlagsAndAttributes,p)))
 	{
 		if constexpr ((om&open_mode::ate)!=open_mode::none)
-			seek(*this,0,seekdir::end);
+			seek_end_local();
 	}
 	basic_win32_file(std::string_view filename,open_mode om,perms pm=static_cast<perms>(420)):basic_win32_io_handle<char_type>(nullptr)
 	{
@@ -514,7 +519,7 @@ public:
 				mode.dwFlagsAndAttributes);
 		}
 		if ((om&open_mode::ate)!=open_mode::none)
-			seek(*this,0,seekdir::end);
+			seek_end_local();
 	}
 	basic_win32_file(std::string_view file,std::string_view mode,perms pm=static_cast<perms>(420)):
 		basic_win32_file(file,fast_io::from_c_mode(mode),pm){}
@@ -532,13 +537,13 @@ public:
 };
 
 template<std::integral ch_type>
-inline auto zero_copy_in_handle(basic_win32_io_handle<ch_type>& handle)
+inline auto zero_copy_in_handle(basic_win32_io_observer<ch_type> handle)
 {
 	return handle.native_handle();
 }
 
 template<std::integral ch_type>
-inline void truncate(basic_win32_io_handle<ch_type>& handle,std::size_t size)
+inline void truncate(basic_win32_io_observer<ch_type> handle,std::size_t size)
 {
 	seek(handle,size,seekdir::beg);
 	if(!win32::SetEndOfFile(handle.native_handle()))
@@ -675,6 +680,13 @@ inline win32_io_handle win32_stdout()
 inline win32_io_handle win32_stderr()
 {
 	return win32_io_handle{win32_stderr_number};
+}
+
+
+template<output_stream output,std::integral intg>
+inline constexpr void print_define(output& out,basic_win32_io_observer<intg> iob)
+{
+	print(out,fast_io::unsigned_view(iob.native_handle()));
 }
 
 }

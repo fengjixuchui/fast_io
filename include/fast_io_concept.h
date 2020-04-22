@@ -138,13 +138,12 @@ concept async_output_stream_impl =
 	async_write(out,iter,iter,func);
 };
 
-/*
 
 template<typename T>
-concept status_stream = requires(T stm)
+concept status_stream_impl = requires(T stm)
 {
-	{typename T::status_type};
-}*/
+	typename T::status_type;
+};
 }
 
 
@@ -228,6 +227,19 @@ concept memory_map_output_stream = output_stream<T>&&details::memory_map_output_
 
 template<typename T>
 concept memory_map_io_stream = memory_map_input_stream<T>&&memory_map_output_stream<T>;
+
+template<typename T>
+concept status_output_stream = output_stream<T>&&details::status_stream_impl<T>&&requires(T out)
+{
+	print_status_define(out);
+	println_status_define(out);
+};
+
+template<typename T>
+concept status_input_stream = input_stream<T>&&details::status_stream_impl<T>&&requires(T in)
+{
+	scan_status_define(in);
+};
 
 template<typename input,typename T>
 concept scanable=input_stream<input>&&requires(input& in,T&& t)

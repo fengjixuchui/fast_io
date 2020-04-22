@@ -9,3 +9,4 @@ int main()
 		close(1);
 	}
 }
+

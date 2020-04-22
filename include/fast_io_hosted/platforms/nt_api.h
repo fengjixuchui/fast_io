@@ -156,5 +156,26 @@ __kernel_entry NTSYSCALLAPI NTSTATUS NtReadFile(
 				void*,std::uint32_t,std::int64_t*,std::uint32_t*)>("NtReadFile"))(std::forward<Args>(args)...);
 }
 
+struct rtlp_curdir_def
+{
+	std::int32_t ref_count;
+	void* handle;
+};
+
+struct rtl_relative_name_u
+{
+	unicode_string relative_name;
+	void* containing_directory;
+	rtlp_curdir_def cur_dir_ref;
+};
+
+template<typename... Args>
+requires (sizeof...(Args)==4)
+inline auto rtl_dos_path_name_to_nt_path_name_u(Args&& ...args)
+{
+//https://github.com/mirror/reactos/blob/master/rostests/apitests/ntdll/RtlDosPathNameToNtPathName_U.c
+	return (get_nt_module_handle<int __stdcall(wchar_t const*,unicode_string*,wchar_t const**,rtl_relative_name_u*)>("RtlDosPathNameToNtPathName_U"))(std::forward<Args>(args)...);
+}
+//RtlDosPathNameToNtPathName_U
 
 }

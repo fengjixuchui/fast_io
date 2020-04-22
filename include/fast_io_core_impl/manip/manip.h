@@ -4,6 +4,7 @@ namespace fast_io
 {
 namespace manip
 {
+
 template<typename T>
 struct char_view
 {
@@ -68,7 +69,7 @@ struct whole
 template<typename T>
 struct line
 {
-	T& reference;
+	T reference;
 };
 
 template<typename T>
@@ -196,7 +197,10 @@ template<typename T>
 inline constexpr manip::whole<T> whole(T &f){return {f};}
 
 template<typename T>
-inline constexpr manip::line<T> line(T &f){return {f};}
+inline constexpr manip::line<T&> line(T &f){return {f};}
+
+template<typename T>
+inline constexpr manip::line<T> line(T&& f){return {std::move(f)};}
 
 template<typename T>
 inline constexpr manip::no_decoration<T> no_decoration(T &f){return {f};}

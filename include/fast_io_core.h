@@ -23,15 +23,17 @@
 #include<cstring>		//for memcpy
 #include<bit>			//for std::endian, std::rotl and std::bit_cast etc
 #include<span>
+#include<atomic>		//std::atomic
+
 //fast_io core
 #include"fast_io_core_impl/before_cpp20_concept.h"
 #include"fast_io_core_impl/overflow.h"
 #include"fast_io_core_impl/eof.h"
 #include"fast_io_core_impl/fill_nc.h"
 #include"fast_io_core_impl/io_ref.h"
+#include"fast_io_core_impl/linux/system_call.h"
 #include"fast_io_core_impl/manip/impl.h"
 
-#include"fast_io_core_impl/linux/system_call.h"
 
 // This should provide an option macro to disable any generation for table in freestanding environments.
 #include"fast_io_core_impl/integers/integer.h"

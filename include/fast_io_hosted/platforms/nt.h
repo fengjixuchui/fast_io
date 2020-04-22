@@ -6,7 +6,7 @@ namespace fast_io
 namespace details::nt
 {
 
-
+/*
 template<typename... Args>
 inline void nt_create_file_impl(std::span<wchar_t> sp,void** FileHandle,std::uint32_t DesiredAccess,win32::nt::object_attributes* ObjectAttributes,Args&& ...args)
 {
@@ -21,7 +21,6 @@ inline void nt_create_file_impl(std::span<wchar_t> sp,void** FileHandle,std::uin
 	if(status)
 		throw nt_error(status);
 };
-
 template<typename... Args>
 requires (sizeof...(Args)==11)
 inline void nt_create_file_impl(std::string_view path,Args&& ...args)
@@ -41,7 +40,7 @@ inline void nt_create_file_impl(std::string_view path,Args&& ...args)
 		nt_create_file_impl(sp,std::forward<Args>(args)...);
 	}
 }
-
+*/
 struct nt_open_mode
 {
 std::uint32_t DesiredAccess{};
@@ -204,7 +203,6 @@ public:
 	}
 };
 
-
 template<std::integral ch_type,std::contiguous_iterator Iter>
 inline Iter write(basic_nt_io_observer<ch_type> obs,Iter cbegin,Iter cend)
 {
@@ -286,11 +284,32 @@ public:
 	basic_nt_file(std::string_view filename,open_interface_t<om>)
 	{
 		constexpr auto& mode{details::nt::nt_file_openmode_single<om>::mode};
-		win32::nt::object_attributes obj{.Length=sizeof(win32::nt::object_attributes),.Attributes=0x00000040};
+		wchar_t const* part_name{};
+		win32::nt::rtl_relative_name_u relative_name;
+		win32::nt::unicode_string nt_name;
+		{
+		details::temp_unique_arr_ptr<wchar_t> buffer(filename.size()+1);
+		*code_cvt_from_utf8_to_utf16(filename.data(),filename.data()+filename.size(),buffer.data())=0;
+		if(!win32::nt::rtl_dos_path_name_to_nt_path_name_u(buffer.data(),std::addressof(nt_name),std::addressof(part_name),std::addressof(relative_name)))
+			details::throw_win32_error();
+		}
 		win32::nt::io_status_block block{};
-		details::nt::nt_create_file_impl(filename,std::addressof(this->native_handle()),
+		win32::nt::object_attributes obj{.Length=sizeof(win32::nt::object_attributes),
+			.RootDirectory=relative_name.containing_directory,
+			.ObjectName=std::addressof(relative_name.relative_name),
+			.Attributes=0x00000040	//Todo
+		};
+
+		auto const status{win32::nt::nt_create_file(
+			std::addressof(this->native_handle()),
 		mode.DesiredAccess,std::addressof(obj),std::addressof(block),nullptr,mode.FileAttributes,
-		mode.ShareAccess,mode.CreateDisposition,mode.CreateOptions,nullptr,0);
+		mode.ShareAccess,mode.CreateDisposition,mode.CreateOptions,nullptr,0)};
+		if(status)
+#ifdef __cpp_exceptions
+			throw nt_error(status);
+#else
+			fast_terminate();
+#endif
 	}
 	~basic_nt_file()
 	{
@@ -357,4 +376,11 @@ using nt_file=basic_nt_file<char>;
 using u8nt_io_observer=basic_nt_io_observer<char8_t>;
 using u8nt_io_handle=basic_nt_io_handle<char8_t>;
 using u8nt_file=basic_nt_file<char8_t>;
+
+template<output_stream output,std::integral intg>
+inline constexpr void print_define(output& out,basic_nt_io_observer<intg> iob)
+{
+	print(out,fast_io::unsigned_view(iob.native_handle()));
+}
+
 }

@@ -10,6 +10,7 @@ class temp_unique_arr_ptr
 {
 public:
 	T* ptr{};
+	constexpr temp_unique_arr_ptr()=default;
 #if __cpp_constexpr_dynamic_alloc >= 201907L
 	constexpr
 #endif
@@ -19,6 +20,14 @@ public:
 	constexpr temp_unique_arr_ptr(temp_unique_arr_ptr&& bmv) noexcept:ptr(bmv.ptr)
 	{
 		bmv.ptr=nullptr;
+	}
+	constexpr T* data() noexcept
+	{
+		return ptr;
+	}
+	constexpr T* data() const noexcept
+	{
+		return ptr;
 	}
 #if __cpp_constexpr_dynamic_alloc >= 201907L
 	constexpr

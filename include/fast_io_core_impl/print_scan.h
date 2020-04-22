@@ -179,6 +179,7 @@ inline constexpr void print_control_line(output& out,T&& t)
 	}
 }
 
+
 template<output_stream output,typename ...Args>
 requires(general_printable<output,Args>&&...)
 inline constexpr void normal_print(output &out,Args&& ...args)
@@ -217,6 +218,28 @@ inline constexpr void normal_send(output &out,Args&& ...args)
 
 }
 
+template<output_stream output,typename T>
+requires ((printable<output,T>&&character_output_stream<output>)||reserve_printable<T>)
+inline constexpr void print_define(output& out,manip::line<T> t)
+{
+	print_scan_details::print_control_line(out,t.reference);
+}
+
+template<reserve_printable T>
+inline constexpr std::size_t print_reserve_size(print_reserve_type_t<manip::line<T>>)
+{
+	constexpr std::size_t sz{print_reserve_size(print_reserve_type<std::remove_cvref_t<T>>)+1};
+	return sz;
+}
+
+template<std::random_access_iterator raiter,reserve_printable T,typename U>
+inline constexpr raiter print_reserve_define(print_reserve_type_t<manip::line<T>>,raiter start,U a)
+{
+	auto it{print_reserve_define(print_reserve_type<std::remove_cvref_t<T>>,start,a.reference)};
+	*it=u8'\n';
+	return ++it;
+}
+
 template<bool report_eof=false,input_stream input,typename ...Args>
 requires (sizeof...(Args)!=0)
 inline constexpr auto scan(input &in,Args&& ...args)
@@ -228,6 +251,8 @@ inline constexpr auto scan(input &in,Args&& ...args)
 		decltype(auto) uh(unlocked_handle(in));
 		return scan<report_eof>(uh,std::forward<Args>(args)...);
 	}
+	else if constexpr(status_input_stream<input>)
+		scan_status_define(in,std::forward<Args>(args)...);
 	else
 		return normal_scan<report_eof>(in,std::forward<Args>(args)...);
 }
@@ -258,6 +283,8 @@ inline constexpr void print(output &out,Args&& ...args)
 		decltype(auto) uh(unlocked_handle(out));
 		print(uh,std::forward<Args>(args)...);
 	}
+	else if constexpr(status_output_stream<output>)
+		print_status_define(out,std::forward<Args>(args)...);
 	else if constexpr(((printable<output,Args>||reserve_printable<Args>)&&...)&&(sizeof...(Args)==1||buffer_output_stream<output>))
 		(print_control(out,std::forward<Args>(args)),...);
 	else if constexpr(true)
@@ -274,6 +301,8 @@ inline constexpr void println(output &out,Args&& ...args)
 		decltype(auto) uh(unlocked_handle(out));
 		println(uh,std::forward<Args>(args)...);
 	}
+	else if constexpr(status_output_stream<output>)
+		println_status_define(out,std::forward<Args>(args)...);
 	else if constexpr((sizeof...(Args)==1&&(reserve_printable<Args>&&...))||
 	((printable<output,Args>&&...)&&buffer_output_stream<output>&&character_output_stream<output>))
 		normal_println(out,std::forward<Args>(args)...);

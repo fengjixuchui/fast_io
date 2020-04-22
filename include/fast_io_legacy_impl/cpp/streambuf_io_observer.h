@@ -103,6 +103,13 @@ using stringbuf_io_observer = basic_stringbuf_io_observer<char>;
 using wstringbuf_io_observer = basic_stringbuf_io_observer<wchar_t>;
 using u8stringbuf_io_observer = basic_stringbuf_io_observer<char8_t>;
 
+template<output_stream output,typename T>
+inline constexpr void print_define(output& out,basic_general_streambuf_io_observer<T> iob)
+{
+	print(out,fast_io::unsigned_view(iob.native_handle()));
+}
+
+
 }
 
 

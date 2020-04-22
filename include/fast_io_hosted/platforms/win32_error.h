@@ -34,4 +34,16 @@ public:
 		return ec;
 	}
 };
+
+namespace details
+{
+inline void throw_win32_error()
+{
+#ifdef __cpp_exceptions
+	throw win32_error();
+#else
+	fast_terminate();
+#endif
+}
+}
 }

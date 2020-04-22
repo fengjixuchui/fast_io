@@ -203,6 +203,10 @@ public:
 #endif
 		return {bit_cast<void*>(os_handle)};
 	}
+	explicit operator basic_nt_io_observer<char_type>() const
+	{
+		return static_cast<basic_nt_io_observer<char_type>>(static_cast<basic_win32_io_observer<char_type>>(*this));
+	}
 #endif
 };
 
@@ -358,6 +362,12 @@ inline void swap(basic_posix_io_observer<ch_type>& a,basic_posix_io_observer<ch_
 template<std::integral ch_type>
 class basic_posix_file:public basic_posix_io_handle<ch_type>
 {
+	void seek_end_local()
+	{
+		basic_posix_file<ch_type> local{this->native_handle()};
+		seek(*this,0,seekdir::end);
+		local.detach();
+	};
 #if defined(__WINNT__) || defined(_MSC_VER)
 	using mode_t = int;
 #endif
@@ -441,25 +451,25 @@ public:
 	basic_posix_file(std::string_view file,open_interface_t<om>,perms_interface_t<pm>):basic_posix_file(native_interface,file.data(),details::posix_file_openmode<om>::mode,static_cast<mode_t>(pm))
 	{
 		if constexpr ((om&open_mode::ate)!=open_mode::none)
-			seek(*this,0,seekdir::end);
+			seek_end_local();
 	}
 	template<open_mode om>
 	basic_posix_file(std::string_view file,open_interface_t<om>):basic_posix_file(native_interface,file.data(),details::posix_file_openmode<om>::mode,static_cast<mode_t>(436))
 	{
 		if constexpr ((om&open_mode::ate)!=open_mode::none)
-			seek(*this,0,seekdir::end);
+			seek_end_local();
 	}
 	template<open_mode om>
 	basic_posix_file(std::string_view file,open_interface_t<om>,perms pm):basic_posix_file(native_interface,file.data(),details::posix_file_openmode<om>::mode,static_cast<mode_t>(pm))
 	{
 		if constexpr ((om&open_mode::ate)!=open_mode::none)
-			seek(*this,0,seekdir::end);
+			seek_end_local();
 	}
 	//potential support modification prv in the future
 	basic_posix_file(std::string_view file,open_mode om,perms pm=static_cast<perms>(436)):basic_posix_file(native_interface,file.data(),details::calculate_posix_open_mode(om),static_cast<mode_t>(pm))
 	{
 		if((om&open_mode::ate)!=open_mode::none)
-			seek(*this,0,seekdir::end);
+			seek_end_local();
 	}
 	basic_posix_file(std::string_view file,std::string_view mode,perms pm=static_cast<perms>(436)):basic_posix_file(file,from_c_mode(mode),pm){}
 #endif
@@ -720,6 +730,12 @@ inline constexpr posix_io_handle posix_stdout()
 inline constexpr posix_io_handle posix_stderr()
 {
 	return posix_io_handle(posix_stderr_number);
+}
+
+template<output_stream output,std::integral intg>
+inline constexpr void print_define(output& out,basic_posix_io_observer<intg> iob)
+{
+	print(out,iob.native_handle());
 }
 
 }

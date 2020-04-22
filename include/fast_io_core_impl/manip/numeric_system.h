@@ -19,7 +19,7 @@ struct decimal_point
 };
 
 template<typename T>
-using dot = decimal_point<T,u8','>;
+using dot = decimal_point<T,u8'.'>;
 
 template<typename T>
 using comma = decimal_point<T,u8','>;

@@ -4,6 +4,8 @@
 #include"fast_io_hosted.h"
 #include"fast_io_legacy_impl/c/impl.h"
 #include"fast_io_legacy_impl/cpp/streambuf_io_observer.h"
+#include"fast_io_legacy_impl/fast_io_streambuf.h"
+#include"fast_io_legacy_impl/std_locale.h"
 
 /*
 #include<iostream>

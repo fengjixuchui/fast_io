@@ -5,5 +5,5 @@ int main()
 {
 	double d;
 	scan(d);
-	println(fast_io::fixed<6>(d));
+	println(fast_io::fixed(d,6));
 }
