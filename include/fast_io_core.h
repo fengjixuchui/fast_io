@@ -29,9 +29,9 @@
 #include"fast_io_core_impl/before_cpp20_concept.h"
 #include"fast_io_core_impl/overflow.h"
 #include"fast_io_core_impl/eof.h"
-#include"fast_io_core_impl/fill_nc.h"
 #include"fast_io_core_impl/io_ref.h"
 #include"fast_io_core_impl/linux/system_call.h"
+#include"fast_io_core_impl/internal_temporary_buffer.h"
 #include"fast_io_core_impl/manip/impl.h"
 
 
@@ -48,6 +48,7 @@
 #include"fast_io_core_impl/ostring.h"
 #include"fast_io_core_impl/ostring_ref.h"
 #include"fast_io_core_impl/skip.h"
+
 //#include"fast_io_core_impl/istack.h"
 //#include"fast_io_core_impl/ebcdic.h"
 // Precondition should be removed in the future. Programming bugs

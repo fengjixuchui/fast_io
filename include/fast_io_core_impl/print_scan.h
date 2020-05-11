@@ -16,7 +16,7 @@ inline constexpr void print_define(output& out,std::basic_string_view<typename o
 	write(out,str.data(),str.data()+str.size());
 }
 
-inline namespace print_scan_details
+namespace details
 {
 
 template<character_input_stream input,typename T>
@@ -222,7 +222,7 @@ template<output_stream output,typename T>
 requires ((printable<output,T>&&character_output_stream<output>)||reserve_printable<T>)
 inline constexpr void print_define(output& out,manip::line<T> t)
 {
-	print_scan_details::print_control_line(out,t.reference);
+	details::print_control_line(out,t.reference);
 }
 
 template<reserve_printable T>
@@ -244,7 +244,6 @@ template<bool report_eof=false,input_stream input,typename ...Args>
 requires (sizeof...(Args)!=0)
 inline constexpr auto scan(input &in,Args&& ...args)
 {
-	using namespace print_scan_details;
 	if constexpr(mutex_input_stream<input>)
 	{
 		typename input::lock_guard_type lg{mutex(in)};
@@ -254,21 +253,20 @@ inline constexpr auto scan(input &in,Args&& ...args)
 	else if constexpr(status_input_stream<input>)
 		scan_status_define(in,std::forward<Args>(args)...);
 	else
-		return normal_scan<report_eof>(in,std::forward<Args>(args)...);
+		return details::normal_scan<report_eof>(in,std::forward<Args>(args)...);
 }
 
 template<input_stream input,typename ...Args>
 requires (sizeof...(Args)!=0)
 inline constexpr void receive(input &in,Args&& ...args)
 {
-	using namespace print_scan_details;
 	if constexpr(mutex_input_stream<input>)
 	{
 		typename input::lock_guard_type lg{mutex(in)};
 		decltype(auto) uh(unlocked_handle(in));
 		receive(uh,std::forward<Args>(args)...);
 	}
-	else if constexpr(true)
+	else
 		normal_receive(in,std::forward<Args>(args)...);
 }
 
@@ -276,7 +274,6 @@ template<output_stream output,typename ...Args>
 requires (sizeof...(Args)!=0)
 inline constexpr void print(output &out,Args&& ...args)
 {
-	using namespace print_scan_details;
 	if constexpr(mutex_output_stream<output>)
 	{
 		typename output::lock_guard_type lg{mutex(out)};
@@ -286,15 +283,20 @@ inline constexpr void print(output &out,Args&& ...args)
 	else if constexpr(status_output_stream<output>)
 		print_status_define(out,std::forward<Args>(args)...);
 	else if constexpr(((printable<output,Args>||reserve_printable<Args>)&&...)&&(sizeof...(Args)==1||buffer_output_stream<output>))
-		(print_control(out,std::forward<Args>(args)),...);
-	else if constexpr(true)
-		buffer_print(out,std::forward<Args>(args)...);
+	{
+		(details::print_control(out,std::forward<Args>(args)),...);
+	}
+	else
+	{
+		internal_temporary_buffer<typename output::char_type> buffer;
+		print(buffer,std::forward<Args>(args)...);
+		write(out,buffer.beg_ptr,buffer.end_ptr);
+	}
 }
 
 template<output_stream output,typename ...Args>
 inline constexpr void println(output &out,Args&& ...args)
 {
-	using namespace print_scan_details;
 	if constexpr(mutex_output_stream<output>)
 	{
 		typename output::lock_guard_type lg{mutex(out)};
@@ -305,16 +307,30 @@ inline constexpr void println(output &out,Args&& ...args)
 		println_status_define(out,std::forward<Args>(args)...);
 	else if constexpr((sizeof...(Args)==1&&(reserve_printable<Args>&&...))||
 	((printable<output,Args>&&...)&&buffer_output_stream<output>&&character_output_stream<output>))
-		normal_println(out,std::forward<Args>(args)...);
-	else if constexpr(true)
-		buffer_println(out,std::forward<Args>(args)...);
+	{
+		if constexpr((sizeof...(Args)==1)&&(reserve_printable<Args>&&...))
+		{
+			((details::print_control_line(out,std::forward<Args>(args))),...);
+		}
+		else
+		{
+			((details::print_control(out,std::forward<Args>(args))),...);
+			put(out,u8'\n');
+		}
+	}
+	else
+	{
+		internal_temporary_buffer<typename output::char_type> buffer;
+		print(buffer,std::forward<Args>(args)...);
+		put(buffer,u8'\n');
+		write(out,buffer.beg_ptr,buffer.end_ptr);
+	}
 }
 
 template<output_stream output,typename ...Args>
 requires (sizeof...(Args)!=0)
 inline constexpr void send(output &out,Args&& ...args)
 {
-	using namespace print_scan_details;
 	if constexpr(mutex_output_stream<output>)
 	{
 		typename output::lock_guard_type lg{mutex(out)};
@@ -322,9 +338,15 @@ inline constexpr void send(output &out,Args&& ...args)
 		send(uh,std::forward<Args>(args)...);
 	}
 	else if constexpr((sendable<output,Args>&&...)&&(sizeof...(Args)==1||buffer_output_stream<output>))
-		normal_send(out,std::forward<Args>(args)...);
-	else if constexpr(true)
-		buffer_send(out,std::forward<Args>(args)...);
+	{
+		(send_define(out,std::forward<Args>(args)),...);
+	}
+	else
+	{
+		internal_temporary_buffer<typename output::char_type> buffer;
+		send(buffer,std::forward<Args>(args)...);
+		write(out,buffer.beg_ptr,buffer.end_ptr);
+	}
 }
 
 #ifndef NDEBUG
@@ -350,7 +372,7 @@ inline constexpr void debug_println(output &out,Args&& ...args)
 }
 
 #endif
-
+/*
 inline namespace print_scan_details
 {
 template<output_stream os,typename ch_type,typename ...Args>
@@ -417,6 +439,6 @@ inline constexpr void fprint(output &out,Args&& ...args)
 		buffer_fprint(out,std::forward<Args>(args)...);
 }
 
-
+*/
 
 }

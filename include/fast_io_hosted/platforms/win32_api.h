@@ -89,6 +89,8 @@ std::uint32_t __stdcall WaitForSingleObject(void*,std::uint32_t) noexcept;
 
 std::uint32_t __stdcall ResumeThread(void*) noexcept;
 
+std::uint32_t __stdcall CancelIo(void*) noexcept;
+
 struct startupinfo
 {
 std::uint32_t cb;
@@ -135,6 +137,13 @@ void*  VirtualAddress;
 std::size_t NumberOfBytes;
 };
 int __stdcall PrefetchVirtualMemory(void*,std::size_t,win32_memory_range_entry*,std::uint32_t flags);*/
+
+
+int __stdcall DeviceIoControl(void*,std::uint32_t,void*,std::uint32_t,void*,std::uint32_t,void*,overlapped*) noexcept;
+
+void* __stdcall CreateIoCompletionPort(void*,void*,std::uintptr_t,std::uint32_t) noexcept;
+
+int __stdcall GetQueuedCompletionStatus(void*,std::uint32_t*,std::uintptr_t*,overlapped**,std::uint32_t) noexcept;
 }
 
 

@@ -30,7 +30,7 @@ inline constexpr bool scan_define(input& in,std::basic_string<typename input::ch
 			auto i{b};
 			for(;i!=e&&dg(*i);++i);
 			str.append(b,i);
-			ibuffer_set_curr(in,b);
+			ibuffer_set_curr(in,i);
 			if(i==e)[[unlikely]]
 			{
 				if(!underflow(in))[[unlikely]]
@@ -149,7 +149,7 @@ inline void getwhole(input& in,std::basic_string<typename input::char_type> &str
 	str.clear();
 	for(decltype(get<true>(in)) ch;!(ch=get<true>(in)).second;str.push_back(ch.first));
 }
-*/
+
 
 template<character_output_stream output,std::size_t indent_width,bool left,char8_t ch,typename T>
 inline constexpr void print_define(output& out,manip::width<indent_width,left,ch,T const> a)
@@ -173,7 +173,7 @@ inline constexpr void print_define(output& out,manip::width<indent_width,left,ch
 	else
 		print(out,bas.str());
 }
-
+*/
 template<output_stream output>
 inline constexpr void print_define(output& out,std::endian e)
 {

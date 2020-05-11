@@ -4,71 +4,69 @@
 
 namespace fast_io
 {
-namespace details
+
+struct dns_iterator
 {
-	struct dns_iterator
+	addrinfo *ptr;
+};
+inline constexpr bool operator==(dns_iterator const& a, dns_iterator const& b)
+{
+	return a.ptr == b.ptr;
+}
+inline constexpr bool operator!=(dns_iterator const& a, dns_iterator const& b)
+{
+	return !(a==b);
+}
+inline constexpr bool operator==(std::default_sentinel_t, dns_iterator const& b)
+{
+	return b.ptr == nullptr;
+}
+inline constexpr bool operator==(dns_iterator const& b, std::default_sentinel_t)
+{
+	return b.ptr == nullptr;
+}
+inline constexpr bool operator!=(std::default_sentinel_t, dns_iterator const& b)
+{
+	return b.ptr != nullptr;
+}
+inline constexpr bool operator!=(dns_iterator const& b, std::default_sentinel_t)
+{
+	return b.ptr != nullptr;
+}
+inline address operator*(dns_iterator const &a)
+{
+	if (a.ptr->ai_family == AF_INET)
 	{
-		addrinfo *ptr;
-	};
-	inline constexpr bool operator==(dns_iterator const& a, dns_iterator const& b)
-	{
-		return a.ptr == b.ptr;
+		sockaddr_in addr;
+		memcpy(std::addressof(addr), a.ptr->ai_addr, sizeof(addr));
+		ipv4 ret;
+		memcpy(ret.storage.data(), std::addressof(addr.sin_addr), sizeof(ret.storage));
+		return address(ret);
 	}
-	inline constexpr bool operator!=(dns_iterator const& a, dns_iterator const& b)
+	else if (a.ptr->ai_family == AF_INET6)
 	{
-		return !(a==b);
+		sockaddr_in6 addr;
+		memcpy(std::addressof(addr), a.ptr->ai_addr, sizeof(addr));
+		ipv6 ret;
+		memcpy(ret.storage.data(), std::addressof(addr.sin6_addr), sizeof(ret.storage));
+		return address(ret);
 	}
-	inline constexpr bool operator==(std::default_sentinel_t, dns_iterator const& b)
-	{
-		return b.ptr == nullptr;
-	}
-	inline constexpr bool operator==(dns_iterator const& b, std::default_sentinel_t)
-	{
-		return b.ptr == nullptr;
-	}
-	inline constexpr bool operator!=(std::default_sentinel_t, dns_iterator const& b)
-	{
-		return b.ptr != nullptr;
-	}
-	inline constexpr bool operator!=(dns_iterator const& b, std::default_sentinel_t)
-	{
-		return b.ptr != nullptr;
-	}
-	inline address operator*(dns_iterator const &a)
-	{
-		if (a.ptr->ai_family == AF_INET)
-		{
-			sockaddr_in addr;
-			memcpy(std::addressof(addr), a.ptr->ai_addr, sizeof(addr));
-			ipv4 ret;
-			memcpy(ret.storage.data(), std::addressof(addr.sin_addr), sizeof(ret.storage));
-			return address(ret);
-		}
-		else if (a.ptr->ai_family == AF_INET6)
-		{
-			sockaddr_in6 addr;
-			memcpy(std::addressof(addr), a.ptr->ai_addr, sizeof(addr));
-			ipv6 ret;
-			memcpy(ret.storage.data(), std::addressof(addr.sin6_addr), sizeof(ret.storage));
-			return address(ret);
-		}
 #ifdef __cpp_exceptions
-		throw std::runtime_error("unknown family");
+	throw std::runtime_error("unknown family");
 #else
-		fast_terminate();
+	fast_terminate();
 #endif
-	}
-	inline constexpr dns_iterator& operator++(dns_iterator& a)
-	{
-		a.ptr = a.ptr->ai_next;
-		return a;
-	}
-	inline constexpr dns_iterator operator++(dns_iterator& a, int)
-	{
-		auto temp(a);
-		++a;
-		return temp;
-	}
+}
+inline constexpr dns_iterator& operator++(dns_iterator& a)
+{
+	a.ptr = a.ptr->ai_next;
+	return a;
+}
+inline constexpr dns_iterator operator++(dns_iterator& a, int)
+{
+	auto temp(a);
+	++a;
+	return temp;
 }
 
 template<fast_io::sock::family fam>
@@ -123,7 +121,7 @@ using dns = basic_dns<fast_io::sock::family::unspec>;
 template<fast_io::sock::family fam>
 inline constexpr auto cbegin(basic_dns<fam> const& d)
 {
-	return details::dns_iterator{d.get_result()};
+	return dns_iterator{d.get_result()};
 }
 
 template<fast_io::sock::family fam>
@@ -135,7 +133,7 @@ inline constexpr auto begin(basic_dns<fam> const& d)
 template<fast_io::sock::family fam>
 inline constexpr auto begin(basic_dns<fam> & d)
 {
-	return details::dns_iterator{d.get_result()};
+	return dns_iterator{d.get_result()};
 }
 
 template<fast_io::sock::family fam>

@@ -11,12 +11,11 @@
 
 #include"fast_io_freestanding_impl/concat.h"
 #include"fast_io_freestanding_impl/manip.h"
-#include"fast_io_freestanding_impl/scan_print.h"
 #include"fast_io_freestanding_impl/exception.h"
 //compile floating point is slow since it requires algorithms like ryu
 #include"fast_io_freestanding_impl/floating.h"
 #include"fast_io_freestanding_impl/iobuf.h"
-#include"fast_io_freestanding_impl/dynamic.h"
+#include"fast_io_freestanding_impl/io_io_file.h"
 #include"fast_io_freestanding_impl/send_receive.h"
 #include"fast_io_freestanding_impl/natural.h"
 #include"fast_io_freestanding_impl/memptr.h"
@@ -35,4 +34,24 @@ using u8ostring = basic_ostring<std::u8string>;
 
 using ostring_ref = basic_ostring_ref<std::string>;
 using u8ostring_ref = basic_ostring_ref<std::u8string>;
+
+template<std::integral char_type>
+using basic_iobuf_io_io_observer = basic_iobuf<basic_io_io_observer<char_type>>;
+template<std::integral char_type>
+using basic_iobuf_io_io_handle = basic_iobuf<basic_io_io_handle<char_type>>;
+template<std::integral char_type>
+using basic_iobuf_io_file = basic_iobuf<basic_io_file<char_type>>;
+
+using iobuf_io_io_observer = basic_iobuf_io_io_observer<char>;
+using iobuf_io_io_handle = basic_iobuf_io_io_handle<char>;
+using iobuf_io_file = basic_iobuf_io_file<char>;
+
+using u8iobuf_io_io_observer = basic_iobuf_io_io_observer<char8_t>;
+using u8iobuf_io_io_handle = basic_iobuf_io_io_handle<char8_t>;
+using u8iobuf_io_file = basic_iobuf_io_file<char8_t>;
+
+using wiobuf_io_io_observer = basic_iobuf_io_io_observer<wchar_t>;
+using wiobuf_io_io_handle = basic_iobuf_io_io_handle<wchar_t>;
+using wiobuf_io_file = basic_iobuf_io_file<wchar_t>;
+
 }

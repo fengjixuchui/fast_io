@@ -99,7 +99,7 @@ inline constexpr T concatln(Args&& ...args)
 		return std::move(v);
 	}
 }
-
+/*
 template<typename T=std::string,typename... Args>
 inline constexpr T format(std::string_view format,Args&& ...args)
 {
@@ -108,7 +108,7 @@ inline constexpr T format(std::string_view format,Args&& ...args)
 	fprint(t,format,std::forward<Args>(args)...);
 	return std::move(v);
 }
-
+*/
 template<typename T,typename... Args>
 inline constexpr void in_place_to(T& t,Args&& ...args)
 {

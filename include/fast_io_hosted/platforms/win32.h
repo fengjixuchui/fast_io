@@ -5,6 +5,15 @@ namespace fast_io
 
 namespace details
 {
+template<typename... Args>
+requires (sizeof...(Args)==4)
+inline auto create_io_completion_port(Args&&... args)
+{
+	auto ptr{fast_io::win32::CreateIoCompletionPort(std::forward<Args>(args)...)};
+	if(ptr==nullptr)[[unlikely]]
+		throw win32_error();
+	return ptr;
+}
 
 template<bool inherit=false>
 inline void* create_file_a_impld(wchar_t const* lpFileName,
@@ -423,6 +432,88 @@ inline Iter write(basic_win32_io_observer<ch_type> handle,Iter cbegin,Iter cend)
 	return cbegin+numberOfBytesWritten/sizeof(*cbegin);
 }
 /*
+template<std::integral ch_type,std::contiguous_iterator Iter>
+inline void async_read(basic_win32_io_observer<ch_type> h,Iter begin,Iter end)
+{
+//https://github.com/changman/iocp_sample/blob/master/iocp_tcp_server/iocp_tcp_server.cpp
+	std::uint32_t numberOfBytesRead{};
+	std::size_t to_read((end-begin)*sizeof(*begin));
+
+	std::size_t total_bytes{sizeof(win32::overlapped)+sizeof(std::size_t)*2+1+to_read};
+	std::byte* ptr=new std::byte[total_bytes];
+	win32::overlapped* over=new(ptr)win32::overlapped{};
+	memset(ptr+(sizeof(win32::overlapped)+sizeof(std::size_t)),0,sizeof(std::size_t)+1);
+	memcpy(ptr+sizeof(win32::overlapped),std::addressof(to_read),sizeof(std::size_t));
+	memcpy(ptr+(sizeof(win32::overlapped)+sizeof(std::size_t)*2+1),std::to_address(begin),to_read);
+	if constexpr(4<sizeof(std::size_t))
+		if(static_cast<std::size_t>(UINT32_MAX)<to_read)
+			to_read=static_cast<std::size_t>(UINT32_MAX);
+	if(!win32::ReadFile(h.native_handle(),ptr+(sizeof(win32::overlapped)+sizeof(std::size_t)*2+1),static_cast<std::uint32_t>(to_read),nullptr,over))
+	{
+		auto err(win32::GetLastError());
+		if(err==997)[[likely]]
+			return;
+#ifdef __cpp_exceptions
+		over->~overlapped();
+		delete[] ptr;
+		throw win32_error(err);
+#else
+		fast_terminate();
+#endif
+	}
+}
+*/
+template<std::integral ch_type,std::contiguous_iterator Iter,typename Func>
+inline void async_write_callback(basic_win32_io_observer<ch_type> h,Iter cbegin,Iter cend,Func callback)
+{
+	using overlapped_t = win32::win32_overlapped<Func>;
+	auto over{new overlapped_t{{.operations=win32::win32_overlapped_operations::write,.function_ptr=[]
+		(win32::overlapped *ptr,std::uintptr_t completionkey,std::size_t bytes)
+	{
+		std::unique_ptr<overlapped_t> uptr(reinterpret_cast<overlapped_t*>(ptr)); 
+		uptr->function(bytes/sizeof(*cbegin));
+	}},callback}};
+	std::size_t to_write((cend-cbegin)*sizeof(*cbegin));
+	if constexpr(4<sizeof(std::size_t))
+		if(static_cast<std::size_t>(UINT32_MAX)<to_write)
+			to_write=static_cast<std::size_t>(UINT32_MAX);
+	if(!win32::WriteFile(h.native_handle(),std::to_address(cbegin),static_cast<std::uint32_t>(to_write),nullptr,std::addressof(over->base.over)))[[likely]]
+	{
+		auto err(win32::GetLastError());
+		if(err==997)[[likely]]
+			return;
+#ifdef __cpp_exceptions
+		delete over;
+		throw win32_error(err);
+#else
+		fast_terminate();
+#endif
+	}
+}
+
+template<std::integral ch_type>
+inline void cancel(basic_win32_io_observer<ch_type> h)
+{
+	if(!fast_io::win32::CancelIo(h.native_handle()))
+		throw win32_error();
+}
+
+template<std::integral ch_type,typename... Args>
+requires requires(basic_win32_io_observer<ch_type> h,Args&& ...args)
+{
+	fast_io::win32::DeviceIoControl(h.native_handle(),std::forward<Args>(args)...);
+}
+inline void io_control(basic_win32_io_observer<ch_type> h,Args&& ...args)
+{
+	if(!fast_io::win32::DeviceIoControl(h.native_handle(),std::forward<Args>(args)...))
+#ifdef __cpp_exceptions
+		throw win32_error();
+#else
+		fast_terminate();
+#endif
+}
+
+/*
 template<std::integral ch_type>
 inline auto memory_map_in_handle(basic_win32_io_observer<ch_type> handle)
 {
@@ -523,11 +614,33 @@ public:
 	}
 	basic_win32_file(std::string_view file,std::string_view mode,perms pm=static_cast<perms>(420)):
 		basic_win32_file(file,fast_io::from_c_mode(mode),pm){}
+	basic_win32_file(io_async_t) requires(std::same_as<char_type,char>):basic_win32_io_handle<char_type>(details::create_io_completion_port(bit_cast<void*>(static_cast<std::uintptr_t>(-1)),nullptr,0,0))
+	{
+	}
+	template<typename... Args>
+	basic_win32_file(io_async_t,basic_win32_io_observer<char> iob,Args&& ...args):basic_win32_file(std::forward<Args>(args)...)
+	{
+		basic_win32_file<ch_type> guard(this->native_handle());
+		details::create_io_completion_port(this->native_handle(),iob.native_handle(),bit_cast<std::uintptr_t>(this->native_handle()),0);
+		guard.release();
+	}
 	~basic_win32_file()
 	{
 		this->close_impl();
 	}
-
+	void close()
+	{
+		if(this->native_handle())[[likely]]
+		{
+			if(win32::CloseHandle(this->native_handle()))
+#ifdef __cpp_exceptions
+				throw win32_error();
+#else
+				fast_terminate();
+#endif
+			this->native_handle()=nullptr;
+		}
+	}
 	constexpr native_handle_type release() noexcept
 	{
 		auto temp{this->native_handle()};
@@ -639,6 +752,7 @@ inline auto write(basic_win32_pipe<ch_type>& h,Iter begin,Iter end)
 	return write(h.out(),begin,end);
 }
 
+
 template<std::integral ch_type>
 inline std::array<void*,2> redirect_handle(basic_win32_pipe<ch_type>& hd)
 {
@@ -682,11 +796,11 @@ inline win32_io_handle win32_stderr()
 	return win32_io_handle{win32_stderr_number};
 }
 
-
 template<output_stream output,std::integral intg>
 inline constexpr void print_define(output& out,basic_win32_io_observer<intg> iob)
 {
 	print(out,fast_io::unsigned_view(iob.native_handle()));
 }
+
 
 }

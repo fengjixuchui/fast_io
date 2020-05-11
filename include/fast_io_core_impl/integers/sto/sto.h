@@ -89,6 +89,8 @@ inline constexpr T input_base_number(input& in)
 			}
 			++length;
 		}
+		if(!length)[[unlikely]]
+			throw std::runtime_error("malformed input");
 		detect_overflow<base>(t,length);
 		return t;
 	}
@@ -100,7 +102,7 @@ inline constexpr T input_base_number(input& in)
 		auto it{begin(ig)};
 		auto ed{end(ig)};
 		if(it==ed)
-			return {};
+			throw fast_io::eof();
 		auto const sign{*it=='-'};
 		if(sign)
 			++it;
@@ -136,6 +138,8 @@ inline constexpr T input_base_number(input& in)
 		detect_signed_overflow<base>(t,length,sign);
 		if(sign)
 			return -static_cast<T>(t);
+		else if(!length)[[unlikely]]
+			throw std::runtime_error("malformed input");
 		return static_cast<T>(t);
 	}
 }

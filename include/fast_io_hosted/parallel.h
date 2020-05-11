@@ -171,7 +171,6 @@ inline constexpr void print_define(stm& output,manip::parallel_counter<Func> ref
 template<output_stream stm,std::ranges::random_access_range R,typename Func>
 inline constexpr void print_define(stm& output,manip::parallel<R,Func> ref)
 {
-	using char_type = typename stm::char_type;
 	auto be{std::ranges::begin(ref.reference)};
 	if constexpr(std::same_as<void,Func>)
 	{
@@ -203,7 +202,6 @@ inline constexpr void print_define(stm& output,manip::parallel<R,Func> ref)
 template<output_stream stm,typename Func>
 inline constexpr void print_define(stm& output,manip::parallel_unit<Func> ref)
 {
-	using char_type = typename stm::char_type;
 	constexpr std::size_t sz{print_reserve_size(print_reserve_type<std::remove_cvref_t<
 	decltype(ref.callback(static_cast<std::size_t>(0)))>>)};
 	details::parrallel_details(output,ref.count,sz,

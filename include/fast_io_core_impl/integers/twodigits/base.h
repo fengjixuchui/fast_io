@@ -154,7 +154,6 @@ namespace twodigits
 template<char8_t base=10,bool uppercase=false,std::random_access_iterator Iter,std::unsigned_integral U>
 inline constexpr std::size_t output_unsigned(Iter str,U value)
 {
-	using char_type = std::iter_value_t<Iter>;
 	std::size_t const len{chars_len<base>(value)};
 	output_base_number_impl<base,uppercase>(str+=len,value);
 	return len;

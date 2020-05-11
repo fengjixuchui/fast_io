@@ -158,10 +158,10 @@ inline constexpr bool operator!=(events const& d,sm& s)
 template<epoll_stream output>
 inline output& add_control(handle_pool& pool,output& out,event e)
 {
-	/*auto const out_ultimate(ultimate_native_handle(out));
+	auto const out_ultimate(ultimate_native_handle(out));
 	epoll_event evt{static_cast<std::uint32_t>(e),{.fd=out_ultimate}};
 	if(::epoll_ctl(pool.native_handle(),1,out_ultimate,std::addressof(evt))==-1)
-		throw std::system_error(errno,std::generic_category());*/
+		throw std::system_error(errno,std::generic_category());
 	return out;
 }
 

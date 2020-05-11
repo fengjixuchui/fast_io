@@ -9,6 +9,8 @@ class basic_file_wrapper:public T
 public:
 	using char_type = typename T::char_type;
 	using native_handle_type = typename T::native_handle_type;
+	constexpr basic_file_wrapper()=default;
+	constexpr basic_file_wrapper(native_handle_type hd):T(hd){}
 	template<typename ...Args>
 	constexpr basic_file_wrapper(native_interface_t,Args&& ...args):
 		T(native_interface,std::forward<Args>(args)...){}

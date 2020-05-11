@@ -180,7 +180,7 @@ inline std::size_t output_unsigned(Iter str,U value)
 			}
 			else
 			{
-
+				*str = static_cast<char8_t>(v2)+u8'0';
 				memcpy(++str,static_tables<ch_type>::table4[remains1].data(),bytes4);
 				memcpy(str += 4,static_tables<ch_type>::table4[remains0].data(),bytes4);
 				return 9;

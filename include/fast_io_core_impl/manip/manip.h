@@ -2,85 +2,94 @@
 
 namespace fast_io
 {
+
 namespace manip
 {
 
 template<typename T>
 struct char_view
 {
+	using manip_tag = manip_tag_t;
 	T& reference;
 };
 
 template<std::integral T>
 struct unsigned_view
 {
+	using manip_tag = manip_tag_t;
 	T& reference;
 };
 
 template<std::integral T>
 struct signed_view
 {
+	using manip_tag = manip_tag_t;
 	T& reference;
 };
-
-template<std::size_t w,bool left,char8_t char_type,typename T>
-struct width
-{
-	T& reference;
-};
-
+/*
 template<typename T>
 struct unix
 {
+	using manip_tag = manip_tag_t;
 	T& reference;
 };
+*/
 template<typename T>
 struct local
 {
+	using manip_tag = manip_tag_t;
 	T& reference;
 };
 template<typename T>
 struct utc
 {
+	using manip_tag = manip_tag_t;
 	T& reference;
 };
 template<typename T>
 struct chinese
 {
+	using manip_tag = manip_tag_t;
 	T& reference;
 };
 template<typename T>
 struct utc_chinese
 {
+	using manip_tag = manip_tag_t;
 	T& reference;
 };
 template<typename T>
 struct local_chinese
 {
+	using manip_tag = manip_tag_t;
 	T& reference;
 };
 
 template<typename T>
 struct whole
 {
+	using manip_tag = manip_tag_t;
 	T& reference;
 };
 
 template<typename T>
 struct line
 {
+	using manip_tag = manip_tag_t;
 	T reference;
 };
 
 template<typename T>
 struct no_decoration
 {
+	using manip_tag = manip_tag_t;
 	T& reference;
 };
 
 template<typename T,std::integral size_type>
 struct transmission
 {
+	using manip_tag = manip_tag_t;
 	size_type& transmitted;
 	T& reference;
 };
@@ -88,6 +97,7 @@ struct transmission
 template<typename T,std::integral size_type>
 struct transmission_with_size
 {
+	using manip_tag = manip_tag_t;
 	size_type& transmitted;
 	T& reference;
 	size_type size;
@@ -96,6 +106,7 @@ struct transmission_with_size
 template<typename T,std::integral offset_type,std::integral size_type>
 struct random_access_transmission
 {
+	using manip_tag = manip_tag_t;
 	size_type& transmitted;
 	offset_type offset;
 	T& reference;
@@ -104,6 +115,7 @@ struct random_access_transmission
 template<typename T,std::integral offset_type,std::integral size_type>
 struct random_access_transmission_with_size
 {
+	using manip_tag = manip_tag_t;
 	size_type& transmitted;
 	offset_type offset;
 	T& reference;
@@ -113,12 +125,14 @@ struct random_access_transmission_with_size
 template<typename T>
 struct binary_serialization
 {
+	using manip_tag = manip_tag_t;
 	T& reference;
 };
 
 template<typename T,std::integral char_type>
 struct follow_character
 {
+	using manip_tag = manip_tag_t;
 	T& reference;
 	char_type character;
 };
@@ -126,6 +140,7 @@ struct follow_character
 template<typename status_type,typename T>
 struct status_tag
 {
+	using manip_tag = manip_tag_t;
 	status_type& status;
 	T& reference;
 };
@@ -133,6 +148,7 @@ struct status_tag
 template<typename T>
 struct code_cvt
 {
+	using manip_tag = manip_tag_t;
 	T& reference;
 };
 
@@ -179,13 +195,16 @@ inline constexpr std::size_t unsigned_view(T * const pointer)
 	return bit_cast<std::size_t>(pointer);
 }
 
+
 template<typename T>
-inline constexpr manip::unix<T const> local(T const &f){return {f};}
+inline constexpr manip::local<T const> local(T const &f){return {f};}
+
 template<typename T>
 inline constexpr manip::utc<T const> utc(T const &f){return {f};}
+/*
 template<typename T>
 inline constexpr manip::unix<T const> unix(T const &f){return {f};}
-
+*/
 template<typename T>
 inline constexpr manip::chinese<T const> chinese(T const &f){return {f};}
 template<typename T>
@@ -244,17 +263,12 @@ inline void print_define(output& out,manip::char_view<T> a)
 	put(out,static_cast<typename output::char_type>(a.reference));
 }
 
-template<std::size_t indent_w,bool left=false,char8_t fill_ch=0x20,typename T>
-inline constexpr manip::width<indent_w,left,fill_ch,T const> width(T const& t)
-{
-	return {t};
-}
-
 template<output_stream output>
 requires (std::same_as<typename output::char_type,char>)
 inline void print_define(output& out,std::u8string_view u8vw)
 {
 	write(out,u8vw);
 }
+
 
 }

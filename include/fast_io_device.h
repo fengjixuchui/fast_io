@@ -28,9 +28,6 @@ using ibuf_file_mutex = basic_iomutex<ibuf_file>;
 using obuf_file_mutex = basic_iomutex<obuf_file>;
 using iobuf_file_mutex = basic_iomutex<iobuf_file>;
 
-using dynamic_buf = basic_iobuf<dynamic_stream>;
-
-
 using u8pipe = io_wrapper<u8native_pipe>;
 
 using u8inative_file = input_file_wrapper<u8native_file>;
@@ -50,8 +47,6 @@ using u8iobuf_file = basic_iobuf<u8ionative_file>;
 using u8ibuf_file_mutex = basic_iomutex<u8ibuf_file>;
 using u8obuf_file_mutex = basic_iomutex<u8obuf_file>;
 using u8iobuf_file_mutex = basic_iomutex<u8iobuf_file>;
-
-using u8dynamic_buf = basic_iobuf<u8dynamic_stream>;
 
 using wpipe = io_wrapper<wnative_pipe>;
 
@@ -73,5 +68,4 @@ using wibuf_file_mutex = basic_iomutex<wibuf_file>;
 using wobuf_file_mutex = basic_iomutex<wobuf_file>;
 using wiobuf_file_mutex = basic_iomutex<wiobuf_file>;
 
-using wdynamic_buf = basic_iobuf<wdynamic_stream>;
 }

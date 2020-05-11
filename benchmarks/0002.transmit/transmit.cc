@@ -9,21 +9,24 @@ int main()
 try
 {
 	{
+		fast_io::timer tm("ofstream <= ifstream");
+		std::ifstream ib("large_file.txt",std::ifstream::binary);
+		std::ofstream ob("large_file_ifstream_to_ofstream.txt",std::ofstream::binary);
+		ob<<ib.rdbuf();
+	}
+	{
+		fast_io::timer tm("ofstream fiob <= ifstream fiob");
+		std::ifstream ib("large_file.txt",std::ifstream::binary);
+		std::ofstream ob("large_file_ifstream_fiob_to_ofstream_fiob.txt",std::ofstream::binary);
+		fast_io::filebuf_io_observer ib_fiob{ib.rdbuf()};
+		fast_io::filebuf_io_observer ob_fiob{ob.rdbuf()};
+
+		transmit(ob_fiob,ib_fiob);
+	}
+	{
 		fast_io::timer tm("obuf_file <= ibuf_file");
 		fast_io::ibuf_file ib("large_file.txt");
 		fast_io::obuf_file ob("large_file_ibuf_to_obuf.txt");
-		transmit(ob,ib);
-	}
-	{
-		fast_io::timer tm("oascii_to_ebcdic<obuf_file> <= ibuf_file");
-		fast_io::ibuf_file ib("large_file.txt");
-		fast_io::oascii_to_ebcdic<fast_io::obuf_file> ob("large_file_ebcdic.txt");
-		transmit(ob,ib);
-	}
-	{
-		fast_io::timer tm("oascii_to_ebcdic<obuf_file> <= ascii_to_ebcdic<ibuf_file>");
-		fast_io::iascii_to_ebcdic<fast_io::ibuf_file> ib("large_file.txt");
-		fast_io::oascii_to_ebcdic<fast_io::obuf_file> ob("large_file_ascii_ebcdic.txt");
 		transmit(ob,ib);
 	}
 	{

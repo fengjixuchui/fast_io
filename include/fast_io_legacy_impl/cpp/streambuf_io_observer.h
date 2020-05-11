@@ -81,6 +81,18 @@ inline Iter write(basic_general_streambuf_io_observer<T>& t,Iter begin,Iter end)
 	return begin+(t.rdb->sputn(static_cast<char_type const*>(static_cast<void const*>(std::to_address(begin))),(end-begin)*sizeof(*begin)/sizeof(char_type)))*sizeof(char_type)/sizeof(*begin);
 }
 
+template<typename T>
+inline void flush(basic_general_streambuf_io_observer<T> h)
+{
+	if(h.native_handle()->pubsync()==-1)
+#ifdef __cpp_exceptions
+		throw std::system_error(std::make_error_code(std::errc::io_error));
+#else
+		fast_terminate();
+#endif
+}
+
+
 template<std::integral CharT,typename Traits = std::char_traits<CharT>>
 using basic_streambuf_io_observer = basic_general_streambuf_io_observer<std::basic_streambuf<CharT,Traits>>;
 
@@ -103,13 +115,33 @@ using stringbuf_io_observer = basic_stringbuf_io_observer<char>;
 using wstringbuf_io_observer = basic_stringbuf_io_observer<wchar_t>;
 using u8stringbuf_io_observer = basic_stringbuf_io_observer<char8_t>;
 
+#if defined(__GLIBCXX__) || defined(__LIBCPP_VERSION)  || defined(_MSVC_STL_UPDATE)
+template<std::integral ch_type,typename Traits>
+requires zero_copy_input_stream<basic_c_io_observer_unlocked<ch_type>>
+inline constexpr decltype(auto) zero_copy_in_handle(basic_filebuf_io_observer<ch_type,Traits> h)
+{
+	return zero_copy_in_handle(static_cast<basic_c_io_observer_unlocked<ch_type>>(h));
+}
+template<std::integral ch_type,typename Traits>
+requires zero_copy_output_stream<basic_c_io_observer_unlocked<ch_type>>
+inline constexpr decltype(auto) zero_copy_out_handle(basic_filebuf_io_observer<ch_type,Traits> h)
+{
+	return zero_copy_out_handle(static_cast<basic_c_io_observer_unlocked<ch_type>>(h));
+}
+
+template<std::integral ch_type,typename... Args>
+requires io_controllable<basic_c_io_observer_unlocked<ch_type>,Args...>
+inline decltype(auto) io_control(basic_filebuf_io_observer<ch_type> h,Args&& ...args)
+{
+	return io_control(static_cast<basic_c_io_observer_unlocked<ch_type>>(h),std::forward<Args>(args)...);
+}
+#endif
+
 template<output_stream output,typename T>
 inline constexpr void print_define(output& out,basic_general_streambuf_io_observer<T> iob)
 {
 	print(out,fast_io::unsigned_view(iob.native_handle()));
 }
-
-
 }
 
 

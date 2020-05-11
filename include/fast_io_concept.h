@@ -29,7 +29,6 @@ template<typename T>
 concept output_stream_impl = stream_char_type_requirement<T>&&requires(T& out,typename T::char_type const* b)
 {
 	{write(out,b,b)};
-//	{flush(out)};
 };
 
 template<typename T>
@@ -93,6 +92,17 @@ concept buffer_output_stream_impl = requires(T& out,typename T::char_type ch)
 	obuffer_set_curr(out,obuffer_curr(out));
 	overflow(out,ch);
 };
+template<typename T>
+concept flush_output_stream_impl = requires(T& out)
+{
+	flush(out);
+};
+
+template<typename T>
+concept dynamic_buffer_output_stream_impl = requires(T& out,std::size_t size)
+{
+	ogrow(out,size);
+};
 
 template<typename T>
 concept zero_copy_input_stream_impl = requires(T& in)
@@ -124,26 +134,12 @@ concept memory_map_output_stream_impl = requires(T& out)
 	memory_map_out_handle(out);
 };
 
-template<typename T,typename U>
-concept async_input_stream_impl =
-	requires(T& in,typename T::char_type* iter,U&& func)
-{
-	async_read(in,iter,iter,func);
-};
-
-template<typename T,typename U>
-concept async_output_stream_impl =
-	requires(T& out,typename T::char_type* iter,U&& func)
-{
-	async_write(out,iter,iter,func);
-};
-
-
 template<typename T>
 concept status_stream_impl = requires(T stm)
 {
 	typename T::status_type;
 };
+
 }
 
 
@@ -182,16 +178,10 @@ concept character_output_stream = output_stream<T>&&details::character_output_st
 
 template<typename T>
 concept character_io_stream = character_input_stream<T>&&character_output_stream<T>;
-/*
-template<typename T>
-concept undo_input_stream = character_input_stream<T>&&details::undo_input_stream_impl<T>;
 
 template<typename T>
-concept undo_output_stream = character_output_stream<T>&&details::undo_output_stream_impl<T>;
+concept flush_output_stream = output_stream<T>&&details::flush_output_stream_impl<T>;
 
-template<typename T>
-concept undo_io_stream = undo_input_stream<T>&&undo_output_stream<T>;
-*/
 template<typename T>
 concept mutex_io_stream = mutex_input_stream<T>&&mutex_output_stream<T>;
 
@@ -209,6 +199,12 @@ concept buffer_output_stream = output_stream<T>&&details::buffer_output_stream_i
 
 template<typename T>
 concept buffer_io_stream = buffer_input_stream<T>&&buffer_output_stream<T>&&io_stream<T>;
+
+template<typename T>
+concept dynamic_buffer_output_stream = buffer_output_stream<T>&&details::dynamic_buffer_output_stream_impl<T>;
+
+template<typename T>
+concept fixed_buffer_output_stream = buffer_output_stream<T>&&!dynamic_buffer_output_stream<T>;
 
 template<typename T>
 concept zero_copy_input_stream = input_stream<T>&&details::zero_copy_input_stream_impl<T>;
@@ -283,5 +279,19 @@ concept printable=output_stream<output>&&requires(output& out,T&& t)
 
 template<typename output,typename T>
 concept general_printable=reserve_printable<T>||printable<output,T>;
+
+template<typename io_device,typename... Args>
+concept io_controllable=requires(io_device& device,Args&& ...args)
+{
+	io_control(device,std::forward<Args>(args)...);
+};
+
+struct manip_tag_t{};
+
+template<typename T>
+concept manipulator = std::same_as<typename T::manip_tag,manip_tag_t>&&requires(T t)
+{
+	{t.reference};
+};
 
 }

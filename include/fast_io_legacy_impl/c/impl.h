@@ -5,12 +5,6 @@
 namespace fast_io
 {
 
-struct c_file_cookie_t
-{
-explicit constexpr c_file_cookie_t()=default;
-};
-inline constexpr c_file_cookie_t c_file_cookie{};
-
 namespace details
 {
 template<open_mode om>
@@ -20,6 +14,113 @@ inline static constexpr std::string_view value=to_c_mode(om);
 };
 
 }
+
+template<typename stm>
+requires stream<std::remove_reference_t<stm>>
+class c_io_cookie_functions_t
+{
+public:
+
+//musl libc also supports this I think
+//https://gitlab.com/bminor/musl/-/blob/061843340fbf2493bb615e20e66f60c5d1ef0455/src/stdio/fopencookie.c
+
+#if defined(_GNU_SOURCE)
+
+//musl libc also supports this I think
+//https://gitlab.com/bminor/musl/-/blob/061843340fbf2493bb615e20e66f60c5d1ef0455/src/stdio/fopencookie.c
+
+	using native_functions_type = cookie_io_functions_t;
+	native_functions_type native_functions{};
+	explicit constexpr c_io_cookie_functions_t()
+	{
+		using value_type = std::remove_reference_t<stm>;
+		if constexpr(!std::is_reference_v<stm>)
+			native_functions.close=[](void* cookie) noexcept->int
+			{
+				delete bit_cast<value_type*>(cookie);
+				return 0;
+			};
+		if constexpr(input_stream<value_type>)
+			native_functions.read=[](void* cookie,char* buf,std::size_t size) noexcept->std::ptrdiff_t
+			{
+				try
+				{
+					return read(*bit_cast<value_type*>(cookie),buf,buf+size)-buf;
+				}
+				catch(std::system_error const& err)
+				{
+					if(err.code().category()==std::generic_category())
+						errno=err.code().value();
+					else
+						errno=EIO;
+					return -1;
+				}
+				catch(...)
+				{
+					errno=EIO;
+					return -1;
+				}
+			};
+		if constexpr(output_stream<value_type>)
+		{
+			native_functions.write=[](void* cookie,char const* buf,std::size_t size) noexcept->std::ptrdiff_t
+			{
+				try
+				{
+					if constexpr(std::same_as<decltype(write(*bit_cast<value_type*>(cookie),buf,buf+size)),void>)
+					{
+						write(*bit_cast<value_type*>(cookie),buf,buf+size);
+						return static_cast<std::ptrdiff_t>(size);
+					}
+					else
+						return write(*bit_cast<value_type*>(cookie),buf,buf+size)-buf;
+				}
+				catch(std::system_error const& err)
+				{
+					if(err.code().category()==std::generic_category())
+						errno=err.code().value();
+					else
+						errno=EIO;
+					return -1;
+				}
+				catch(...)
+				{
+					errno=EIO;
+					return -1;
+				}
+			};
+		}
+		if constexpr(random_access_stream<value_type>)
+		{
+			native_functions.seek=[](void *cookie, off64_t *offset, int whence) noexcept->int
+			{
+				try
+				{
+					*offset=seek(*bit_cast<value_type*>(cookie),*offset,static_cast<fast_io::seekdir>(whence));
+					return 0;
+				}
+				catch(std::system_error const& err)
+				{
+					if(err.code().category()==std::generic_category())
+						errno=err.code().value();
+					else
+						errno=EIO;
+					return -1;
+				}
+				catch(...)
+				{
+					errno=EIO;
+					return -1;
+				}
+			};
+		}
+	}
+#endif
+};
+
+template<typename stm>
+inline constexpr c_io_cookie_functions_t<stm> c_io_cookie_functions{};
+
 template<std::integral ch_type>
 class basic_c_io_observer_unlocked
 {
@@ -66,7 +167,7 @@ public:
 };
 
 template<std::integral ch_type>
-inline auto redirect_handle(basic_c_io_observer_unlocked<ch_type>& h)
+inline auto redirect_handle(basic_c_io_observer_unlocked<ch_type> h)
 {
 #if defined(__WINNT__) || defined(_MSC_VER)
 	return static_cast<basic_win32_io_observer<ch_type>>(h).native_handle();
@@ -121,7 +222,7 @@ inline void write(basic_c_io_observer_unlocked<T> cfhd,Iter begin,Iter end)
 }
 
 template<std::integral T>
-inline void flush(basic_c_io_observer_unlocked<T>& cfhd)
+inline void flush(basic_c_io_observer_unlocked<T> cfhd)
 {
 	if(
 #if defined(_MSC_VER)
@@ -166,6 +267,13 @@ template<std::integral ch_type,std::integral U>
 inline auto seek(basic_c_io_observer_unlocked<ch_type> cfhd,U i,seekdir s=seekdir::beg)
 {
 	return seek(cfhd,seek_type<char>,i,s);
+}
+
+template<std::integral ch_type,typename... Args>
+requires io_controllable<basic_posix_io_observer<ch_type>,Args...>
+inline decltype(auto) io_control(basic_c_io_observer_unlocked<ch_type> h,Args&& ...args)
+{
+	return io_control(static_cast<basic_posix_io_observer<ch_type>>(h),std::forward<Args>(args)...);
 }
 
 class c_io_lock_guard;
@@ -220,7 +328,7 @@ public:
 };
 
 template<std::integral T>
-inline auto mutex(basic_c_io_observer<T>& h)
+inline auto mutex(basic_c_io_observer<T> h)
 {
 	return h.native_handle();
 }
@@ -293,7 +401,7 @@ inline void flush(basic_c_io_observer<T> cfhd)
 }
 
 template<typename P,typename T,std::integral U>
-inline auto seek(basic_c_io_observer<P>& cfhd,seek_type_t<T>,U i,seekdir s=seekdir::beg)
+inline auto seek(basic_c_io_observer<P> cfhd,seek_type_t<T>,U i,seekdir s=seekdir::beg)
 {
 	if(std::fseek(cfhd.native_handle(),seek_precondition<long,T,typename basic_c_io_observer<P>::char_type>(i),static_cast<int>(s)))
 #ifdef __cpp_exceptions
@@ -312,7 +420,7 @@ inline auto seek(basic_c_io_observer<P>& cfhd,seek_type_t<T>,U i,seekdir s=seekd
 }
 
 template<typename P,std::integral U>
-inline auto seek(basic_c_io_observer<P>& cfhd,U i,seekdir s=seekdir::beg)
+inline auto seek(basic_c_io_observer<P> cfhd,U i,seekdir s=seekdir::beg)
 {
 	return seek(cfhd,seek_type<typename basic_c_io_observer<P>::char_type>,i,s);
 }
@@ -452,97 +560,16 @@ public:
 	basic_c_file_impl(std::string_view file,std::string_view mode,Args&& ...args):
 		basic_c_file_impl(basic_posix_file<typename T::char_type>(file,mode,std::forward<Args>(args)...),mode)
 	{}
+
 	template<stream stm,typename... Args>
-	requires (std::same_as<typename T::char_type,char>&&std::same_as<typename stm::char_type,char>)
-	basic_c_file_impl(c_file_cookie_t,std::string_view mode,std::in_place_type_t<stm>,Args&& ...args)
-#if defined(_GNU_SOURCE)
-//musl libc also supports this I think
-//https://gitlab.com/bminor/musl/-/blob/061843340fbf2493bb615e20e66f60c5d1ef0455/src/stdio/fopencookie.c
+	basic_c_file_impl(io_cookie_t,std::string_view mode,std::in_place_type_t<stm>,Args&& ...args)
 	{
-		cookie_io_functions_t io_funcs{.close=[](void* cookie) noexcept->int
-		{
-			delete bit_cast<stm*>(cookie);
-			return 0;
-		}};
-		if constexpr(input_stream<stm>)
-			io_funcs.read=[](void* cookie,char* buf,std::size_t size) noexcept->std::ptrdiff_t
-			{
-				try
-				{
-					return read(*bit_cast<stm*>(cookie),buf,buf+size)-buf;
-				}
-				catch(std::system_error const& err)
-				{
-					if(err.code().category()==std::generic_category())
-						errno=err.code().value();
-					else
-						errno=EIO;
-					return -1;
-				}
-				catch(...)
-				{
-					errno=EIO;
-					return -1;
-				}
-			};
-		if constexpr(output_stream<stm>)
-		{
-			io_funcs.write=[](void* cookie,char const* buf,std::size_t size) noexcept->std::ptrdiff_t
-			{
-				try
-				{
-					if constexpr(std::same_as<decltype(write(*bit_cast<stm*>(cookie),buf,buf+size)),void>)
-					{
-						write(*bit_cast<stm*>(cookie),buf,buf+size);
-						return static_cast<std::ptrdiff_t>(size);
-					}
-					else
-						return write(*bit_cast<stm*>(cookie),buf,buf+size)-buf;
-				}
-				catch(std::system_error const& err)
-				{
-					if(err.code().category()==std::generic_category())
-						errno=err.code().value();
-					else
-						errno=EIO;
-					return -1;
-				}
-				catch(...)
-				{
-					errno=EIO;
-					return -1;
-				}
-			};
-		}
-		if constexpr(random_access_stream<stm>)
-		{
-			io_funcs.seek=[](void *cookie, off64_t *offset, int whence) noexcept->int
-			{
-				try
-				{
-					*offset=seek(*bit_cast<stm*>(cookie),*offset,static_cast<fast_io::seekdir>(whence));
-					return 0;
-				}
-				catch(std::system_error const& err)
-				{
-					if(err.code().category()==std::generic_category())
-						errno=err.code().value();
-					else
-						errno=EIO;
-					return -1;
-				}
-				catch(...)
-				{
-					errno=EIO;
-					return -1;
-				}
-			};
-		}
+#if defined(_GNU_SOURCE)
 		std::unique_ptr<stm> up{std::make_unique<stm>(std::forward<Args>(args)...)};
-		if(!(this->native_handle()=fopencookie(up.get(),mode.data(),io_funcs)))[[unlikely]]
+		if(!(this->native_handle()=fopencookie(up.get(),mode.data(),c_io_cookie_functions<stm>.native_functions)))[[unlikely]]
 			throw std::system_error(errno,std::generic_category());
 		up.release();
-	}
+#else
 /*
 #elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__)) || defined (__BIONIC__)
 Todo
@@ -550,104 +577,22 @@ Todo
 
 	}
 */
-#else
-//not supported platform like windows MSVCRT. We throw std::errc::operation_not_supported
-
-	{
 #ifdef __cpp_exceptions
 		throw std::system_error(std::make_error_code(std::errc::operation_not_supported));
 #else
 		fast_terminate();
 #endif
-	}
-#endif
 
+#endif
+	}
 
 	template<stream stm>
-	requires (std::same_as<typename T::char_type,char>&&std::same_as<typename stm::char_type,char>)
-	basic_c_file_impl(c_file_cookie_t,std::string_view mode,std::reference_wrapper<stm> reff)
-#if defined(_GNU_SOURCE)
-//musl libc also supports this I think
-//https://gitlab.com/bminor/musl/-/blob/061843340fbf2493bb615e20e66f60c5d1ef0455/src/stdio/fopencookie.c
+	basic_c_file_impl(io_cookie_t,std::string_view mode,stm& reff)
 	{
-		cookie_io_functions_t io_funcs{};
-		if constexpr(input_stream<stm>)
-			io_funcs.read=[](void* cookie,char* buf,std::size_t size) noexcept->std::ptrdiff_t
-			{
-				try
-				{
-					return read(*bit_cast<stm*>(cookie),buf,buf+size)-buf;
-				}
-				catch(std::system_error const& err)
-				{
-					if(err.code().category()==std::generic_category())
-						errno=err.code().value();
-					else
-						errno=EIO;
-					return -1;
-				}
-				catch(...)
-				{
-					errno=EIO;
-					return -1;
-				}
-			};
-		if constexpr(output_stream<stm>)
-		{
-			io_funcs.write=[](void* cookie,char const* buf,std::size_t size) noexcept->std::ptrdiff_t
-			{
-				try
-				{
-					if constexpr(std::same_as<decltype(write(*bit_cast<stm*>(cookie),buf,buf+size)),void>)
-					{
-						write(*bit_cast<stm*>(cookie),buf,buf+size);
-						return static_cast<std::ptrdiff_t>(size);
-					}
-					else
-						return write(*bit_cast<stm*>(cookie),buf,buf+size)-buf;
-				}
-				catch(std::system_error const& err)
-				{
-					if(err.code().category()==std::generic_category())
-						errno=err.code().value();
-					else
-						errno=EIO;
-					return -1;
-				}
-				catch(...)
-				{
-					errno=EIO;
-					return -1;
-				}
-			};
-		}
-		if constexpr(random_access_stream<stm>)
-		{
-			io_funcs.seek=[](void *cookie, off64_t *offset, int whence) noexcept->int
-			{
-				try
-				{
-					*offset=seek(*bit_cast<stm*>(cookie),*offset,static_cast<fast_io::seekdir>(whence));
-					return 0;
-				}
-				catch(std::system_error const& err)
-				{
-					if(err.code().category()==std::generic_category())
-						errno=err.code().value();
-					else
-						errno=EIO;
-					return -1;
-				}
-				catch(...)
-				{
-					errno=EIO;
-					return -1;
-				}
-			};
-		}
-		if(!(this->native_handle()=fopencookie(std::addressof(reff.get()),mode.data(),io_funcs)))[[unlikely]]
+#if defined(_GNU_SOURCE)
+		if(!(this->native_handle()=fopencookie(std::addressof(reff),mode.data(),c_io_cookie_functions<stm&>)))[[unlikely]]
 			throw std::system_error(errno,std::generic_category());
-	}
+#else
 /*
 #elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__)) || defined (__BIONIC__)
 Todo
@@ -655,17 +600,17 @@ Todo
 
 	}
 */
-#else
-//not supported platform like windows MSVCRT. We throw std::errc::operation_not_supported
-
-	{
 #ifdef __cpp_exceptions
 		throw std::system_error(std::make_error_code(std::errc::operation_not_supported));
 #else
 		fast_terminate();
 #endif
-	}
+
 #endif
+	}
+	template<stream stm>
+	basic_c_file_impl(io_cookie_t,std::string_view mode,stm&& rref):basic_c_file_impl(io_cookie,mode,std::in_place_type<stm>,std::move(rref)){}
+
 
 	basic_c_file_impl(basic_c_file_impl const&)=delete;
 	basic_c_file_impl& operator=(basic_c_file_impl const&)=delete;
@@ -703,7 +648,7 @@ using basic_c_file_unlocked=details::basic_c_file_impl<basic_c_io_handle_unlocke
 
 
 template<std::integral ch_type>
-inline auto redirect_handle(basic_c_io_observer<ch_type>& h)
+inline auto redirect_handle(basic_c_io_observer<ch_type> h)
 {
 #if defined(__WINNT__) || defined(_MSC_VER)
 	return static_cast<basic_win32_io_observer<ch_type>>(h).native_handle();
@@ -726,19 +671,19 @@ using wc_io_handle = basic_c_io_handle<wchar_t>;
 using wc_file = basic_c_file<wchar_t>;
 using wc_file_unlocked = basic_c_file_unlocked<wchar_t>;
 
-#ifdef __linux__
 template<std::integral ch_type>
-inline auto zero_copy_in_handle(basic_c_io_observer_unlocked<ch_type>& h)
+requires zero_copy_input_stream<basic_posix_io_observer<ch_type>>
+inline decltype(auto) zero_copy_in_handle(basic_c_io_observer_unlocked<ch_type> h)
 {
-	return ::fileno_unlocked(h.native_handle());
+	return zero_copy_in_handle(static_cast<basic_posix_io_observer<ch_type>>(h));
 }
-template<std::integral ch_type>
-inline auto zero_copy_out_handle(basic_c_io_observer_unlocked<ch_type>& h)
-{
-	return ::fileno_unlocked(h.native_handle());
-}
-#endif
 
+template<std::integral ch_type>
+requires zero_copy_output_stream<basic_posix_io_observer<ch_type>>
+inline decltype(auto) zero_copy_out_handle(basic_c_io_observer_unlocked<ch_type> h)
+{
+	return zero_copy_out_handle(static_cast<basic_posix_io_observer<ch_type>>(h));
+}
 
 template<output_stream output,std::integral intg>
 inline constexpr void print_define(output& out,basic_c_io_observer_unlocked<intg> iob)

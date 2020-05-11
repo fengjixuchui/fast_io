@@ -9,6 +9,10 @@
 #ifdef __linux__
 #include<sys/sendfile.h>
 #endif
+#ifdef _POSIX_C_SOURCE
+#include<sys/ioctl.h>
+#endif
+
 
 namespace fast_io
 {
@@ -30,24 +34,25 @@ inline constexpr int calculate_posix_open_mode_for_win32_handle(open_mode value)
 			mode |= _O_TEXT;
 	}
 	constexpr auto supported_values{open_mode::out|open_mode::app|open_mode::in};
-	switch(supported_values&value)
+	using utype = typename std::underlying_type<open_mode>::type;
+	switch(static_cast<utype>(supported_values)&static_cast<utype>(value))
 	{
 //Action if file already exists;	Action if file does not exist;	c-style mode;	Explanation
 //Read from start;	Failure to open;	"r";	Open a file for reading
-	case open_mode::in:
+	case static_cast<utype>(open_mode::in):
 		return mode | O_RDONLY;
 //Destroy contents;	Create new;	"w";	Create a file for writing
-	case open_mode::out:
+	case static_cast<utype>(open_mode::out):
 //Read from start;	Error;	"r+";		Open a file for read/write
-	case open_mode::out|open_mode::in:
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::in):
 		return mode;
 //Append to file;	Create new;	"a";	Append to a file
-	case open_mode::app:
-	case open_mode::out|open_mode::app:
+	case static_cast<utype>(open_mode::app):
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::app):
 		return mode | O_APPEND;
 //Write to end;	Create new;	"a+";	Open a file for read/write
-	case open_mode::out|open_mode::in|open_mode::app:
-	case open_mode::in|open_mode::app:
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::app):
+	case static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::app):
 		return mode | O_APPEND;
 //Destroy contents;	Error;	"wx";	Create a file for writing
 	default:
@@ -136,26 +141,27 @@ inline constexpr int calculate_posix_open_mode(open_mode value)
 	else
 		mode |= _O_RANDOM;
 #endif
-	constexpr auto supported_values{open_mode::out|open_mode::app|open_mode::in};
-	switch(value&supported_values)
+	using utype = typename std::underlying_type<open_mode>::type;
+	constexpr auto supported_values{static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::app)|static_cast<utype>(open_mode::in)};
+	switch(static_cast<utype>(value)&static_cast<utype>(supported_values))
 	{
 //Action if file already exists;	Action if file does not exist;	c-style mode;	Explanation
 //Read from start;	Failure to open;	"r";	Open a file for reading
-	case open_mode::in:
+	case static_cast<utype>(open_mode::in):
 		return mode | O_RDONLY;
 //Destroy contents;	Create new;	"w";	Create a file for writing
-	case open_mode::out:
+	case static_cast<utype>(open_mode::out):
 		return mode | O_WRONLY | O_CREAT | O_TRUNC;
 //Append to file;	Create new;	"a";	Append to a file
-	case open_mode::app:
-	case open_mode::out|open_mode::app:
+	case static_cast<utype>(open_mode::app):
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::app):
 		return mode | O_WRONLY | O_CREAT | O_APPEND;
 //Read from start;	Error;	"r+";		Open a file for read/write
-	case open_mode::out|open_mode::in:
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::in):
 		return mode | O_RDWR;
 //Write to end;	Create new;	"a+";	Open a file for read/write
-	case open_mode::out|open_mode::in|open_mode::app:
-	case open_mode::in|open_mode::app:
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::app):
+	case static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::app):
 		return mode | O_RDWR | O_CREAT | O_APPEND;
 //Destroy contents;	Error;	"wx";	Create a file for writing
 	default:
@@ -273,13 +279,13 @@ public:
 };
 
 template<std::integral ch_type>
-inline bool valid(basic_posix_io_observer<ch_type>& h)
+inline bool valid(basic_posix_io_observer<ch_type> h)
 {
 	return h.native_handle()!=-1;
 }
 
 template<std::integral ch_type,std::contiguous_iterator Iter>
-inline Iter read(basic_posix_io_observer<ch_type>& h,Iter begin,Iter end)
+inline Iter read(basic_posix_io_observer<ch_type> h,Iter begin,Iter end)
 {
 	auto read_bytes(
 #if defined(__linux__)&&defined(__x86_64__)
@@ -292,7 +298,7 @@ inline Iter read(basic_posix_io_observer<ch_type>& h,Iter begin,Iter end)
 	return begin+(read_bytes/sizeof(*begin));
 }
 template<std::integral ch_type,std::contiguous_iterator Iter>
-inline Iter write(basic_posix_io_observer<ch_type>& h,Iter begin,Iter end)
+inline Iter write(basic_posix_io_observer<ch_type> h,Iter begin,Iter end)
 {
 	auto write_bytes(
 #if defined(__linux__)&&defined(__x86_64__)
@@ -306,7 +312,7 @@ inline Iter write(basic_posix_io_observer<ch_type>& h,Iter begin,Iter end)
 }
 
 template<std::integral ch_type,typename T,std::integral R>
-inline std::common_type_t<std::int64_t, std::size_t> seek(basic_posix_io_observer<ch_type>& h,seek_type_t<T>,R i=0,seekdir s=seekdir::cur)
+inline std::common_type_t<std::int64_t, std::size_t> seek(basic_posix_io_observer<ch_type> h,seek_type_t<T>,R i=0,seekdir s=seekdir::cur)
 {
 	auto ret(
 #if defined(__linux__)&&defined(__x86_64__)
@@ -319,12 +325,12 @@ inline std::common_type_t<std::int64_t, std::size_t> seek(basic_posix_io_observe
 	return ret;
 }
 template<std::integral ch_type,std::integral R>
-inline auto seek(basic_posix_io_observer<ch_type>& h,R i=0,seekdir s=seekdir::cur)
+inline auto seek(basic_posix_io_observer<ch_type> h,R i=0,seekdir s=seekdir::cur)
 {
 	return seek(h,seek_type<ch_type>,i,s);
 }
 template<std::integral ch_type>
-inline void flush(basic_posix_io_observer<ch_type>&)
+inline void flush(basic_posix_io_observer<ch_type>)
 {
 	// no need fsync. OS can deal with it
 //		if(::fsync(fd)==-1)
@@ -333,18 +339,18 @@ inline void flush(basic_posix_io_observer<ch_type>&)
 
 #ifdef __linux__
 template<std::integral ch_type>
-inline auto zero_copy_in_handle(basic_posix_io_observer<ch_type>& h)
+inline auto zero_copy_in_handle(basic_posix_io_observer<ch_type> h)
 {
 	return h.native_handle();
 }
 template<std::integral ch_type>
-inline auto zero_copy_out_handle(basic_posix_io_observer<ch_type>& h)
+inline auto zero_copy_out_handle(basic_posix_io_observer<ch_type> h)
 {
 	return h.native_handle();
 }
 #endif
 template<std::integral ch_type>
-inline auto redirect_handle(basic_posix_io_observer<ch_type>& h)
+inline auto redirect_handle(basic_posix_io_observer<ch_type> h)
 {
 #if defined(__WINNT__) || defined(_MSC_VER)
 	return bit_cast<void*>(_get_osfhandle(h.native_handle()));
@@ -353,11 +359,35 @@ inline auto redirect_handle(basic_posix_io_observer<ch_type>& h)
 #endif
 }
 
-template<std::integral ch_type>
-inline void swap(basic_posix_io_observer<ch_type>& a,basic_posix_io_observer<ch_type>& b) noexcept
+#if defined(__WINNT__) || defined(_MSC_VER)
+template<std::integral ch_type,typename... Args>
+requires io_controllable<basic_win32_io_observer<ch_type>,Args...>
+inline decltype(auto) io_control(basic_posix_io_observer<ch_type> h,Args&& ...args)
 {
-	a.swap(b);
+	return io_control(static_cast<basic_win32_io_observer<ch_type>>(h),std::forward<Args>(args)...);
 }
+#else
+template<std::integral ch_type,typename... Args>
+requires requires(basic_posix_io_observer<ch_type> h,Args&& ...args)
+{
+	::ioctl(h.native_handle(),std::forward<Args>(args)...);
+}
+inline void io_control(basic_posix_io_observer<ch_type> h,Args&& ...args)
+{
+#if defined(__linux__)&&defined(__x86_64__)
+	system_call_throw_error(system_call<16,int>(h.native_handle(),std::forward<Args>(args)...));
+#else
+	if(::ioctl(h.native_handle(),std::forward<Args>(args)...)==-1)
+	{
+#ifdef __cpp_exceptions
+		throw std::system_error(errno,std::generic_category());
+#else
+		fast_terminate();
+#endif
+	}
+#endif
+}
+#endif
 
 template<std::integral ch_type>
 class basic_posix_file:public basic_posix_io_handle<ch_type>
@@ -480,7 +510,7 @@ public:
 };
 
 template<std::integral ch_type>
-inline void truncate(basic_posix_io_observer<ch_type>& h,std::size_t size)
+inline void truncate(basic_posix_io_observer<ch_type> h,std::size_t size)
 {
 #if defined(__WINNT__) || defined(_MSC_VER)
 	auto err(_chsize_s(h.native_handle(),size));

@@ -81,7 +81,7 @@ inline constexpr basic_input_buffer_iterator<input> begin(basic_input_buffer_gen
 }
 
 template<buffer_input_stream input>
-inline constexpr std::default_sentinel_t end(basic_input_buffer_generator<input> a)
+inline constexpr std::default_sentinel_t end(basic_input_buffer_generator<input>)
 {
 	return {};
 }
