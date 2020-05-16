@@ -7,7 +7,7 @@ template<bool uppercase=false,typename T>
 inline constexpr manip::comma_decimal_point<T&> comma(T&f){return {f};}
 */
 template<typename T>
-inline constexpr manip::comma<T&> comma(T&f){return {f};}
+inline constexpr manip::comma<T&> comma(T&&f){return {f};}
 template<bool uppercase=false,typename T>
 inline constexpr manip::comma<manip::general<false,T const>> comma_general(T const &f){return {{f}};}
 template<bool uppercase=false,typename T>

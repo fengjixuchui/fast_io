@@ -140,13 +140,13 @@ inline constexpr void print_define(output& out, manip::utc<std::chrono::time_poi
 	auto tmt(Clock::to_time_t(tmp.reference));
 	print_define(out,*gmtime(std::addressof(tmt)));
 }
-/*
+
 template<character_output_stream output,typename Clock,typename Duration>
 inline constexpr void print_define(output& out, manip::unix<std::chrono::time_point<Clock,Duration> const> tmp)
 {
 	print_define(out,std::chrono::duration_cast<std::chrono::duration<double>>(tmp.reference.time_since_epoch()));
 }
-*/
+
 template<character_output_stream output,typename Clock,typename Duration>
 inline constexpr void print_define(output& out, manip::local_chinese<std::chrono::time_point<Clock,Duration> const> tmp)
 {

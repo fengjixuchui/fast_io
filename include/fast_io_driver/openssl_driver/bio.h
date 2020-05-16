@@ -326,5 +326,25 @@ void print_define(output& out,openssl_error const& err)
 	bio_file bf(io_cookie,out);
 	ERR_print_errors(bf.native_handle());
 }
+/*
+inline constexpr char* ibuffer_begin(bio_io_observer cio) noexcept
+{
+}
 
+inline constexpr char* ibuffer_curr(bio_io_observer cio) noexcept
+{
+}
+
+inline constexpr char* ibuffer_end(bio_io_observer cio) noexcept
+{
+}
+
+inline constexpr void ibuffer_set_curr(bio_io_observer cio,char* ptr) noexcept
+{
+}
+
+inline bool underflow(bio_io_observer cio) noexcept
+{
+}
+*/
 }

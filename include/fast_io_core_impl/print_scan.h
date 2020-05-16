@@ -179,7 +179,7 @@ inline constexpr void print_control_line(output& out,T&& t)
 	}
 }
 
-
+/*
 template<output_stream output,typename ...Args>
 requires(general_printable<output,Args>&&...)
 inline constexpr void normal_print(output &out,Args&& ...args)
@@ -201,7 +201,7 @@ inline constexpr void normal_println(output &out,Args&& ...args)
 		put(out,u8'\n');
 	}
 }
-
+*/
 template<input_stream input,typename ...Args>
 requires(receiveable<input,Args>&&...)
 inline constexpr void normal_receive(input &in,Args&& ...args)
@@ -289,7 +289,7 @@ inline constexpr void print(output &out,Args&& ...args)
 	else
 	{
 		internal_temporary_buffer<typename output::char_type> buffer;
-		print(buffer,std::forward<Args>(args)...);
+		(details::print_control(buffer,std::forward<Args>(args)),...);
 		write(out,buffer.beg_ptr,buffer.end_ptr);
 	}
 }
@@ -321,8 +321,15 @@ inline constexpr void println(output &out,Args&& ...args)
 	else
 	{
 		internal_temporary_buffer<typename output::char_type> buffer;
-		print(buffer,std::forward<Args>(args)...);
-		put(buffer,u8'\n');
+		if constexpr((sizeof...(Args)==1)&&(reserve_printable<Args>&&...))
+		{
+			((details::print_control_line(buffer,std::forward<Args>(args))),...);
+		}
+		else
+		{
+			((details::print_control(buffer,std::forward<Args>(args))),...);
+			put(buffer,u8'\n');
+		}
 		write(out,buffer.beg_ptr,buffer.end_ptr);
 	}
 }
@@ -344,7 +351,7 @@ inline constexpr void send(output &out,Args&& ...args)
 	else
 	{
 		internal_temporary_buffer<typename output::char_type> buffer;
-		send(buffer,std::forward<Args>(args)...);
+		(send_define(buffer,std::forward<Args>(args)),...);
 		write(out,buffer.beg_ptr,buffer.end_ptr);
 	}
 }
