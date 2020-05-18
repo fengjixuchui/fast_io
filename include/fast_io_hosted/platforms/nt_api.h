@@ -111,7 +111,7 @@ ULONG(std::uint32_t)              EaLength
 				std::uint32_t,std::uint32_t,std::uint32_t,std::uint32_t,void*,std::uint32_t)>("NtCreateFile"))(std::forward<Args>(args)...);
 }
 
-using pio_apc_routine = void (*__stdcall)(void*,io_status_block*,std::uint32_t);
+using pio_apc_routine = void (*)(void*,io_status_block*,std::uint32_t);
 //typedef VOID (NTAPI *PIO_APC_ROUTINE)(PVOID ApcContext,PIO_STATUS_BLOCK IoStatusBlock,ULONG Reserved);
 
 template<typename... Args>

@@ -12,7 +12,7 @@ int main()
 	std::vector<double> vec;
 	vec.reserve(N);
 	std::mt19937_64 eng;
-	std::uniform_real_distribution dis(-1000.0,1000.0);
+	std::uniform_real_distribution dis(-10000.0,10000.0);
 	for(std::size_t i(0);i!=N;++i)
 		vec.emplace_back(dis(eng));
 	{

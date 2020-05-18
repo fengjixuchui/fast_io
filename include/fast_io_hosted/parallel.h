@@ -82,8 +82,10 @@ struct span_raii
 		other.osp.span()={};
 		return *this;
 	}
-
-	constexpr ~span_raii()
+#if __cpp_constexpr >= 201907L
+	constexpr
+#endif
+	~span_raii()
 	{
 		if(osp.span().data())[[likely]]
 			delete[] osp.span().data();

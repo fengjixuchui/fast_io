@@ -71,7 +71,13 @@ public:
 	template<std::integral ch_type>
 	win32_file_mapping(basic_win32_io_observer<ch_type> bf,file_map_attribute attr,std::size_t size):
 	handle(win32::CreateFileMappingW(
-	bf.native_handle(),nullptr,static_cast<std::uint32_t>(attr),size>>32,static_cast<std::uint32_t>(size),nullptr))
+	bf.native_handle(),nullptr,static_cast<std::uint32_t>(attr),
+#if (_WIN64 || __x86_64__ || __ppc64__)
+			size>>32
+#else
+			0
+#endif
+	,static_cast<std::uint32_t>(size),nullptr))
 	{
 		if(handle==nullptr)
 #ifdef __cpp_exceptions
@@ -117,7 +123,12 @@ class win32_map_view_of_file
 public:
 	win32_map_view_of_file(win32_file_mapping& wm,win32_file_map_attribute attr,std::size_t bytes,std::size_t start_address=0):
 			rg({reinterpret_cast<std::byte*>(win32::MapViewOfFile(wm.native_handle(),static_cast<std::uint32_t>(attr),
-			start_address>>32,static_cast<std::uint32_t>(start_address),bytes)),bytes})
+#if (_WIN64 || __x86_64__ || __ppc64__)
+			start_address>>32
+#else
+			0
+#endif
+			,static_cast<std::uint32_t>(start_address),bytes)),bytes})
 	{
 		if(rg.data()==nullptr)
 #ifdef __cpp_exceptions

@@ -11,7 +11,11 @@ inline auto create_io_completion_port(Args&&... args)
 {
 	auto ptr{fast_io::win32::CreateIoCompletionPort(std::forward<Args>(args)...)};
 	if(ptr==nullptr)[[unlikely]]
+#ifdef __cpp_exceptions
 		throw win32_error();
+#else
+		fast_terminate();
+#endif
 	return ptr;
 }
 

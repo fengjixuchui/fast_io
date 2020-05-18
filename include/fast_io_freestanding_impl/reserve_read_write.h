@@ -50,7 +50,6 @@ inline constexpr void reserve_write(output& out,std::size_t required_size,Func f
 				details::reserve_write_cold_path(out,required_size,func);
 			else
 				orelease(out,func(iter));
-			
 		}
 		else if constexpr(std::contiguous_iterator<std::remove_cvref_t<decltype(iter)>>)
 			orelease(out,func(std::to_address(iter))-std::to_address(iter)+iter);
