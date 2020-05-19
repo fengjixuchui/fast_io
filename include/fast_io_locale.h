@@ -9,3 +9,4 @@
 #include"fast_io_locale/ctype_storage.h"
 #include"fast_io_locale/c_ctype_storage.h"
 #include"fast_io_locale/lcv.h"
+#include"fast_io_locale/c_locale_wrapper.h"

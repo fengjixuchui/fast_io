@@ -21,23 +21,17 @@ constexpr std::size_t cal_floating_len()
 }
 
 template<buffer_input_stream input,std::floating_point T>
-inline constexpr bool scan_define(input& in,T &t)
+inline constexpr void space_scan_define(input& in,T &t)
 {
-	if(!skip_space(in))
-		return false;
 	auto igen{igenerator(in)};
 	t=static_cast<std::remove_cvref_t<T>>(details::ryu::input_floating<u8'.',double>(begin(igen),end(igen)));
-	return true;
 }
 
 template<char32_t dec,buffer_input_stream input,std::floating_point T>
-inline constexpr bool scan_define(input& in,manip::decimal_point<T&,dec> t)
+inline constexpr void space_scan_define(input& in,manip::decimal_point<T&,dec> t)
 {
-	if(!skip_space(in))
-		return false;
 	auto igen{igenerator(in)};
 	t.value=static_cast<std::remove_cvref_t<T>>(details::ryu::input_floating<dec,double>(begin(igen),end(igen)));
-	return true;
 }
 
 template<manip::floating_formats fm,bool uppercase,std::floating_point T,char32_t dec>

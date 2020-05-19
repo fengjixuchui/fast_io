@@ -50,18 +50,12 @@ struct basic_c_lconv_storage:public basic_lconv_storage<ch_type,stg_type>
 			stog.insert(stog.end(),itemptr,itemptr+size);
 			return stog.size();
 		});
-		auto mon_grouping_start_pos{insert_lmd(lcv.grouping)};
-		auto positive_sign_start_pos{insert_lmd(lcv.mon_grouping)};
-		auto negative_sign_start_pos{insert_lmd(lcv.positive_sign)};
-		auto currency_symbol_start_pos{insert_lmd(lcv.negative_sign)};
-		auto int_curr_symbol_start_pos{insert_lmd(lcv.currency_symbol)};
+		this->mon_grouping_start=insert_lmd(lcv.grouping);
+		this->positive_sign_start=insert_lmd(lcv.mon_grouping);
+		this->negative_sign_start=insert_lmd(lcv.positive_sign);
+		this->currency_symbol_start=insert_lmd(lcv.negative_sign);
+		this->int_curr_symbol_start=insert_lmd(lcv.currency_symbol);
 		insert_lmd(lcv.int_curr_symbol);
-
-		this->mon_grouping_start=stog.begin()+mon_grouping_start_pos;
-		this->positive_sign_start=stog.begin()+positive_sign_start_pos;
-		this->negative_sign_start=stog.begin()+negative_sign_start_pos;
-		this->currency_symbol_start=stog.begin()+currency_symbol_start_pos;
-		this->int_curr_symbol_start=stog.begin()+int_curr_symbol_start_pos;
 	}
 };
 

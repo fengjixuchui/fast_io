@@ -3,17 +3,19 @@
 namespace fast_io
 {
 
-template<character_input_stream input>
-inline constexpr bool scan_define(input& in,std::basic_string<typename input::char_type> &str)
+namespace details
 {
-	constexpr details::is_none_space dg;
+
+template<character_input_stream input,typename Func>
+inline constexpr bool scan_std_string(input& in,std::basic_string<typename input::char_type>& str,Func&& dg)
+{
 	if constexpr(buffer_input_stream<input>)
 	{
 		for(;;)
 		{
 			auto b{ibuffer_curr(in)};
 			auto e{ibuffer_end(in)};
-			for(;b!=e&&!dg(*b);++b);
+			for(;b!=e&&dg(*b);++b);
 			ibuffer_set_curr(in,b);
 			if(b==e)[[unlikely]]
 			{
@@ -28,7 +30,7 @@ inline constexpr bool scan_define(input& in,std::basic_string<typename input::ch
 			auto b{ibuffer_curr(in)};
 			auto e{ibuffer_end(in)};
 			auto i{b};
-			for(;i!=e&&dg(*i);++i);
+			for(;i!=e&&!dg(*i);++i);
 			str.append(b,i);
 			ibuffer_set_curr(in,i);
 			if(i==e)[[unlikely]]
@@ -46,13 +48,31 @@ inline constexpr bool scan_define(input& in,std::basic_string<typename input::ch
 		auto gen{igenerator(in)};
 		auto i{begin(gen)};
 		auto e{end(gen)};
-		for(;i!=e&&!dg(*i);++i);
+		for(;i!=e&&dg(*i);++i);
 		if(i==e)
 			return false;
-		for(str.clear();i!=e&&dg(*i);++i)
+		for(str.clear();i!=e&&!dg(*i);++i)
 			str.push_back(*i);
 		return true;
 	}
+}
+
+}
+
+template<character_input_stream input,typename func>
+inline constexpr bool scan_define(input& in,manip::space<std::basic_string<typename input::char_type>&,func&> str)
+{
+	return details::scan_std_string(in,str.reference,str.function);
+}
+
+template<character_input_stream input>
+inline constexpr bool scan_define(input& in,std::basic_string<typename input::char_type> &str)
+{
+	constexpr details::is_none_space dg;
+	return details::scan_std_string(in,str,[&](auto ch)
+	{
+		return !dg(ch);
+	});
 }
 
 template<input_stream input>

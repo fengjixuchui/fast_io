@@ -152,6 +152,14 @@ struct code_cvt
 	T& reference;
 };
 
+template<typename T,typename Func>
+struct space
+{
+	using manip_tag = manip_tag_t;
+	T reference;
+	Func function;
+};
+
 }
 template<typename T>
 requires (std::floating_point<T>||std::integral<T>)
@@ -256,6 +264,9 @@ inline constexpr manip::status_tag<typename stm::status_type,T const> status(stm
 {
 	return {f,ch};
 }*/
+
+template<typename T,typename Func>
+inline constexpr manip::space<T&,Func&> space(T&& f,Func&& func){return {f,func};}
 
 template<character_output_stream output,std::integral T>
 inline void print_define(output& out,manip::char_view<T> a)

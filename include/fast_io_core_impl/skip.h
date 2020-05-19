@@ -15,21 +15,52 @@ inline constexpr bool operator()(T ch) const
 };
 
 }
-
 template<character_input_stream input,typename UnaryPredicate>
-[[nodiscard]] inline constexpr bool skip_until(input& in,UnaryPredicate pred)
+[[nodiscard]] inline constexpr bool skip_while(input& in,UnaryPredicate&& pred)
 {
 	if constexpr(buffer_input_stream<input>)
 	{
 		for(;;)
 		{
-//			decltype(auto) gbegin{ibuffer_curr(in)};
+			auto b{ibuffer_curr(in)};
+			auto e{ibuffer_end(in)};
+			for(;b!=e&&pred(*b);++b);
+			ibuffer_set_curr(in,b);
+			if(b==e)[[unlikely]]
+			{
+				if(underflow(in))[[likely]]
+					continue;
+				return false;
+			}
+			return true;
+		}
+	}
+	else
+	{
+		auto ig{igenerator(in)};
+		auto b{begin(ig)};
+		auto e{end(ig)};
+		for(;b!=e&&pred(*b);++b);
+		return b!=e;
+	}
+}
+template<character_input_stream input,typename UnaryPredicate>
+[[nodiscard]] inline constexpr bool skip_until(input& in,UnaryPredicate&& pred)
+{
+	if constexpr(buffer_input_stream<input>)
+	{
+		for(;;)
+		{
 			auto b{ibuffer_curr(in)};
 			auto e{ibuffer_end(in)};
 			for(;b!=e&&!pred(*b);++b);
 			ibuffer_set_curr(in,b);
-			if(b==e&&!underflow(in))[[unlikely]]
+			if(b==e)[[unlikely]]
+			{
+				if(underflow(in))[[likely]]
+					continue;
 				return false;
+			}
 			return true;
 		}
 	}
@@ -158,4 +189,13 @@ template<character_input_stream input>
 	}
 }
 
+template<character_input_stream input,typename T,typename Func>
+requires space_scanable<input,T&>
+[[nodiscard]] inline constexpr bool scan_define(input& in,manip::space<T&,Func&> t)
+{
+	if(!skip_while(in,t.function))
+		return false;
+	space_scan_define(in,t.reference);
+	return true;
+}
 }

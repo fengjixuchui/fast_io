@@ -8,7 +8,7 @@ struct basic_lconv_storage
 {
 	using char_type = ch_type;
 	using storage_type = stg_type;
-	using iterator = storage_type::iterator;
+	using size_type = storage_type::size_type;
 	using string_view_type = std::basic_string_view<char_type>;
 	storage_type storage;
 
@@ -33,34 +33,34 @@ struct basic_lconv_storage
 	char_type int_p_sign_posn{};
 	char_type int_n_sign_posn{};
 
-	iterator mon_grouping_start{};
-	iterator positive_sign_start{};
-	iterator negative_sign_start{};
-	iterator currency_symbol_start{};
-	iterator int_curr_symbol_start{};
+	size_type mon_grouping_start{};
+	size_type positive_sign_start{};
+	size_type negative_sign_start{};
+	size_type currency_symbol_start{};
+	size_type int_curr_symbol_start{};
 	constexpr string_view_type grouping() const noexcept
 	{
-		return string_view_type(storage.data(),std::to_address(mon_grouping_start));
+		return string_view_type(storage.data(),storage.data()+mon_grouping_start);
 	}
 	constexpr string_view_type mon_grouping() const noexcept
 	{
-		return string_view_type(std::to_address(mon_grouping_start),std::to_address(positive_sign_start));
+		return string_view_type(storage.data()+mon_grouping_start,storage.data()+positive_sign_start);
 	}
 	constexpr string_view_type positive_sign() const noexcept
 	{
-		return string_view_type(std::to_address(positive_sign_start),std::to_address(negative_sign_start));
+		return string_view_type(storage.data()+positive_sign_start,storage.data()+negative_sign_start);
 	}
 	constexpr string_view_type negative_sign() const noexcept
 	{
-		return string_view_type(std::to_address(negative_sign_start),std::to_address(currency_symbol_start));
+		return string_view_type(storage.data()+negative_sign_start,storage.data()+currency_symbol_start);
 	}
 	constexpr string_view_type currency_symbol() const noexcept
 	{
-		return string_view_type(std::to_address(currency_symbol_start),std::to_address(int_curr_symbol_start));
+		return string_view_type(storage.data()+currency_symbol_start,storage.data()+int_curr_symbol_start);
 	}
 	constexpr string_view_type int_curr_symbol() const noexcept
 	{
-		return string_view_type(std::to_address(int_curr_symbol_start),storage.data()+storage.size());
+		return string_view_type(storage.data()+int_curr_symbol_start,storage.data()+storage.size());
 	}
 };
 

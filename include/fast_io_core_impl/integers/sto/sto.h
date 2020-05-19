@@ -146,12 +146,29 @@ inline constexpr T input_base_number(input& in)
 }
 
 template<char8_t base,bool uppercase,character_input_stream input,std::integral T>
-inline constexpr bool scan_define(input& in,manip::base_t<base,uppercase,T> v)
+inline constexpr void space_scan_define(input& in,manip::base_t<base,uppercase,T> v)
 {
-	if(!skip_space(in))
-		return false;
 	v.reference=details::input_base_number<std::remove_cvref_t<T>,base>(in);
-	return true;
+}
+
+template<character_input_stream input,std::integral T>
+inline constexpr void space_scan_define(input& in,T& a)
+{
+	a=details::input_base_number<std::remove_cvref_t<T>,10>(in);
+}
+
+template<char8_t base,bool uppercase,character_input_stream input,typename T>
+requires std::same_as<std::byte,std::remove_cvref_t<T>>
+inline constexpr void space_scan_define(input& in,manip::base_t<base,uppercase,T> v)
+{
+	v.reference=static_cast<std::byte>(details::input_base_number<char8_t,base>(in));
+}
+/*
+template<char8_t base,bool uppercase,character_input_stream input,typename T>
+requires std::same_as<std::byte,std::remove_cvref_t<T>>
+inline constexpr void scan_define(input& in,manip::no_decoration<manip::base_t<base,uppercase,T>> v)
+{
+	v.reference.reference=static_cast<std::byte>(details::input_base_number<char8_t,base>(in));
 }
 
 template<character_input_stream input,std::integral T>
@@ -165,31 +182,5 @@ inline constexpr void scan_define(input& in,manip::no_decoration<manip::base_t<b
 {
 	v.reference.reference=details::input_base_number<std::remove_cvref_t<T>,base>(in);
 }
-
-template<character_input_stream input,std::integral T>
-inline constexpr bool scan_define(input& in,T& a)
-{
-	if(!skip_space(in))
-		return false;
-	a=details::input_base_number<std::remove_cvref_t<T>,10>(in);
-	return true;
-}
-
-template<char8_t base,bool uppercase,character_input_stream input,typename T>
-requires std::same_as<std::byte,std::remove_cvref_t<T>>
-inline constexpr bool scan_define(input& in,manip::base_t<base,uppercase,T> v)
-{
-	if(!skip_space(in))
-		return false;
-	v.reference=static_cast<std::byte>(details::input_base_number<char8_t,base>(in));
-	return true;
-}
-
-template<char8_t base,bool uppercase,character_input_stream input,typename T>
-requires std::same_as<std::byte,std::remove_cvref_t<T>>
-inline constexpr void scan_define(input& in,manip::no_decoration<manip::base_t<base,uppercase,T>> v)
-{
-	v.reference.reference=static_cast<std::byte>(details::input_base_number<char8_t,base>(in));
-}
-
+*/
 }

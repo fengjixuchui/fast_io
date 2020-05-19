@@ -18,15 +18,29 @@ inline constexpr void print_define(output& out,std::basic_string_view<typename o
 
 namespace details
 {
+template<character_input_stream input,typename T>
+requires (general_scanable<input,T>)
+inline constexpr auto scan_with_space(input &in,T&& t)
+{
+	if constexpr(space_scanable<input,T>)
+	{
+		if(!skip_space(in))
+			return false;
+		space_scan_define(in,std::forward<T>(t));
+		return true;
+	}
+	else
+		return scan_define(in,std::forward<T>(t));
+}
 
 template<character_input_stream input,typename T>
 inline constexpr void scan_with_ex(input &in,T&& t)
 {
-	if constexpr(std::same_as<decltype(scan_define(in,std::forward<T>(t))),void>)
-		scan_define(in,std::forward<T>(t));
+	if constexpr(std::same_as<decltype(scan_with_space(in,std::forward<T>(t))),void>)
+		scan_with_space(in,std::forward<T>(t));
 	else
 	{
-		if(!scan_define(in,t))
+		if(!scan_with_space(in,t))
 #ifdef __cpp_exceptions
 			throw eof();
 #else
@@ -36,11 +50,11 @@ inline constexpr void scan_with_ex(input &in,T&& t)
 }
 
 template<bool report_eof,character_input_stream input,typename ...Args>
-requires(scanable<input,Args>&&...)
+requires(general_scanable<input,Args>&&...)
 inline constexpr auto normal_scan(input &ip,Args&& ...args)
 {
 	if constexpr(report_eof)
-		return (static_cast<std::size_t>(scan_define(ip,std::forward<Args>(args)))+...);
+		return (static_cast<std::size_t>(scan_with_space(ip,std::forward<Args>(args)))+...);
 	else
 		(scan_with_ex(ip,std::forward<Args>(args)),...);
 }
@@ -241,7 +255,6 @@ inline constexpr raiter print_reserve_define(print_reserve_type_t<manip::line<T>
 }
 
 template<bool report_eof=false,input_stream input,typename ...Args>
-requires (sizeof...(Args)!=0)
 inline constexpr auto scan(input &in,Args&& ...args)
 {
 	if constexpr(mutex_input_stream<input>)
@@ -251,7 +264,7 @@ inline constexpr auto scan(input &in,Args&& ...args)
 		return scan<report_eof>(uh,std::forward<Args>(args)...);
 	}
 	else if constexpr(status_input_stream<input>)
-		scan_status_define(in,std::forward<Args>(args)...);
+		return scan_status_define<report_eof>(in,std::forward<Args>(args)...);
 	else
 		return details::normal_scan<report_eof>(in,std::forward<Args>(args)...);
 }
@@ -271,7 +284,6 @@ inline constexpr void receive(input &in,Args&& ...args)
 }
 
 template<output_stream output,typename ...Args>
-requires (sizeof...(Args)!=0)
 inline constexpr void print(output &out,Args&& ...args)
 {
 	if constexpr(mutex_output_stream<output>)
