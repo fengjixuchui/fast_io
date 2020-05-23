@@ -29,6 +29,23 @@ public:
 	{
 		return ptr;
 	}
+	constexpr T* get() noexcept
+	{
+		return ptr;
+	}
+	constexpr T* get() const noexcept
+	{
+		return ptr;
+	}
+#if __cpp_constexpr_dynamic_alloc >= 201907L
+	constexpr
+#endif
+	void reset(T* nptr) noexcept
+	{
+		if(ptr)[[likely]]
+			delete[] ptr;
+		ptr=nptr;
+	}
 #if __cpp_constexpr_dynamic_alloc >= 201907L
 	constexpr
 #endif

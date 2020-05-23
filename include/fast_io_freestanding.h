@@ -9,16 +9,17 @@
 #include<system_error>
 //#include<cmath>
 
+#include"fast_io_freestanding_impl/transformers/transformers.h"
 #include"fast_io_freestanding_impl/concat.h"
 #include"fast_io_freestanding_impl/manip.h"
 #include"fast_io_freestanding_impl/exception.h"
 //compile floating point is slow since it requires algorithms like ryu
 #include"fast_io_freestanding_impl/floating_point/floating.h"
 #include"fast_io_freestanding_impl/iobuf.h"
+#include"fast_io_freestanding_impl/posix_error.h"
 #include"fast_io_freestanding_impl/io_io_file.h"
 #include"fast_io_freestanding_impl/send_receive.h"
 #include"fast_io_freestanding_impl/natural.h"
-#include"fast_io_freestanding_impl/memptr.h"
 #include"fast_io_freestanding_impl/reserve_read_write.h"
 #include"fast_io_freestanding_impl/code_cvt/utf.h"
 //#include"fast_io_freestanding_impl/ucs.h"

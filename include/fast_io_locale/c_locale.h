@@ -206,9 +206,9 @@ public:
 	{
 		if(!*this)
 #ifdef __cpp_exceptions
-			throw std::system_error(errno,std::generic_category());
+			throw posix_error();
 #else
-			fast_io::terminate();
+			fast_terminate();
 #endif
 	}
 	c_locale_handle& operator=(c_locale_handle const& c)
@@ -216,9 +216,9 @@ public:
 		auto cloned{duplocale(c.native_handle())};
 		if(cloned==static_cast<native_handle_type>(0))
 #ifdef __cpp_exceptions
-			throw std::system_error(errno,std::generic_category());
+			throw posix_error();
 #else
-			fast_io::terminate();
+			fast_terminate();
 #endif
 		if(*this)[[likely]]
 #if defined(__WINNT__) || defined(_MSC_VER)
@@ -269,9 +269,9 @@ public:
 {
 	if(!*this)
 #ifdef __cpp_exceptions
-		throw std::runtime_error("unknown locale");
+		throw fast_io_text_error("unknown locale");
 #else
-		fast_io::terminate();
+		fast_terminate();
 #endif
 }
 	c_locale(c_locale_category catg):
@@ -285,9 +285,9 @@ public:
 {
 	if(!*this)
 #ifdef __cpp_exceptions
-		throw std::runtime_error("unknown locale");
+		throw fast_io_text_error("unknown locale");
 #else
-		fast_io::terminate();
+		fast_terminate();
 #endif
 }
 	~c_locale()

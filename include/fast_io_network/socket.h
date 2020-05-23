@@ -221,7 +221,7 @@ inline void unblock(basic_socket<true>& sv)
 {
 	if(::fcntl(sv.native_handle(), F_SETFL, O_NONBLOCK)==-1)
 #ifdef __cpp_exceptions
-		throw std::system_error(errno,std::generic_category());
+		throw posix_error();
 #else
 		fast_terminate();
 #endif

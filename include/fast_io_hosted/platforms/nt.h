@@ -130,7 +130,7 @@ FILE_OVERWRITE_IF	Open the file, and overwrite it.	Create the file. 0x00000005
 		mode.CreateDisposition=1;		//FILE_OPEN
 		if((value&open_mode::trunc)!=open_mode::none)
 #ifdef __cpp_exceptions
-			throw std::system_error(make_error_code(std::errc::invalid_argument));
+			throw posix_error(EINVAL);
 #else
 			fast_terminate();
 #endif
@@ -144,7 +144,7 @@ FILE_OVERWRITE_IF	Open the file, and overwrite it.	Create the file. 0x00000005
 		else
 		{
 #ifdef __cpp_exceptions
-			throw std::system_error(make_error_code(std::errc::invalid_argument));
+			throw posix_error(EINVAL);
 #else
 			fast_terminate();
 #endif

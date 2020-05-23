@@ -212,7 +212,7 @@ inline std::size_t zero_copy_transmit_once(output& outp,input& inp,std::size_t b
 	if(!((fast_io::sock::details::get_proc_address_mswsock<decltype(fast_io::win32::TransmitFile)*>
 		("TransmitFile"))(zero_copy_out_handle(outp),zero_copy_in_handle(inp),bytes,0,std::addressof(ov),nullptr,0/*TF_USE_DEFAULT_WORKER*/)))
 #ifdef __cpp_exceptions
-		throw std::system_error(errno,std::generic_category());
+		throw posix_error();
 #else
 		fast_terminate();
 #endif
@@ -222,7 +222,7 @@ inline std::size_t zero_copy_transmit_once(output& outp,input& inp,std::size_t b
 	if(!((fast_io::sock::details::get_proc_address_mswsock<decltype(fast_io::win32::TransmitFile)*>
 		("TransmitFile"))(zero_copy_out_handle(outp),zero_copy_in_handle(inp),bytes,0,nullptr,nullptr,0/*TF_USE_DEFAULT_WORKER*/)))
 #ifdef __cpp_exceptions
-		throw std::system_error(errno,std::generic_category());
+		throw posix_error();
 #else
 		fast_terminate();
 #endif

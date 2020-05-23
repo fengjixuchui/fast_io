@@ -22,7 +22,7 @@ inline constexpr void detect_overflow(T const& t,std::size_t length)
 	{
 		if((max_size<length)|(t<=base))[[unlikely]]
 #ifdef __cpp_exceptions
-			throw std::overflow_error("unsigned overflow");
+			throw fast_io_text_error("unsigned overflow");
 #else
 			fast_terminate();
 #endif
@@ -37,13 +37,13 @@ inline constexpr void detect_signed_overflow(T const& t,std::size_t length,bool 
 	{
 		if((max_size<length)|(t<=base))[[unlikely]]
 #ifdef __cpp_exceptions
-			throw std::overflow_error("signed overflow");
+			throw fast_io_text_error("signed overflow");
 #else
 			fast_terminate();
 #endif
 		if(static_cast<T>(static_cast<T>(std::numeric_limits<std::make_signed_t<T>>::max())+sign)<t)
 #ifdef __cpp_exceptions
-			throw std::overflow_error("signed overflow");
+			throw fast_io_text_error("signed overflow");
 #else
 			fast_terminate();
 #endif
@@ -90,7 +90,11 @@ inline constexpr T input_base_number(input& in)
 			++length;
 		}
 		if(!length)[[unlikely]]
-			throw std::runtime_error("malformed input");
+#ifdef __cpp_exceptions
+			throw fast_io_text_error("malformed input");
+#else
+			fast_terminate();
+#endif
 		detect_overflow<base>(t,length);
 		return t;
 	}
@@ -102,7 +106,11 @@ inline constexpr T input_base_number(input& in)
 		auto it{begin(ig)};
 		auto ed{end(ig)};
 		if(it==ed)
+#ifdef __cpp_exceptions
 			throw fast_io::eof();
+#else
+			fast_terminate();
+#endif
 		auto const sign{*it=='-'};
 		if(sign)
 			++it;
@@ -139,7 +147,11 @@ inline constexpr T input_base_number(input& in)
 		if(sign)
 			return -static_cast<T>(t);
 		else if(!length)[[unlikely]]
-			throw std::runtime_error("malformed input");
+#ifdef __cpp_exceptions
+			throw fast_io_text_error("malformed input");
+#else
+			fast_terminate();
+#endif
 		return static_cast<T>(t);
 	}
 }

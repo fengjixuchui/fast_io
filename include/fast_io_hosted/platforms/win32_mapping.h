@@ -51,7 +51,7 @@ inline constexpr win32_file_map_attribute to_win32_file_map_attribute(file_map_a
 	case file_map_attribute::write_copy:return win32_file_map_attribute::write|win32_file_map_attribute::copy;
 	default:
 #ifdef __cpp_exceptions
-		throw std::runtime_error("unknown file_mapping_attribute");
+		throw fast_io_text_error("unknown file_mapping_attribute");
 #else
 		fast_terminate();
 #endif

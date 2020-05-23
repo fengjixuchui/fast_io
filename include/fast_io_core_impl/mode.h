@@ -175,7 +175,7 @@ inline auto constexpr to_c_mode(open_mode const& m)
 	break;
 	default:
 #ifdef __cpp_exceptions
-		throw std::runtime_error("unknown open mode");
+		throw fast_io_text_error("unknown open mode");
 #else
 		fast_terminate();
 #endif
@@ -218,7 +218,7 @@ inline auto constexpr from_c_mode(std::basic_string_view<ch_type> csm)
 			break;
 			default:
 #ifdef __cpp_exceptions
-				throw std::runtime_error("unknown C-style open mode");
+				throw fast_io_text_error("unknown C-style open mode");
 #else
 				fast_terminate();
 #endif

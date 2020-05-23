@@ -118,7 +118,7 @@ inline generator<http_header_line<typename input::char_type>> scan_http_header(i
 				co_return;
 			auto sz{str.find(u8':')};
 			if(sz==std::string::npos)
-				throw std::runtime_error("unknown http header line");
+				throw fast_io_text_error("unknown http header line");
 			std::size_t i{sz+1};
 			for(;i!=str.size()&&i==u8' ';++i);
 			co_yield http_header_line<typename input::char_type>{

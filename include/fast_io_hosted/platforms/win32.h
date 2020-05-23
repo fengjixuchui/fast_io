@@ -167,7 +167,7 @@ does not exist
 		mode.dwCreationDisposition=1;//	CREATE_NEW
 		if((value&open_mode::trunc)!=open_mode::none)
 #ifdef __cpp_exceptions
-			throw std::system_error(make_error_code(std::errc::invalid_argument));
+			throw posix_error(EINVAL);
 #else
 			fast_terminate();
 #endif
@@ -181,7 +181,7 @@ does not exist
 		else
 		{
 #ifdef __cpp_exceptions
-			throw std::system_error(make_error_code(std::errc::invalid_argument));
+			throw posix_error(EINVAL);
 #else
 			fast_terminate();
 #endif

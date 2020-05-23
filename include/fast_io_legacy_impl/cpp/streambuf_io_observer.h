@@ -74,7 +74,7 @@ inline Iter write(basic_general_streambuf_io_observer<T>& t,Iter begin,Iter end)
 /*
 	if(!t.rdb->sputn(static_cast<char_type const*>(static_cast<void const*>(std::to_address(begin))),(end-begin)*sizeof(*begin)/sizeof(char_type)))
 #ifdef __cpp_exceptions
-		throw std::system_error(std::make_error_code(std::errc::io_error));
+		throw posix_error(EIO);
 #else
 		fast_terminate();
 #endif*/
@@ -86,7 +86,7 @@ inline void flush(basic_general_streambuf_io_observer<T> h)
 {
 	if(h.native_handle()->pubsync()==-1)
 #ifdef __cpp_exceptions
-		throw std::system_error(std::make_error_code(std::errc::io_error));
+		throw posix_error(EIO);
 #else
 		fast_terminate();
 #endif

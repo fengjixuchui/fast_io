@@ -77,7 +77,7 @@ inline void put(streambuf_view<T>& t,typename T::char_type ch)
 {
 	if(!t.native_handle()->sputc(ch))
 #ifdef __cpp_exceptions
-		throw std::system_error(std::make_error_code(std::errc::io_error));
+		throw posix_error(EIO);
 #else
 		fast_terminate();
 #endif
@@ -89,7 +89,7 @@ inline void write(streambuf_view<T>& t,Iter begin,Iter end)
 	using char_type = typename T::char_type;
 	if(!t.native_handle()->sputn(static_cast<char_type const*>(static_cast<void const*>(std::to_address(begin))),(end-begin)*sizeof(*begin)/sizeof(char_type)))
 #ifdef __cpp_exceptions
-		throw std::system_error(std::make_error_code(std::errc::io_error));
+		throw posix_error(EIO);
 #else
 		fast_terminate();
 #endif

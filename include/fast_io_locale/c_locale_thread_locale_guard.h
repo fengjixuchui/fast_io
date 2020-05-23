@@ -17,7 +17,7 @@ public:
 	{
 		if(old_status==-1)
 #ifdef __cpp_exceptions
-			throw std::system_error(errno,std::generic_category());
+			throw posix_error();
 #else
 			fast_terminate();
 #endif
@@ -28,7 +28,7 @@ public:
 	{
 		if(!old_locale_value)
 #ifdef __cpp_exceptions
-			throw std::system_error(errno,std::generic_category());
+			throw posix_error();
 #else
 			fast_terminate();
 #endif

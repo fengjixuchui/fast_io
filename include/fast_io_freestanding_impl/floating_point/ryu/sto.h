@@ -44,7 +44,7 @@ inline constexpr F input_floating(It_First iter,It_Second ed)
 			if(ch==decimal_point_value_after_minus_zero)
 			{
 				if(dot_index!=-1)
-					throw std::runtime_error("malformed input");
+					throw fast_io_text_error("malformed input");
 				dot_index=index;
 				++index;
 				continue;
@@ -72,7 +72,7 @@ inline constexpr F input_floating(It_First iter,It_Second ed)
 		if(iter!=ed&&static_cast<unsigned_char_type>(*iter-u8'1')<9)[[unlikely]]
 		{
 #ifdef __cpp_exceptions
-			throw std::runtime_error("out of precision of ryu algorithm. To do with multiprecision");
+			throw fast_io_text_error("out of precision of ryu algorithm. To do with multiprecision");
 #else
 			fast_terminate();
 #endif
@@ -86,13 +86,13 @@ inline constexpr F input_floating(It_First iter,It_Second ed)
 	{
 		e_index=index;
 		if(++iter==ed)[[unlikely]]
-			throw std::runtime_error("malformed input");
+			throw fast_io_text_error("malformed input");
 		++index;
 		if((*iter==u8'+')||(*iter==u8'-'))[[likely]]
 		{
 			exp_negative=(*iter==u8'-');
 			if(++iter==ed)[[unlikely]]
-				throw std::runtime_error("malformed input");
+				throw fast_io_text_error("malformed input");
 			++index;
 		}
 		for(;iter!=ed&&*iter==u8'0';++iter)
@@ -110,7 +110,7 @@ inline constexpr F input_floating(It_First iter,It_Second ed)
 	}
 	detect_overflow<10>(ue10,ue10digits);
 	if((ue10+=extra_e10)<extra_e10)[[unlikely]]
-		throw std::runtime_error("exp part integer overflow");
+		throw fast_io_text_error("exp part integer overflow");
 	signed_exponent_type e10(static_cast<signed_exponent_type>(ue10));
 	if(exp_negative)
 		e10=-e10;
@@ -138,7 +138,7 @@ inline constexpr F input_floating(It_First iter,It_Second ed)
 	{
 		e2+=log2pow5(e10);
 		m2=mul_shift(m10,pow5<F,true>::split[e10],e2-e10-pow5bits(e10)+floating_trait::pow5_bitcount);
-		trailing_zeros = e2 < e10 || multiple_of_power_of_2(m10, e2 - e10);
+		trailing_zeros = e2 < e10 || (e2 - e10 < 64 && multiple_of_power_of_2(m10, e2 - e10));
 	}
 	signed_exponent_type ieee_e2(e2 + (floating_trait::bias-1) + std::bit_width(m2));
 	if(ieee_e2<0)

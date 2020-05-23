@@ -27,12 +27,12 @@ inline std::size_t c_mbstowcs_s_l(Args&& ...args)
 	std::size_t sz{};
 	auto err{_mbstowcs_s_l(std::addressof(sz),std::forward<Args>(args)...)};
 	if(err)
-		throw std::system_error(static_cast<int>(err),std::generic_category());
+		throw posix_error(static_cast<int>(err));
 	return sz;
 #else
 	std::size_t sz{mbstowcs_l(std::forward<Args>(args)...)};
 	if(sz==std::numeric_limits<std::size_t>::max())
-		throw std::system_error(errno,std::generic_category());
+		throw posix_error();
 	return sz;
 #endif
 }

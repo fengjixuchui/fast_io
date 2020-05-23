@@ -151,7 +151,7 @@ class basic_bio_file:public basic_bio_io_observer<ch_type>
 	void detect_open_failure()
 	{
 		if(this->native_handle()==nullptr)[[unlikely]]
-			throw openssl_error("BIO_new() failed");
+			throw openssl_error();
 	}
 public:
 	using native_handle_type = BIO*;
@@ -297,7 +297,7 @@ inline Iter read(basic_bio_io_observer<ch_type> iob,Iter begin,Iter end)
 	std::size_t read_bytes{};
 	if(BIO_read_ex(iob.native_handle(),std::to_address(begin),
 		sizeof(*begin)*(std::to_address(end)-std::to_address(begin)),std::addressof(read_bytes))==-1)
-		throw openssl_error("BIO_read_ex failed()");
+		throw openssl_error();
 	return begin+read_bytes/sizeof(*begin);
 }
 
@@ -307,7 +307,7 @@ inline Iter write(basic_bio_io_observer<ch_type> iob,Iter begin,Iter end)
 	std::size_t written_bytes{};
 	if(BIO_write_ex(iob.native_handle(),std::to_address(begin),
 		sizeof(*begin)*(std::to_address(end)-std::to_address(begin)),std::addressof(written_bytes))==-1)
-		throw openssl_error("BIO_write_ex failed()");
+		throw openssl_error();
 	return begin+written_bytes/sizeof(*begin);
 }
 
@@ -325,6 +325,15 @@ void print_define(output& out,openssl_error const& err)
 {
 	bio_file bf(io_cookie,out);
 	ERR_print_errors(bf.native_handle());
+}
+
+inline
+#if __cpp_constexpr >= 201907L
+	constexpr
+#endif
+void openssl_error::report(error_reporter& err) const
+{
+	print(err,*this);
 }
 /*
 inline constexpr char* ibuffer_begin(bio_io_observer cio) noexcept

@@ -36,7 +36,7 @@ inline void write(streambuf_handle<T>& hd,Iter begin,Iter end)
 	using char_type = typename T::char_type;
 	if(!hd.handle.sputn(static_cast<char_type const*>(static_cast<void const*>(std::to_address(begin))),(end-begin)*sizeof(*begin)/sizeof(char_type)))
 #ifdef __cpp_exceptions
-		throw std::system_error(std::make_error_code(std::errc::io_error));
+		throw posix_error(EIO);
 #else
 		fast_terminate();
 #endif

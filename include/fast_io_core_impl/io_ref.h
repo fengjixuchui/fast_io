@@ -118,12 +118,6 @@ inline constexpr decltype(auto) zero_copy_out_handle(io_ref<out>& t)
 	return zero_copy_out_handle(*t);
 }
 
-template<buffer_input_stream in>
-inline constexpr decltype(auto) ireserve(io_ref<in>& t)
-{
-	return ireserve(*t);
-}
-
 template<buffer_output_stream out>
 inline constexpr decltype(auto) oreserve(io_ref<out>& t)
 {

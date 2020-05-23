@@ -86,7 +86,7 @@ inline constexpr output_iter my_copy_n(input_iter first,count_type count,output_
 	}
 }
 template<std::input_iterator input_iter,std::input_or_output_iterator output_iter>
-inline constexpr input_iter my_copy(input_iter first,input_iter second,output_iter result)
+inline constexpr output_iter my_copy(input_iter first,input_iter second,output_iter result)
 {
 	using input_value_type = typename std::iterator_traits<input_iter>::value_type;
 	using output_value_type = typename std::iterator_traits<output_iter>::value_type;

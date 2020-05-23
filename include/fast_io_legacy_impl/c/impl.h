@@ -152,7 +152,7 @@ public:
 );
 		if(fd<0)
 #ifdef __cpp_exceptions
-			throw std::system_error(errno,std::system_category());
+			throw posix_error();
 #else
 			fast_terminate();
 #endif
@@ -195,7 +195,7 @@ inline Iter read(basic_c_io_observer_unlocked<T> cfhd,Iter begin,Iter end)
 	if(r==count||std::feof(cfhd.native_handle()))
 		return begin+r;
 #ifdef __cpp_exceptions
-	throw std::system_error(errno,std::generic_category());
+	throw posix_error();
 #else
 	fast_terminate();
 #endif
@@ -215,7 +215,7 @@ inline void write(basic_c_io_observer_unlocked<T> cfhd,Iter begin,Iter end)
 #endif
 	(std::to_address(begin),sizeof(*begin),count,cfhd.native_handle())<count)
 #ifdef __cpp_exceptions
-		throw std::system_error(errno,std::system_category());
+		throw posix_error();
 #else
 		fast_terminate();
 #endif
@@ -234,7 +234,7 @@ inline void flush(basic_c_io_observer_unlocked<T> cfhd)
 #endif
 	(cfhd.native_handle()))
 #ifdef __cpp_exceptions
-		throw std::system_error(errno,std::system_category());
+		throw posix_error();
 #else
 		fast_terminate();
 #endif
@@ -252,11 +252,11 @@ inline auto seek(basic_c_io_observer_unlocked<ch_type> cfhd,seek_type_t<T>,U i,s
 		fseek
 #endif
 	(cfhd.native_handle(),seek_precondition<long,T,char>(i),static_cast<int>(s)))
-		throw std::system_error(errno,std::system_category()); 
+		throw posix_error(); 
 	auto val(std::ftell(cfhd.native_handle()));
 	if(val<0)
 #ifdef __cpp_exceptions
-		throw std::system_error(errno,std::system_category());
+		throw posix_error();
 #else
 		fast_terminate();
 #endif
@@ -309,7 +309,7 @@ public:
 );
 		if(fd<0)
 #ifdef __cpp_exceptions
-			throw std::system_error(errno,std::system_category());
+			throw posix_error();
 #else
 			fast_terminate();
 #endif
@@ -371,7 +371,7 @@ inline Iter read(basic_c_io_observer<T> cfhd,Iter begin,Iter end)
 	if(r==count||std::feof(cfhd.native_handle()))
 		return begin+r;
 #ifdef __cpp_exceptions
-	throw std::system_error(errno,std::system_category());
+	throw posix_error();
 #else
 	fast_terminate();
 #endif
@@ -383,7 +383,7 @@ inline void write(basic_c_io_observer<T> cfhd,Iter begin,Iter end)
 	std::size_t const count(end-begin);
 	if(std::fwrite(std::to_address(begin),sizeof(*begin),count,cfhd.native_handle())<count)
 #ifdef __cpp_exceptions
-		throw std::system_error(errno,std::system_category());
+		throw posix_error();
 #else
 		fast_terminate();
 #endif
@@ -394,7 +394,7 @@ inline void flush(basic_c_io_observer<T> cfhd)
 {
 	if(std::fflush(cfhd.native_handle()))
 #ifdef __cpp_exceptions
-		throw std::system_error(errno,std::system_category());
+		throw posix_error();
 #else
 		fast_terminate();
 #endif
@@ -405,14 +405,14 @@ inline auto seek(basic_c_io_observer<P> cfhd,seek_type_t<T>,U i,seekdir s=seekdi
 {
 	if(std::fseek(cfhd.native_handle(),seek_precondition<long,T,typename basic_c_io_observer<P>::char_type>(i),static_cast<int>(s)))
 #ifdef __cpp_exceptions
-		throw std::system_error(errno,std::system_category());
+		throw posix_error();
 #else
 		fast_terminate();
 #endif
 	auto val(std::ftell(cfhd.native_handle()));
 	if(val<0)
 #ifdef __cpp_exceptions
-		throw std::system_error(errno,std::system_category());
+		throw posix_error();
 #else
 		fast_terminate();
 #endif
@@ -477,7 +477,7 @@ public:
 	{
 		if(native_handle()==nullptr)
 #ifdef __cpp_exceptions
-			throw std::system_error(errno,std::system_category());
+			throw posix_error();
 #else
 			fast_terminate();
 #endif
@@ -499,7 +499,7 @@ public:
 	{
 		if(native_handle()==nullptr)
 #ifdef __cpp_exceptions
-			throw std::system_error(errno,std::system_category());
+			throw posix_error();
 #else
 			fast_terminate();
 #endif
@@ -515,7 +515,7 @@ public:
 			{
 #ifdef __cpp_exceptions
 				std::fclose(this->native_handle());
-				throw std::system_error(errno,std::generic_category());
+				throw posix_error();
 #else
 				fast_terminate();
 #endif
@@ -567,7 +567,7 @@ public:
 #if defined(_GNU_SOURCE)
 		std::unique_ptr<stm> up{std::make_unique<stm>(std::forward<Args>(args)...)};
 		if(!(this->native_handle()=fopencookie(up.get(),mode.data(),c_io_cookie_functions<stm>.native_functions)))[[unlikely]]
-			throw std::system_error(errno,std::generic_category());
+			throw posix_error();
 		up.release();
 #else
 /*
@@ -578,7 +578,7 @@ Todo
 	}
 */
 #ifdef __cpp_exceptions
-		throw std::system_error(std::make_error_code(std::errc::operation_not_supported));
+		throw posix_error(EOPNOTSUPP);
 #else
 		fast_terminate();
 #endif
@@ -591,7 +591,7 @@ Todo
 	{
 #if defined(_GNU_SOURCE)
 		if(!(this->native_handle()=fopencookie(std::addressof(reff),mode.data(),c_io_cookie_functions<stm&>)))[[unlikely]]
-			throw std::system_error(errno,std::generic_category());
+			throw posix_error();
 #else
 /*
 #elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__)) || defined (__BIONIC__)
@@ -601,7 +601,7 @@ Todo
 	}
 */
 #ifdef __cpp_exceptions
-		throw std::system_error(std::make_error_code(std::errc::operation_not_supported));
+		throw posix_error(EOPNOTSUPP);
 #else
 		fast_terminate();
 #endif

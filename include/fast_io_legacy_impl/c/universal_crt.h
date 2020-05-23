@@ -168,7 +168,7 @@ inline void overflow(c_io_observer_unlocked cio,char ch)
 {
 	if(__acrt_stdio_flush_and_write_narrow_nolock(static_cast<int>(static_cast<unsigned char>(ch)),cio.fp)==EOF)[[unlikely]]
 #ifdef __cpp_exceptions
-		throw std::system_error(errno,std::generic_category());
+		throw posix_error();
 #else
 		fast_terminate();
 #endif
@@ -242,7 +242,7 @@ inline void overflow(wc_io_observer_unlocked cio,wchar_t ch)
 	obuffer_set_curr(cio,obuffer_end(cio));
 	if(__acrt_stdio_flush_and_write_wide_nolock(static_cast<wint_t>(static_cast<std::make_unsigned_t<wchar_t>>(ch)),cio.fp)==WEOF)[[unlikely]]
 #ifdef __cpp_exceptions
-		throw std::system_error(errno,std::generic_category());
+		throw posix_error();
 #else
 		fast_terminate();
 #endif

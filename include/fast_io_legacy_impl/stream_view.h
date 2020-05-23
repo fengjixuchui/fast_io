@@ -86,7 +86,7 @@ template<fast_io::stream_view_details::ostream_concept_impl T>
 inline void put(stream_view<T>& t,typename T::char_type ch)
 {
 	if(!t.native_handle().put(ch))
-		throw std::runtime_error("put() failed for streambuf view");
+		throw fast_io_text_error("put() failed for streambuf view");
 }
 
 template<fast_io::stream_view_details::ostream_concept_impl T,std::contiguous_iterator Iter>
@@ -94,7 +94,7 @@ inline void write(stream_view<T>& t,Iter begin,Iter end)
 {
 	using char_type = typename T::char_type;
 	if(!t.native_handle().write(static_cast<char_type const*>(static_cast<void const*>(std::to_address(begin))),(end-begin)*sizeof(*begin)/sizeof(char_type)))
-		throw std::runtime_error("send failed for stream view");
+		throw fast_io_text_error("send failed for stream view");
 }
 
 template<fast_io::stream_view_details::ostream_concept_impl T>

@@ -33,28 +33,28 @@ inline constexpr manip::width<T,ch_type> width(T t,std::size_t wd,bool left=fals
 
 template<typename T,std::integral ch_type=char8_t>
 requires (!manipulator<T>)
-inline constexpr manip::width<T const&,ch_type> left_width(T const& t,std::size_t wd,bool left=false,ch_type indent_character=u8' ')
+inline constexpr manip::width<T const&,ch_type> left_width(T const& t,std::size_t wd,ch_type indent_character=u8' ')
 {
-	return {t,wd,false,indent_character};
+	return {t,wd,true,indent_character};
 }
 
 template<manipulator T,std::integral ch_type=char8_t>
-inline constexpr manip::width<T,ch_type> left_width(T t,std::size_t wd,bool left=false,ch_type indent_character=u8' ')
+inline constexpr manip::width<T,ch_type> left_width(T t,std::size_t wd,ch_type indent_character=u8' ')
 {
-	return {t,wd,false,indent_character};
+	return {t,wd,true,indent_character};
 }
 
 template<typename T,std::integral ch_type=char8_t>
 requires (!manipulator<T>)
 inline constexpr manip::width<T const&,ch_type> right_width(T const& t,std::size_t wd,ch_type indent_character=u8' ')
 {
-	return {t,wd,true,indent_character};
+	return {t,wd,false,indent_character};
 }
 
 template<manipulator T,std::integral ch_type=char8_t>
 inline constexpr manip::width<T,ch_type> right_width(T t,std::size_t wd,ch_type indent_character=u8' ')
 {
-	return {t,wd,true,indent_character};
+	return {t,wd,false,indent_character};
 }
 
 

@@ -17,14 +17,6 @@ add_definitions(-Xclang -fconcepts-ts -ffast-math)
 endif()
 
 set(CMAKE_CXX_STANDARD 20)
-add_library(fast_io SHARED src/fast_io_c_interface.cc)
-add_library(fast_io_static STATIC src/fast_io_c_interface.cc)
 
-set_target_properties(fast_io PROPERTIES OUTPUT_NAME "fast_io_c_interface")
-set_target_properties(fast_io_static PROPERTIES OUTPUT_NAME "fast_io_c_interface")
 
-install(TARGETS fast_io
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(TARGETS fast_io_static
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 INSTALL (DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include)

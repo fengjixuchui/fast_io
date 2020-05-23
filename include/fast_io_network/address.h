@@ -81,9 +81,9 @@ inline constexpr void scan_define(input& in,ipv6& v6)
 	std::basic_string<typename input::char_type> str;
 	scan(in,str);
 	if(str.size()<2)
-		throw std::runtime_error(reinterpret_cast<char const*>(u8"ipv6 address too short"));
+		throw fast_io_text_error(reinterpret_cast<char const*>(u8"ipv6 address too short"));
 	else if(39<str.size())
-		throw std::runtime_error(reinterpret_cast<char const*>(u8"ipv6 address too long"));
+		throw fast_io_text_error(reinterpret_cast<char const*>(u8"ipv6 address too long"));
 	std::size_t colons(0),position(npos);
 	if(str.front()!=0x3a)
 		++colons;
@@ -100,7 +100,7 @@ inline constexpr void scan_define(input& in,ipv6& v6)
 			}
 		}
 	if(7<colons)
-		throw std::runtime_error(reinterpret_cast<char const*>(u8"too many : for ipv6 address"));
+		throw fast_io_text_error(reinterpret_cast<char const*>(u8"too many : for ipv6 address"));
 	if(position!=npos)
 	{
 		std::u8string tempstr(1,0x20);

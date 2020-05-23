@@ -1,5 +1,5 @@
 #include"../include/fast_io_device.h"
-#include"../include/fast_io_c_interface.h"
+#include"../include/fast_io_c_interface/fast_io_c_interface.h"
 #include"../include/fast_io_legacy_impl/c/impl.h"
 
 namespace fast_io

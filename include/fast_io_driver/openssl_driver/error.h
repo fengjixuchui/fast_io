@@ -3,12 +3,14 @@
 namespace fast_io::openssl
 {
 
-class openssl_error:public std::runtime_error
+class openssl_error:public fast_io_error
 {
 public:
-	template<typename... Args>
-	requires std::constructible_from<std::runtime_error,Args...>
-	explicit openssl_error(Args&& ...args):std::runtime_error(std::forward<Args>(args)...){}
+	virtual
+#if __cpp_constexpr >= 201907L
+	constexpr
+#endif
+	void report(error_reporter& err) const override;
 };
 
 }

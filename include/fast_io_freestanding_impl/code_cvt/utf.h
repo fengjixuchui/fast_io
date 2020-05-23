@@ -190,7 +190,7 @@ inline constexpr to_iter code_cvt_from_utf8_to_utf16(from_iter p_src_iter,from_i
 				details::utf::get_code_units(cdpt, pDst);
 			else
 #ifdef __cpp_exceptions
-				throw std::range_error("illegal utf8");
+				throw fast_io_text_error("illegal utf8");
 #else
 				fast_terminate();
 #endif
@@ -213,7 +213,7 @@ inline constexpr to_iter code_cvt_from_utf8_to_utf16(from_iter p_src_iter,from_i
 			details::utf::get_code_units(cdpt, pDst);
 	    else
 #ifdef __cpp_exceptions
-			throw std::range_error("illegal utf8");
+			throw fast_io_text_error("illegal utf8");
 #else
 			fast_terminate();
 #endif

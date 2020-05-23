@@ -12,7 +12,7 @@ inline constexpr auto seek_precondition(integr i)
 	if constexpr(offset_max<static_cast<std::make_unsigned_t<integr>>(std::numeric_limits<integr>::max()))
 	{
 		if(offset_max<static_cast<std::make_unsigned_t<integr>>(i))
-			throw std::runtime_error("index is not in range for seek type");
+			throw fast_io_text_error("index is not in range for seek type");
 	}
 	return static_cast<offset_type>(i);*/
 	return static_cast<offset_type>(i * static_cast<std::ptrdiff_t>(sizeof(T))/static_cast<std::ptrdiff_t>(sizeof(char_type)));

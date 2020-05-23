@@ -73,7 +73,7 @@ inline void overflow(basic_general_streambuf_io_observer<T> cio,typename T::char
 	using traits_type = typename T::traits_type;
 	if(cio.rdb->sputc(ch)==traits_type::eof())
 #ifdef __cpp_exceptions
-		throw std::system_error(std::make_error_code(std::errc::io_error));
+		throw posix_error(EIO);
 #else
 		fast_terminate();
 #endif

@@ -55,7 +55,7 @@ inline void overflow(c_io_observer_unlocked cio,char ch)
 {
 	if(__overflow(cio.fp,static_cast<int>(static_cast<unsigned char>(ch)))==EOF)[[unlikely]]
 #ifdef __cpp_exceptions
-		throw std::system_error(errno,std::generic_category());
+		throw posix_error();
 #else
 		fast_terminate();
 #endif
@@ -143,7 +143,7 @@ inline void overflow(wc_io_observer_unlocked cio,wchar_t ch)
 {
 	if(__woverflow(cio.fp,static_cast<std::wint_t>(ch))==WEOF)[[unlikely]]
 #ifdef __cpp_exceptions
-		throw std::system_error(errno,std::generic_category());
+		throw posix_error();
 #else
 		fast_terminate();
 #endif

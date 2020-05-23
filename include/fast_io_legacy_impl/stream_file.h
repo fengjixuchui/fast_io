@@ -68,7 +68,7 @@ public:
 		stm.rdbuf(std::addressof(hd));
 		if(!stm)
 #ifdef __cpp_exceptions
-			throw std::system_error(std::make_error_code(std::errc::io_error));
+			throw posix_error(EIO);
 #else
 			fast_terminate();
 #endif
@@ -86,7 +86,7 @@ public:
 	{
 		if(!stm)
 #ifdef __cpp_exceptions
-			throw std::system_error(std::make_error_code(std::errc::io_error));
+			throw posix_error(EIO);
 #else
 			fast_terminate();
 #endif
@@ -103,7 +103,7 @@ public:
 	{
 		if(!stm)
 #ifdef __cpp_exceptions
-			throw std::system_error(std::make_error_code(std::errc::io_error));
+			throw posix_error(EIO);
 #else
 			fast_terminate();
 #endif

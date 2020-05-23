@@ -29,24 +29,24 @@ public:
 	explicit handle_pool(std::integral auto counts):fd(::epoll_create(static_cast<int>(counts)))
 	{
 		if(fd==-1)
-			throw std::system_error(errno,std::generic_category());
+			throw posix_error();
 	}
 	explicit handle_pool(std::integral auto counts,close_on_exec_function_invoked_t):
 		fd(::epoll_create1(static_cast<int>(counts)|EPOLL_CLOEXEC))
 	{
 		if(fd==-1)
-			throw std::system_error(errno,std::generic_category());
+			throw posix_error();
 	}
 	handle_pool(handle_pool const& dp):fd(dup(dp.fd))
 	{
 		if(fd<0)
-			throw std::system_error(errno,std::generic_category());
+			throw posix_error();
 	}
 	handle_pool& operator=(handle_pool const& dp)
 	{
 		auto newfd(dup2(dp.fd,fd));
 		if(newfd<0)
-			throw std::system_error(errno,std::generic_category());
+			throw posix_error();
 		fd=newfd;
 		return *this;
 	}
@@ -161,7 +161,7 @@ inline output& add_control(handle_pool& pool,output& out,event e)
 	auto const out_ultimate(ultimate_native_handle(out));
 	epoll_event evt{static_cast<std::uint32_t>(e),{.fd=out_ultimate}};
 	if(::epoll_ctl(pool.native_handle(),1,out_ultimate,std::addressof(evt))==-1)
-		throw std::system_error(errno,std::generic_category());
+		throw posix_error();
 	return out;
 }
 
@@ -171,7 +171,7 @@ inline output& delete_control(handle_pool& pool,output& out)
 	auto const out_ultimate(ultimate_native_handle(out));
 	epoll_event evt{1,{.fd=out_ultimate}};
 	if(::epoll_ctl(pool.native_handle(),2,out_ultimate,std::addressof(evt))==-1)
-		throw std::system_error(errno,std::generic_category());
+		throw posix_error();
 	return out;
 }
 template<epoll_stream output>
@@ -180,7 +180,7 @@ inline output& modify_control(handle_pool& pool,output& out,event e)
 	auto const out_ultimate(ultimate_native_handle(out));
 	epoll_event evt{static_cast<std::uint32_t>(e),{.fd=out_ultimate}};
 	if(::epoll_ctl(pool.native_handle(),3,out_ultimate,std::addressof(evt))==-1)
-		throw std::system_error(errno,std::generic_category());
+		throw posix_error();
 	return out;
 }
 
@@ -190,7 +190,7 @@ inline std::span<events> wait(handle_pool& pool,std::span<events> evs,std::chron
 	int ret(::epoll_wait(pool.native_handle(),evs.data(),static_cast<int>(evs.size()),
 		static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(timeout).count())==1));
 	if(ret==-1)
-		throw std::system_error(errno,std::generic_category());
+		throw posix_error();
 	return evs.first(static_cast<std::size_t>(ret));
 }
 
@@ -198,7 +198,7 @@ inline std::span<events> wait(handle_pool& pool,std::span<events> evs)
 {
 	int ret(::epoll_wait(pool.native_handle(),evs.data(),static_cast<int>(evs.size()),-1));
 	if(ret==-1)
-		throw std::system_error(errno,std::generic_category());
+		throw posix_error();
 	return evs.first(static_cast<std::size_t>(ret));
 }
 
@@ -208,14 +208,14 @@ template<output_stream output>
 inline void delete_control(handle_pool& pool,output& out,std::integral auto value)
 {
 	if(::epoll_ctl(pool.native_handle(),std::addressof(func),2,nullptr,epoll_event{0,static_cast<std::uint64_t>(value)})==-1)
-		throw std::system_error(errno,std::generic_category());
+		throw posix_error();
 }
 
 template<output_stream output>
 inline void modify_control(handle_pool& pool,output& out,event e,std::integral auto value)
 {
 	if(::epoll_ctl(pool.native_handle(),std::addressof(func),3,epoll_event{e,static_cast<std::uint64_t>(value)})==-1)
-		throw std::system_error(errno,std::generic_category());
+		throw posix_error();
 }
 */
 }

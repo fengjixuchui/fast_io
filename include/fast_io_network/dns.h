@@ -52,7 +52,7 @@ inline address operator*(dns_iterator const &a)
 		return address(ret);
 	}
 #ifdef __cpp_exceptions
-	throw std::runtime_error("unknown family");
+	throw fast_io_text_error("unknown family");
 #else
 	fast_terminate();
 #endif
