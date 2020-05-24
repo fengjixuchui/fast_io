@@ -26,7 +26,7 @@
 #include<atomic>		//std::atomic
 
 //fast_io core
-#include"fast_io_core_impl/before_cpp20_concept.h"
+#include"fast_io_core_impl/utils.h"
 
 #include"fast_io_core_impl/overflow.h"
 #include"fast_io_core_impl/io_ref.h"

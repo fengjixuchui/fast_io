@@ -151,7 +151,7 @@ inline constexpr bool is_space(T const u)
 
 namespace twodigits
 {
-template<char8_t base=10,bool uppercase=false,std::random_access_iterator Iter,std::unsigned_integral U>
+template<char8_t base=10,bool uppercase=false,std::random_access_iterator Iter,my_unsigned_integral U>
 inline constexpr std::size_t output_unsigned(Iter str,U value)
 {
 	std::size_t const len{chars_len<base>(value)};

@@ -4,20 +4,11 @@ namespace fast_io
 {
 namespace details
 {
-template<std::integral intg,char8_t base>
-requires (2<=base&&base<=36)
-inline constexpr std::size_t get_max_size()
-{
-	std::size_t i{};
-	for(auto v(std::numeric_limits<intg>::max());v;++i)
-		v/=base;
-	return i;
-}
 
-template<char8_t base,std::unsigned_integral T>
+template<char8_t base,my_unsigned_integral T>
 inline constexpr void detect_overflow(T const& t,std::size_t length)
 {
-	constexpr std::size_t max_size{get_max_size<T,base>()};
+	constexpr std::size_t max_size{cal_max_int_size<T,base>()};
 	if(max_size<=length)[[unlikely]]
 	{
 		if((max_size<length)|(t<=base))[[unlikely]]
@@ -29,10 +20,10 @@ inline constexpr void detect_overflow(T const& t,std::size_t length)
 	}
 }
 
-template<char8_t base,std::unsigned_integral T>
+template<char8_t base,my_unsigned_integral T>
 inline constexpr void detect_signed_overflow(T const& t,std::size_t length,bool sign)
 {
-	constexpr std::size_t max_size{get_max_size<T,base>()};
+	constexpr std::size_t max_size{cal_max_int_size<T,base>()};
 	if(max_size<=length)[[unlikely]]
 	{
 		if((max_size<length)|(t<=base))[[unlikely]]
@@ -41,7 +32,7 @@ inline constexpr void detect_signed_overflow(T const& t,std::size_t length,bool 
 #else
 			fast_terminate();
 #endif
-		if(static_cast<T>(static_cast<T>(std::numeric_limits<std::make_signed_t<T>>::max())+sign)<t)
+		if(static_cast<T>(get_int_max_unsigned<T>()+sign)<t)
 #ifdef __cpp_exceptions
 			throw fast_io_text_error("signed overflow");
 #else
@@ -51,56 +42,141 @@ inline constexpr void detect_signed_overflow(T const& t,std::size_t length,bool 
 }
 
 
-template<std::integral T,char8_t base,bool no_dec=false,character_input_stream input>
+template<my_integral T,char8_t base,bool no_dec=false,character_input_stream input>
 inline constexpr T input_base_number(input& in)
 {
 	using unsigned_char_type = std::make_unsigned_t<typename input::char_type>;
-	using unsigned_t = std::make_unsigned_t<std::remove_cvref_t<T>>;
-	if constexpr(std::unsigned_integral<T>)
+	using unsigned_t = my_make_unsigned_t<std::remove_cvref_t<T>>;
+	if constexpr(my_unsigned_integral<T>)
 	{
-		unsigned_t t{};
-		std::size_t length{};
-		for(unsigned_char_type ch : igenerator(in))
+		if constexpr(sizeof(unsigned_t)==16)
 		{
-			if constexpr(base<=10)
+			//special optimization for uint128_t
+			std::size_t length{};
+			auto ig{igenerator(in)};
+			auto it{begin(ig)};
+			auto ed{end(ig)};
+			std::uint64_t t{};
+			for(;it!=ed;++it)
 			{
-				unsigned_char_type const e(static_cast<unsigned_char_type>(ch)-u8'0');
-				if(base<=e)[[unlikely]]
-					break;
-				t*=base;
-				t+=e;
-			}
-			else
-			{
-				unsigned_char_type e(static_cast<unsigned_char_type>(ch)-u8'0');
-				constexpr char8_t bm10{base-10};
-				if(e<=10)
+				unsigned_char_type e(static_cast<unsigned_char_type>(*it)-u8'0');
+				if constexpr(base<=10)
 				{
+					if(base<=e)[[unlikely]]
+						break;
 					t*=base;
 					t+=e;
 				}
-				else if(static_cast<unsigned_char_type>(e-=17)<bm10||static_cast<unsigned_char_type>(e-=32)<bm10)
+				else
 				{
-					t*=base;
-					t+=e+10;
+					constexpr char8_t bm10{base-10};
+					if(e<=10)
+					{
+						t*=base;
+						t+=e;
+					}
+					else if(static_cast<unsigned_char_type>(e-=17)<bm10||static_cast<unsigned_char_type>(e-=32)<bm10)
+					{
+						t*=base;
+						t+=e+10;
+					}
+					else[[unlikely]]
+						break;
 				}
-				else[[unlikely]]
+				if(++length==19)[[unlikely]]
 					break;
 			}
-			++length;
-		}
-		if(!length)[[unlikely]]
+			if(it!=ed&&length==19)	//phase 2
+			{
+				unsigned_t t2(t);
+				for(++it;it!=ed;++it)
+				{
+					unsigned_char_type e(static_cast<unsigned_char_type>(*it)-u8'0');
+					if constexpr(base<=10)
+					{
+						if(base<=e)[[unlikely]]
+							break;
+						t2*=base;
+						t2+=e;
+					}
+					else
+					{
+						constexpr char8_t bm10{base-10};
+						if(e<=10)
+						{
+							t2*=base;
+							t2+=e;
+						}
+						else if(static_cast<unsigned_char_type>(e-=17)<bm10||static_cast<unsigned_char_type>(e-=32)<bm10)
+						{
+							t2*=base;
+							t2+=e+10;
+						}
+						else[[unlikely]]
+							break;
+					}
+					++length;
+				}
+				detect_overflow<base>(t2,length);
+				return t2;
+			};
+			if(!length)[[unlikely]]
+			{
 #ifdef __cpp_exceptions
-			throw fast_io_text_error("malformed input");
+				throw fast_io_text_error("malformed input");
 #else
-			fast_terminate();
+				fast_terminate();
 #endif
-		detect_overflow<base>(t,length);
-		return t;
+			}
+			return t;
+		}
+		else
+		{
+			unsigned_t t{};
+			std::size_t length{};
+			for(unsigned_char_type ch : igenerator(in))
+			{
+				if constexpr(base<=10)
+				{
+					unsigned_char_type const e(static_cast<unsigned_char_type>(ch)-u8'0');
+					if(base<=e)[[unlikely]]
+						break;
+					t*=base;
+					t+=e;
+				}
+				else
+				{
+					unsigned_char_type e(static_cast<unsigned_char_type>(ch)-u8'0');
+					constexpr char8_t bm10{base-10};
+					if(e<=10)
+					{
+						t*=base;
+						t+=e;
+					}
+					else if(static_cast<unsigned_char_type>(e-=17)<bm10||static_cast<unsigned_char_type>(e-=32)<bm10)
+					{
+						t*=base;
+						t+=e+10;
+					}
+					else[[unlikely]]
+						break;
+				}
+				++length;
+			}
+
+			if(!length)[[unlikely]]
+#ifdef __cpp_exceptions
+				throw fast_io_text_error("malformed input");
+#else
+				fast_terminate();
+#endif
+			detect_overflow<base>(t,length);
+			return t;
+		}
 	}
 	else
 	{
-		unsigned_t t{};
+		
 		std::size_t length{};
 		auto ig{igenerator(in)};
 		auto it{begin(ig)};
@@ -114,56 +190,144 @@ inline constexpr T input_base_number(input& in)
 		auto const sign{*it=='-'};
 		if(sign)
 			++it;
-		for(;it!=ed;++it)
+		if constexpr(sizeof(unsigned_t)==16)
 		{
-			if constexpr(base<=10)
-			{
-				unsigned_char_type const e(static_cast<unsigned_char_type>(*it)-u8'0');
-				if(base<=e)[[unlikely]]
-					break;
-				t*=base;
-				t+=e;
-			}
-			else
+			std::uint64_t t{};
+			for(;it!=ed;++it)
 			{
 				unsigned_char_type e(static_cast<unsigned_char_type>(*it)-u8'0');
-				constexpr char8_t bm10{base-10};
-				if(e<=10)
+				if constexpr(base<=10)
 				{
+					if(base<=e)[[unlikely]]
+						break;
 					t*=base;
 					t+=e;
 				}
-				else if(static_cast<unsigned_char_type>(e-=17)<bm10||static_cast<unsigned_char_type>(e-=32)<bm10)
+				else
 				{
-					t*=base;
-					t+=e+10;
+					constexpr char8_t bm10{base-10};
+					if(e<=10)
+					{
+						t*=base;
+						t+=e;
+					}
+					else if(static_cast<unsigned_char_type>(e-=17)<bm10||static_cast<unsigned_char_type>(e-=32)<bm10)
+					{
+						t*=base;
+						t+=e+10;
+					}
+					else[[unlikely]]
+						break;
 				}
-				else[[unlikely]]
+				if(++length==19)[[unlikely]]
 					break;
 			}
-			++length;
-		}
-		detect_signed_overflow<base>(t,length,sign);
-		if(sign)
-			return -static_cast<T>(t);
-		else if(!length)[[unlikely]]
+			if(it!=ed&&length==19)	//phase 2
+			{
+				unsigned_t t2(t);
+				for(++it;it!=ed;++it)
+				{
+					unsigned_char_type e(static_cast<unsigned_char_type>(*it)-u8'0');
+					if constexpr(base<=10)
+					{
+						if(base<=e)[[unlikely]]
+							break;
+						t2*=base;
+						t2+=e;
+					}
+					else
+					{
+						constexpr char8_t bm10{base-10};
+						if(e<=10)
+						{
+							t2*=base;
+							t2+=e;
+						}
+						else if(static_cast<unsigned_char_type>(e-=17)<bm10||static_cast<unsigned_char_type>(e-=32)<bm10)
+						{
+							t2*=base;
+							t2+=e+10;
+						}
+						else[[unlikely]]
+							break;
+					}
+					++length;
+				}
+				detect_signed_overflow<base>(t2,length,sign);
+				if(sign)
+					return -static_cast<T>(t2);
+				else if(!length)[[unlikely]]
 #ifdef __cpp_exceptions
-			throw fast_io_text_error("malformed input");
+					throw fast_io_text_error("malformed input");
 #else
-			fast_terminate();
+					fast_terminate();
 #endif
-		return static_cast<T>(t);
+				return static_cast<T>(t2);
+			};
+			if(sign)
+				return -static_cast<T>(t);
+			else if(!length)[[unlikely]]
+#ifdef __cpp_exceptions
+				throw fast_io_text_error("malformed input");
+#else
+				fast_terminate();
+#endif
+			return t;
+		}
+		else
+		{
+			unsigned_t t{};
+			for(;it!=ed;++it)
+			{
+				if constexpr(base<=10)
+				{
+					unsigned_char_type const e(static_cast<unsigned_char_type>(*it)-u8'0');
+					if(base<=e)[[unlikely]]
+						break;
+					t*=base;
+					t+=e;
+				}
+				else
+				{
+					unsigned_char_type e(static_cast<unsigned_char_type>(*it)-u8'0');
+					constexpr char8_t bm10{base-10};
+					if(e<=10)
+					{
+						t*=base;
+						t+=e;
+					}
+					else if(static_cast<unsigned_char_type>(e-=17)<bm10||static_cast<unsigned_char_type>(e-=32)<bm10)
+					{
+						t*=base;
+						t+=e+10;
+					}
+					else[[unlikely]]
+						break;
+				}
+				++length;
+			}
+			detect_signed_overflow<base>(t,length,sign);
+			if(sign)
+				return -static_cast<T>(t);
+			else if(!length)[[unlikely]]
+#ifdef __cpp_exceptions
+				throw fast_io_text_error("malformed input");
+#else
+				fast_terminate();
+#endif
+			return static_cast<T>(t);
+		}
 	}
 }
 }
 
-template<char8_t base,bool uppercase,character_input_stream input,std::integral T>
+template<char8_t base,bool uppercase,character_input_stream input,details::my_integral T>
 inline constexpr void space_scan_define(input& in,manip::base_t<base,uppercase,T> v)
 {
 	v.reference=details::input_base_number<std::remove_cvref_t<T>,base>(in);
 }
 
-template<character_input_stream input,std::integral T>
+template<character_input_stream input,details::my_integral T>
 inline constexpr void space_scan_define(input& in,T& a)
 {
 	a=details::input_base_number<std::remove_cvref_t<T>,10>(in);

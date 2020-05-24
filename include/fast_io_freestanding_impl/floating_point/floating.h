@@ -1,4 +1,5 @@
 #pragma once
+#include"jiaendu_fp.h"
 #include"floating_integer_part.h"
 #include"ryu/ryu.h"
 //#include"grisu_exact/grisu_exact.h"
@@ -52,21 +53,21 @@ inline raiter print_reserve_define(print_reserve_type_t<manip::decimal_point<man
 	{
 		if(1024<a.value.precision)
 			throw fast_io_text_error("precision too large");
-		return details::ryu::output_fixed<dec,false,uppercase>(start,a.value.reference,a.value.precision);
+		return details::ryu::output_fixed<dec,false,uppercase>(start,static_cast<double>(a.value.reference),a.value.precision);
 	}
 	else if constexpr(fm==manip::floating_formats::scientific)
 	{
 		if(512<a.value.precision)
 			throw fast_io_text_error("precision too large");
-		return details::ryu::output_fixed<dec,true,uppercase>(start,a.value.reference,a.value.precision);
+		return details::ryu::output_fixed<dec,true,uppercase>(start,static_cast<double>(a.value.reference),a.value.precision);
 	}
 	else if constexpr(fm==manip::floating_formats::general)
 	{
 		if(1024<a.value.precision)
 			throw fast_io_text_error("precision too large");
-		auto fixed_iter{details::ryu::output_fixed<dec,false,uppercase>(start,a.value.reference,a.value.precision)};
+		auto fixed_iter{details::ryu::output_fixed<dec,false,uppercase>(start,static_cast<double>(a.value.reference),a.value.precision)};
 		std::array<std::iter_value_t<raiter>,512> scientific;
-		auto scientific_it{details::ryu::output_fixed<dec,true,uppercase>(scientific.data(),a.value.reference,a.value.precision)};
+		auto scientific_it{details::ryu::output_fixed<dec,true,uppercase>(scientific.data(),static_cast<double>(a.value.reference),a.value.precision)};
 		if(scientific_it-scientific.data()<fixed_iter-start)[[unlikely]]
 		{
 			details::my_copy(scientific.data(),scientific_it,start);
@@ -100,11 +101,11 @@ requires (dec<std::numeric_limits<std::iter_value_t<raiter>>::max())
 inline raiter print_reserve_define(print_reserve_type_t<manip::decimal_point<manip::floating_manip<fm,uppercase,T const>,dec>>,raiter start,U a)
 {
 	if constexpr(fm==manip::floating_formats::general)
-		return details::ryu::output_shortest<uppercase,0,true>(details::compile_time_floating_v<dec>,start,static_cast<double>(a.value.reference));
+		return details::ryu::output_shortest<uppercase,0,true>(details::compile_time_floating_v<dec>,start,a.value.reference);
 	else if constexpr(fm==manip::floating_formats::fixed)
-		return details::ryu::output_shortest<false,1,true>(details::compile_time_floating_v<dec>,start,static_cast<double>(a.value.reference));
+		return details::ryu::output_shortest<false,1,true>(details::compile_time_floating_v<dec>,start,a.value.reference);
 	else if constexpr(fm==manip::floating_formats::scientific)
-		return details::ryu::output_shortest<uppercase,2,true>(details::compile_time_floating_v<dec>,start,static_cast<double>(a.value.reference));
+		return details::ryu::output_shortest<uppercase,2,true>(details::compile_time_floating_v<dec>,start,a.value.reference);
 }
 
 template<std::floating_point T,char32_t dec>
@@ -118,7 +119,7 @@ template<std::random_access_iterator raiter,std::floating_point T,char32_t dec,t
 requires (dec<std::numeric_limits<std::iter_value_t<raiter>>::max())
 inline raiter print_reserve_define(print_reserve_type_t<manip::decimal_point<T&,dec>>,raiter start,U a)
 {
-	return details::ryu::output_shortest<false,0,true>(details::compile_time_floating_v<dec>,start,static_cast<double>(a.value));
+	return details::ryu::output_shortest<false,0,true>(details::compile_time_floating_v<dec>,start,a.value);
 }
 
 }

@@ -52,12 +52,10 @@ inline constexpr Iter output_shortest(
 		}
 		return result;
 	}
-/*	printf("55\n");
-
 	if constexpr(int_hint)//scientific integer hint?? Is that useless?
 	{
 		auto const r2(init_rep<F,false>(mantissa,static_cast<signed_exponent_type>(exponent)));
-		if(-52<=r2.e&&r2.e<=0)[[likely]]
+		if(-static_cast<std::int32_t>(floating_trait::mantissa_bits)<=r2.e&&r2.e<=0)[[likely]]
 		{
 			mantissa_type const mask = (static_cast<mantissa_type>(1) << -r2.e) - 1;
 			if (!(r2.m & mask))[[likely]]
@@ -151,12 +149,10 @@ inline constexpr Iter output_shortest(
 			}
 		}
 	}
-*/
 	auto const r2(init_repm2<F>(mantissa,static_cast<signed_exponent_type>(exponent)));
 	bool const accept_bounds(!(r2.m&1));
 	auto const mv(r2.m<<2);
 	exponent_type const mm_shift(mantissa||static_cast<signed_exponent_type>(exponent)<2);
-//	std::array<mantissa_type,3> v{};
 	//vr,vp,vm
 	mantissa_type vr,vp,vm;
 	signed_exponent_type e10{};
@@ -168,7 +164,7 @@ inline constexpr Iter output_shortest(
 		if constexpr(!std::same_as<floating_type,float>)
 			q-=-(3<r2.e);
 		e10=static_cast<signed_exponent_type>(q);
-		signed_exponent_type const k(floating_trait::pow5_bitcount + pow5bits(q) - 1);
+		signed_exponent_type const k(floating_trait::pow5_inv_bitcount + pow5bits(q) - 1);
 		signed_exponent_type const i(-r2.e+static_cast<signed_exponent_type>(q)+k);
 		if constexpr(std::same_as<std::remove_cvref_t<F>,long double>)
 			vr=mul_shift_all(r2.m,compute_pow5_inv(q),i,vp,vm,mm_shift);
@@ -179,8 +175,11 @@ inline constexpr Iter output_shortest(
 			vr = mul_pow5_inv_div_pow2(mv, q, i);
 			vp = mul_pow5_inv_div_pow2(mv+2, q, i);
 			vm = mul_pow5_inv_div_pow2(mv-1-mm_shift, q, i);
-			std::int32_t const l = floating_trait::pow5_bitcount + pow5bits(static_cast<std::int32_t>(q - 1)) - 1;
-			last_removed_digit = static_cast<char8_t>(mul_pow5_inv_div_pow2(mv, q - 1, -r2.e + static_cast<std::int32_t>(q) - 1 + l) % 10);
+			if (q != 0 && (vp - 1) / 10 <= vm / 10)
+			{
+				std::int32_t const l = floating_trait::pow5_inv_bitcount + pow5bits(static_cast<std::int32_t>(q - 1)) - 1;
+				last_removed_digit = static_cast<char8_t>(mul_pow5_inv_div_pow2(mv, q - 1, -r2.e + static_cast<std::int32_t>(q) - 1 + l) % 10);
+			}
 		}
 		if(q<=floating_trait::floor_log5)//here
 		{
@@ -209,9 +208,9 @@ inline constexpr Iter output_shortest(
 			vr=mul_shift_all(r2.m,pow5<F,true>::split[i],j,vp,vm,mm_shift);
 		else if constexpr(std::same_as<floating_type,float>)
 		{
-			vr = mul_pow5_div_pow2(mv, static_cast<uint32_t>(i), j);
-			vp = mul_pow5_div_pow2(mv+2, static_cast<uint32_t>(i), j);
-			vm = mul_pow5_div_pow2(mv-1-mm_shift, static_cast<uint32_t>(i), j);
+			vr = mul_pow5_div_pow2(mv, static_cast<std::uint32_t>(i), j);
+			vp = mul_pow5_div_pow2(mv+2, static_cast<std::uint32_t>(i), j);
+			vm = mul_pow5_div_pow2(mv-1-mm_shift, static_cast<std::uint32_t>(i), j);
 			if (q != 0 && (vp - 1) / 10 <= vm / 10)
 			{
 				j = static_cast<std::int32_t>(q) - 1 - (pow5bits(i + 1) - floating_trait::pow5_bitcount);
@@ -234,13 +233,6 @@ inline constexpr Iter output_shortest(
 				vr_is_trailing_zeros=multiple_of_power_of_2(mv,q);
 		}
 	}
-/*
-  printf("e10=%d\n", e10);
-  printf("V+=%u\nV =%u\nV-=%u\n", vp, vr, vm);
-  printf("vm is trailing zeros=%s\n", vm_is_trailing_zeros ? "true" : "false");
-  printf("vr is trailing zeros=%s\n", vr_is_trailing_zeros ? "true" : "false");
-  printf("lastRemovedDigit:%u\n", (unsigned)last_removed_digit);
-*/
 	signed_exponent_type removed{};
 	if(vm_is_trailing_zeros||vr_is_trailing_zeros)
 	{
@@ -262,22 +254,38 @@ inline constexpr Iter output_shortest(
 			++removed;
 		}
 		if(vm_is_trailing_zeros)
-			for(;;)
+		{
+			if constexpr(std::same_as<floating_type,float>)
 			{
-				mantissa_type const vmdiv10(vm/10);
-				auto const vmmod10(static_cast<char8_t>(vm%10));
-				if(vmmod10)
-					break;
-				mantissa_type const vpdiv10(vp/10);
-				mantissa_type const vrdiv10(vr/10);
-				auto const vrmod10(vr%10);
-				vr_is_trailing_zeros&=!last_removed_digit;
-				last_removed_digit=static_cast<char8_t>(vrmod10);
-				vr=vrdiv10;
-				vp=vpdiv10;
-				vm=vmdiv10;
-				++removed;
+//https://github.com/ulfjack/ryu/issues/156 I am not sure whether it works. But I am going to adapt it.
+				while (vm % 10 == 0)
+				{
+					vm /= 10;
+					vr = vm;
+					last_removed_digit = 0;
+					++removed;
+				}
 			}
+			else
+			{
+				for(;;)
+				{
+					mantissa_type const vmdiv10(vm/10);
+					auto const vmmod10(static_cast<char8_t>(vm%10));
+					if(vmmod10)
+						break;
+					mantissa_type const vpdiv10(vp/10);
+					mantissa_type const vrdiv10(vr/10);
+					auto const vrmod10(vr%10);
+					vr_is_trailing_zeros&=!last_removed_digit;
+					last_removed_digit=static_cast<char8_t>(vrmod10);
+					vr=vrdiv10;
+					vp=vpdiv10;
+					vm=vmdiv10;
+					++removed;
+				}
+			}
+		}
 		if(vr_is_trailing_zeros&&last_removed_digit==5&&!(vr&1))
 			last_removed_digit=4;
 		vr += ((vr==vm&&(!accept_bounds || !vm_is_trailing_zeros))|| 4 < last_removed_digit);
@@ -286,15 +294,6 @@ inline constexpr Iter output_shortest(
 	{
 		if constexpr(std::same_as<floating_type,float>)
 		{
-/*			while (vp / 10 > vm / 10)
-			{
-				last_removed_digit = static_cast<char8_t> (vr % 10);
-				vr /= 10;
-				vp /= 10;
-				vm /= 10;
-				++removed;
-			}*/
-
 			for (;;)
 			{
 				mantissa_type const vpdiv10(vp/10);

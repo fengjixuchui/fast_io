@@ -35,7 +35,7 @@ inline constexpr std::size_t fp_output_unsigned(Iter iter,U i)
 #ifdef FAST_IO_OPTIMIZE_SIZE
 			optimize_size;
 #else
-			jiaendu;
+			jiaendu::fp;
 #endif
 		return algo_decision::output_unsigned(iter,static_cast<std::remove_cvref_t<U>>(i));
 	}
@@ -63,7 +63,7 @@ inline constexpr std::size_t fp_output_unsigned_point([[maybe_unused]]compile_ti
 #ifdef FAST_IO_OPTIMIZE_SIZE
 				optimize_size;
 #else
-				jiaendu;
+				jiaendu::fp;
 #endif
 			std::size_t ret(algo_decision::output_unsigned(std::to_address(str)+1,value));
 			*str=str[1];

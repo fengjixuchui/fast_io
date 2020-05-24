@@ -3,7 +3,7 @@
 namespace fast_io::details::optimize_size
 {
 
-template<char8_t base=10,bool uppercase=false,std::random_access_iterator Iter,std::unsigned_integral U>
+template<char8_t base=10,bool uppercase=false,std::random_access_iterator Iter,my_unsigned_integral U>
 inline constexpr std::size_t output_unsigned(Iter str,U value)
 {
 	using char_type = std::iter_value_t<Iter>;

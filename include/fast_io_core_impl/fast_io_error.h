@@ -82,7 +82,7 @@ Iter write(error_reporter& dev,Iter begin,Iter end)
 	}
 }
 
-constexpr inline void flush(error_reporter& dev){}
+constexpr inline void flush(error_reporter&){}
 
 #if __cpp_constexpr >= 201907L
 	constexpr
