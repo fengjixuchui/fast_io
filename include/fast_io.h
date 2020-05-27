@@ -11,23 +11,22 @@ static inline constexpr posix_io_observer in(posix_stdin());
 static inline constexpr posix_io_observer out(posix_stdout());
 static inline constexpr posix_io_observer err(posix_stderr());
 
+using in_buf_type = basic_ibuf<native_io_observer>;
 using log_type = basic_obuf<native_io_observer>;
+
+inline auto in_buf()
+{
+	return in_buf_type(native_stdin());
+}
+
 inline auto out_buf()
 {
-	native_io_handle hd{native_stdout_number};
-	return log_type(hd);
+	return log_type(native_stdout());
 }
 
 inline auto log()
 {
-	native_io_handle hd{native_stderr_number};
-	return log_type(hd);
-}
-using in_buf_type = basic_ibuf<native_io_observer>;
-inline auto in_buf()
-{
-	native_io_handle hd{native_stdin_number};
-	return log_type(hd);
+	return log_type(native_stderr());
 }
 
 }

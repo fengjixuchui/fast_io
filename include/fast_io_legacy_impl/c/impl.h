@@ -24,7 +24,7 @@ public:
 //musl libc also supports this I think
 //https://gitlab.com/bminor/musl/-/blob/061843340fbf2493bb615e20e66f60c5d1ef0455/src/stdio/fopencookie.c
 
-#if defined(_GNU_SOURCE)
+#if defined(_GNU_SOURCE) || defined(__MUSL__)
 
 //musl libc also supports this I think
 //https://gitlab.com/bminor/musl/-/blob/061843340fbf2493bb615e20e66f60c5d1ef0455/src/stdio/fopencookie.c
@@ -565,7 +565,7 @@ public:
 	template<stream stm,typename... Args>
 	basic_c_file_impl(io_cookie_t,std::string_view mode,std::in_place_type_t<stm>,Args&& ...args)
 	{
-#if defined(_GNU_SOURCE)
+#if defined(_GNU_SOURCE) || defined(__MUSL__)
 		std::unique_ptr<stm> up{std::make_unique<stm>(std::forward<Args>(args)...)};
 		if(!(this->native_handle()=fopencookie(up.get(),mode.data(),c_io_cookie_functions<stm>.native_functions)))[[unlikely]]
 			throw posix_error();
@@ -590,7 +590,7 @@ Todo
 	template<stream stm>
 	basic_c_file_impl(io_cookie_t,std::string_view mode,stm& reff)
 	{
-#if defined(_GNU_SOURCE)
+#if defined(_GNU_SOURCE) || defined(__MUSL__)
 		if(!(this->native_handle()=fopencookie(std::addressof(reff),mode.data(),c_io_cookie_functions<stm&>)))[[unlikely]]
 			throw posix_error();
 #else
