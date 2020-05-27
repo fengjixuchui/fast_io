@@ -13,9 +13,9 @@
 #if defined(__linux__)
 #ifdef __x86_64__
 #include"linux/amd64.h"
+#endif
+#endif
 #include"linux/system_call.h"
-#endif
-#endif
 #include"posix.h"
 #ifdef _POSIX_C_SOURCE
 #include"posix_mapping.h"
@@ -66,25 +66,12 @@ using wnative_io_observer = wposix_io_observer;
 using wnative_io_handle = wposix_io_handle;
 using wnative_file = wposix_file;
 using wnative_pipe = wposix_pipe;
+#ifdef _POSIX_C_SOURCE
 using native_file_map = posix_file_map;
-
+#endif
 template<std::integral ch_type>
 using basic_native_io_observer = basic_posix_io_observer<ch_type>;
 
 #endif
-
-
-inline native_io_handle native_stdin()
-{
-	return native_io_handle{native_stdin_number};
-}
-inline native_io_handle native_stdout()
-{
-	return native_io_handle{native_stdout_number};
-} 
-inline native_io_handle native_stderr()
-{
-	return native_io_handle{native_stderr_number};
-}
 
 }

@@ -2,6 +2,7 @@
 
 //fast_io_legacy.h deals with legacy C <stdio.h> and C++ <iostream>/<fstream>/<sstream> interface
 #include"fast_io_hosted.h"
+#include"fast_io.h"
 #include"fast_io_legacy_impl/c/impl.h"
 #include"fast_io_legacy_impl/cpp/streambuf_io_observer.h"
 #include"fast_io_legacy_impl/fast_io_streambuf.h"
@@ -24,15 +25,14 @@
 */
 namespace fast_io
 {
-inline namespace
-{
-inline c_io_handle c_stdin{stdin};
-inline c_io_handle c_stdout{stdout};
-inline c_io_handle c_stderr{stderr};
 
-inline wc_io_handle wc_stdin{stdin};
-inline wc_io_handle wc_stdout{stdout};
-inline wc_io_handle wc_stderr{stderr};
+static inline c_io_observer c_stdin{stdin};
+static inline c_io_observer c_stdout{stdout};
+static inline c_io_observer c_stderr{stderr};
+
+static inline wc_io_observer wc_stdin{stdin};
+static inline wc_io_observer wc_stdout{stdout};
+static inline wc_io_observer wc_stderr{stderr};
 //inline stream_view cpp_clog(std::clog);
-}
+
 }

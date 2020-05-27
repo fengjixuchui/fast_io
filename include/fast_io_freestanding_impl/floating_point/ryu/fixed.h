@@ -5,13 +5,13 @@
 namespace fast_io::details::ryu
 {
 
-template<std::integral mantissaType,std::integral exponentType>
+template<my_integral mantissaType,std::integral exponentType>
 struct unrep
 {
 	using mantissa_type = mantissaType;
 	using exponent_type = exponentType;
-	mantissa_type m=0;
-	exponent_type e=0;
+	mantissa_type m;
+	exponent_type e;
 };
 template<std::unsigned_integral T>
 inline constexpr T index_for_exponent(T e){return (e+15)>>4;}
@@ -19,10 +19,17 @@ inline constexpr T index_for_exponent(T e){return (e+15)>>4;}
 template<std::unsigned_integral T>
 inline constexpr T pow10_bits_for_index(T idx){return (idx<<4)+120;}
 
-template<std::unsigned_integral T>
-inline constexpr bool multiple_of_power_of_2(T value,std::size_t p) {
-// return __builtin_ctz(value) >= p;
-return !(static_cast<uint128_t>(value) & ((static_cast<uint128_t>(1)<<p) - 1));
+
+template<typename T>
+inline constexpr std::uint32_t mul_shift_mod_1e9(std::uint64_t m, std::array<T,3> const& mul, std::size_t j)
+{
+	uint128_t b1(mul_extend(m,mul[1]));
+	b1+=high(mul_extend(m,mul[0]));
+	uint128_t s1(mul_extend(m,mul[2]));
+	s1+=high(b1);
+	s1>>=j-128;
+	uint128_t constexpr mulb(construct_unsigned_extension(static_cast<std::uint64_t>(0x31680A88F8953031),static_cast<std::uint64_t>(0x89705F4136B4A597)));
+	return static_cast<std::uint32_t>(s1)-1000000000*static_cast<std::uint32_t>(low(mul_high(s1,mulb))>>29);
 }
 
 template<typename T>
@@ -36,17 +43,7 @@ inline constexpr std::uint32_t pow5_factor(T value)
 	}
 	return 0;
 }
-template<std::integral U>
-inline constexpr std::int32_t log2pow5(U e)
-{
-	return static_cast<int32_t>(((static_cast<std::uint32_t>(e) * 1217359) >> 19));
-}
 
-template<std::integral U>
-inline constexpr std::int32_t pow5bits(U e)
-{
-	return log2pow5(e)+1;
-}
 
 
 // Returns true if value is divisible by 5^p.
@@ -96,62 +93,9 @@ inline constexpr std::array<fast_io::uint128_t,2> compute_pow5_inv(T v)
 {
 }
 */
-template<std::unsigned_integral T,std::size_t muldiff=sizeof(T)*8>
-requires std::same_as<T,std::uint64_t>||std::same_as<T,fast_io::uint128_t>
-inline constexpr T mul_shift(T m, std::array<T,2> const& mul, std::size_t j)
-{
-#if defined(_MSC_VER) && defined(_M_X64)
-	if constexpr(std::same_as<T,std::uint64_t>)
-	{
-		// m is maximum 55 bits
-		std::uint64_t high1;                                   // 128
-		std::uint64_t low1{_umul128(m, mul[1], std::addressof(high1))}; // 64
-		std::uint64_t high0;                                   // 64
-		_umul128(m, mul.front(), std::addressof(high0));                       // 0
-		std::uint64_t const sum{high0 + low1};
-		if (sum < high0)
-			++high1; // overflow into high1
-		return __shiftright128(sum, high1, static_cast<unsigned char>(j - 64));
-	}
-	else
-	{
-#endif
-		return low((mul_extend(m,mul.back())+high(mul_extend(m,mul.front())))>>(j-muldiff));
-#if defined(_MSC_VER) && defined(_M_X64)
-	}
-#endif
-}
 
-template<std::unsigned_integral T,std::size_t muldiff=sizeof(T)*8>
-requires std::same_as<T,std::uint32_t>
-inline constexpr T mul_shift(T m, std::uint64_t mul, std::size_t j)
-{
-	return (static_cast<std::uint64_t>(m)*mul)>>(j-muldiff);
-}
 
-template<typename T,typename P,typename M>
-requires (std::same_as<std::uint32_t,T>||std::same_as<std::uint64_t,T>||std::same_as<fast_io::uint128_t,T>)
-inline constexpr auto mul_shift_all(T m, P& mul,std::size_t j,M& vp,M& vm,std::uint32_t mmshift)
-{
-	auto const m4(m<<2);
-	vp = mul_shift(m4 + 2, mul, j);
-	vm = mul_shift(m4 - 1 - mmshift, mul, j);
-	return mul_shift(m4, mul, j);
-}
-
-template<typename T>
-inline constexpr std::uint32_t mul_shift_mod_1e9(std::uint64_t m, std::array<T,3> const& mul, std::size_t j)
-{
-	uint128_t b1(mul_extend(m,mul[1]));
-	b1+=high(mul_extend(m,mul[0]));
-	uint128_t s1(mul_extend(m,mul[2]));
-	s1+=high(b1);
-	s1>>=j-128;
-	uint128_t constexpr mulb(construct_unsigned_extension(static_cast<std::uint64_t>(0x31680A88F8953031),static_cast<std::uint64_t>(0x89705F4136B4A597)));
-	return static_cast<std::uint32_t>(s1)-1000000000*static_cast<std::uint32_t>(low(mul_high(s1,mulb))>>29);
-}
-
-template<std::random_access_iterator Iter,std::unsigned_integral mantissaType>
+template<std::random_access_iterator Iter,my_unsigned_integral mantissaType>
 inline constexpr auto easy_case(Iter result,bool sign, mantissaType const& mantissa)
 {
 	if (mantissa)
@@ -161,19 +105,31 @@ inline constexpr auto easy_case(Iter result,bool sign, mantissaType const& manti
 	return my_copy_n(u8"inf",3,result);
 }
 
-template<std::floating_point floating,bool ignore_exp0=false,std::unsigned_integral mantissaType,std::signed_integral exponentType>
+template<std::floating_point floating,bool ignore_exp0=false,my_unsigned_integral mantissaType,std::signed_integral exponentType>
 inline constexpr unrep<mantissaType,exponentType> init_rep(mantissaType const& mantissa,exponentType const& exponent)
 {
-	if constexpr(!ignore_exp0)
+	if constexpr(sizeof(floating)==16)
 	{
-		if(!exponent)
-			return {mantissa,1-static_cast<exponentType>(floating_traits<floating>::bias+floating_traits<floating>::mantissa_bits)};
+		if constexpr(!ignore_exp0)
+		{
+			if(!exponent)
+				return {mantissa,1-static_cast<exponentType>(floating_traits<floating>::bias+floating_traits<floating>::mantissa_bits)};
+		}
+		return {mantissa,static_cast<exponentType>(exponent-static_cast<exponentType>(floating_traits<floating>::bias+floating_traits<floating>::mantissa_bits))};
+	}	
+	else
+	{
+		if constexpr(!ignore_exp0)
+		{
+			if(!exponent)
+				return {mantissa,1-static_cast<exponentType>(floating_traits<floating>::bias+floating_traits<floating>::mantissa_bits)};
+		}
+		return {static_cast<mantissaType>((static_cast<mantissaType>(1)<<floating_traits<floating>::mantissa_bits)|mantissa),
+			static_cast<exponentType>(exponent-static_cast<exponentType>(floating_traits<floating>::bias+floating_traits<floating>::mantissa_bits))};
 	}
-	return {static_cast<mantissaType>((static_cast<mantissaType>(1)<<floating_traits<floating>::mantissa_bits)|mantissa),
-		static_cast<exponentType>(exponent-static_cast<exponentType>(floating_traits<floating>::bias+floating_traits<floating>::mantissa_bits))};
 }
 
-template<bool uppercase_e=false,std::signed_integral T,std::random_access_iterator Iter>
+template<bool uppercase_e=false,bool four_digits=false,std::signed_integral T,std::random_access_iterator Iter>
 requires std::same_as<T,std::int32_t>
 inline constexpr Iter output_exp(T exp,Iter result)
 {
@@ -195,9 +151,39 @@ inline constexpr Iter output_exp(T exp,Iter result)
 	}
 	using char_type = std::remove_reference_t<decltype(*result)>;
 	std::make_unsigned_t<T> unsigned_exp(exp);
+#ifdef FAST_IO_OPTIMIZE_SIZE
+	std::size_t len{2};
+	if constexpr(four_digits)
+	{
+		if(1000<=unsigned_exp)[[unlikely]]
+			len=4;
+		else if(100<=unsigned_exp)[[unlikely]]
+			len=3;
+	}
+	else
+	{
+		if(100<=unsigned_exp)[[unlikely]]
+			len=3;
+	}
+	auto str{result+len};
+	for(std::size_t i{};i!=len;++i)
+	{
+		std::make_unsigned_t<T> const temp(unsigned_exp/10);
+		char_type const res(unsigned_exp%10);
+		*--str=u8'0'+res;
+		unsigned_exp=temp;
+	}
+	return result+len;
+#else
+	if constexpr(four_digits)
+	{
+	if(1000<=unsigned_exp)[[unlikely]]
+		return my_copy_n(jiaendu::static_tables<char_type>::table4[unsigned_exp].data(),4,result);
+	}
 	if(100<=unsigned_exp)[[unlikely]]
 		return my_copy_n(jiaendu::static_tables<char_type>::table3[unsigned_exp].data(),3,result);
 	return my_copy_n(jiaendu::static_tables<char_type>::table2[unsigned_exp].data(),2,result);
+#endif
 }
 
 template<char32_t dec,bool scientific = false,bool uppercase_e=false,std::random_access_iterator Iter,std::floating_point F>

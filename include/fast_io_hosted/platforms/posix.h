@@ -9,10 +9,6 @@
 #ifdef __linux__
 #include<sys/sendfile.h>
 #endif
-#ifdef _POSIX_C_SOURCE
-#include<sys/ioctl.h>
-#endif
-
 
 namespace fast_io
 {
@@ -367,17 +363,19 @@ inline decltype(auto) io_control(basic_posix_io_observer<ch_type> h,Args&& ...ar
 	return io_control(static_cast<basic_win32_io_observer<ch_type>>(h),std::forward<Args>(args)...);
 }
 #else
+
+extern "C" int ioctl(int fd, unsigned long request, ...) noexcept;
 template<std::integral ch_type,typename... Args>
 requires requires(basic_posix_io_observer<ch_type> h,Args&& ...args)
 {
-	::ioctl(h.native_handle(),std::forward<Args>(args)...);
+	ioctl(h.native_handle(),std::forward<Args>(args)...);
 }
 inline void io_control(basic_posix_io_observer<ch_type> h,Args&& ...args)
 {
 #if defined(__linux__)&&defined(__x86_64__)
 	system_call_throw_error(system_call<16,int>(h.native_handle(),std::forward<Args>(args)...));
 #else
-	if(::ioctl(h.native_handle(),std::forward<Args>(args)...)==-1)
+	if(ioctl(h.native_handle(),std::forward<Args>(args)...)==-1)
 	{
 #ifdef __cpp_exceptions
 		throw posix_error();
@@ -749,19 +747,34 @@ inline std::conditional_t<report_einval,std::pair<std::uintmax_t,bool>,std::uint
 
 #endif
 
-inline constexpr posix_io_handle posix_stdin()
+inline constexpr posix_io_observer posix_stdin()
 {
-	return posix_io_handle(posix_stdin_number);
+	return posix_io_observer(posix_stdin_number);
 }
-inline constexpr posix_io_handle posix_stdout()
+inline constexpr posix_io_observer posix_stdout()
 {
-	return posix_io_handle(posix_stdout_number);
+	return posix_io_observer(posix_stdout_number);
 } 
-inline constexpr posix_io_handle posix_stderr()
+inline constexpr posix_io_observer posix_stderr()
 {
-	return posix_io_handle(posix_stderr_number);
+	return posix_io_observer(posix_stderr_number);
+}
+#if !defined(__WINNT__) && !defined(_MSC_VER)
+inline constexpr posix_io_observer native_stdin()
+{
+	return  posix_io_observer(posix_stdin_number);
 }
 
+inline constexpr posix_io_observer native_stdout()
+{
+	return posix_io_observer(posix_stdout_number);
+}
+
+inline constexpr posix_io_observer native_stderr()
+{
+	return posix_io_observer(posix_stderr_number);
+}
+#endif
 template<output_stream output,std::integral intg>
 inline constexpr void print_define(output& out,basic_posix_io_observer<intg> iob)
 {

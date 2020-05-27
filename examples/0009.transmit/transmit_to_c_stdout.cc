@@ -1,4 +1,3 @@
-#include"../../include/fast_io_in.h"
 #include"../../include/fast_io_legacy.h"
 
 int main()

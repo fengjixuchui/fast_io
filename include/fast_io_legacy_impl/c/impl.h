@@ -202,7 +202,8 @@ inline Iter read(basic_c_io_observer_unlocked<T> cfhd,Iter begin,Iter end)
 }
 
 template<std::integral T,std::contiguous_iterator Iter>
-inline void write(basic_c_io_observer_unlocked<T> cfhd,Iter begin,Iter end)
+inline void write(basic_c_io_observer_unlocked<T> cfhd,Iter begin,Iter end);
+/*
 {
 	std::size_t const count(end-begin);
 	if(
@@ -220,7 +221,7 @@ inline void write(basic_c_io_observer_unlocked<T> cfhd,Iter begin,Iter end)
 		fast_terminate();
 #endif
 }
-
+*/
 template<std::integral T>
 inline void flush(basic_c_io_observer_unlocked<T> cfhd)
 {
@@ -698,12 +699,16 @@ inline constexpr void print_define(output& out,basic_c_io_observer<intg> iob)
 }
 
 }
-#ifdef _MSC_VER
+#if defined(_MSC_VER)||defined(_UCRT)
 #include"universal_crt.h"
 #elif defined(__WINNT__)
 #include"msvcrt.h"
 #elif defined(__GLIBC__)
 #include"glibc.h"
+#elif defined(__MUSL__)
+#include"musl.h"
 #else
 #include"general.h"
 #endif
+
+#include"done.h"

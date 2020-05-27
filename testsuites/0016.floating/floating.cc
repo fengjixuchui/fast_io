@@ -31,6 +31,7 @@ inline void test_speciail_case()
 int main()
 {
 //float
+	print("------------------float--------------\n\n");
 	check(0.0f);
 	check(-0.0f);
 	check(1.0f);
@@ -74,7 +75,7 @@ int main()
 	check(3.3554432E7f);
 	check(1.26217745E-29f);
 	test_speciail_case<float>();
-	print("\n\n--------------------------\n\n");
+	print("\n\n-----------------double--------------\n\n");
 //double
 	check(0.0);
 	check(-0.0);
@@ -104,4 +105,30 @@ int main()
 	check(3.67301024534615E16);
 	check(5.9604644775390625E-8);
 	test_speciail_case<double>();
+	print("\n\n------------long double--------------\n\n");
+//double
+	check(0.0L);
+	check(-0.0L);
+	check(1.0L);
+	check(-1.0L);
+	check(1.0E7L);
+	check(9999999.999999998L);
+	check(0.001L);
+	check(0.0009999999999999998L);
+	check(-2.109808898695963E16L);
+	check(4.940656E-318L);
+	check(1.18575755E-316L);
+	check(2.989102097996E-312L);
+	check(9.0608011534336E15L);
+	check(4.708356024711512E18L);
+	check(9.409340012568248E18L);
+	check(1.8531501765868567E21L);
+	check(-3.347727380279489E33L);
+	check(1.9430376160308388E16L);
+	check(-6.9741824662760956E19L);
+	check(4.3816050601147837E18L);
+	check(7.1202363472230444E-307L);
+	check(3.67301024534615E16L);
+	check(5.9604644775390625E-8L);
+	test_speciail_case<long double>();
 }

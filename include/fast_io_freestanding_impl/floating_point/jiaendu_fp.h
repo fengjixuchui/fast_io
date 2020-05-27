@@ -3,14 +3,27 @@
 namespace fast_io::details::jiaendu::fp
 {
 
-//this is only use for integer
-template<std::contiguous_iterator Iter,std::unsigned_integral U>
-requires (sizeof(U)==4||sizeof(U)==8)
+//this is only use for floating point formatting
+template<std::contiguous_iterator Iter,my_unsigned_integral U>
+requires (sizeof(U)==4||sizeof(U)==8||sizeof(U)==16)
 inline std::size_t output_unsigned(Iter str,U value)
 {
 	using ch_type = std::remove_cvref_t<decltype(*str)>;
 	constexpr std::size_t bytes4{4*sizeof(ch_type)};
-	if constexpr(sizeof(U)==8)
+	if constexpr(sizeof(U)==16)
+	{
+		if(value>=10000000000000000000ULL)
+		{
+			auto v2{value/10000000000000000000ULL};
+			std::uint64_t remain{static_cast<std::uint64_t>(value-v2*10000000000000000000ULL)};
+			auto offset{output_unsigned(str,static_cast<std::uint64_t>(v2))};
+			output_unsigned_partial(str+offset,remain);
+			return offset+19;
+		}
+		else
+			return fast_io::details::jiaendu::output_unsigned(str,static_cast<std::uint64_t>(value));
+	}
+	else if constexpr(sizeof(U)==8)
 	{
 		if (value>=10000000000000000ULL)
 		{

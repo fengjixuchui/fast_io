@@ -3,13 +3,23 @@
 namespace fast_io::details::ryu
 {
 
-template<std::floating_point floating,std::unsigned_integral mantissaType,std::signed_integral exponentType>
+template<std::floating_point floating,my_unsigned_integral mantissaType,std::signed_integral exponentType>
 inline constexpr unrep<mantissaType,exponentType> init_repm2(mantissaType const& mantissa,exponentType const& exponent)
 {
+	if constexpr(std::same_as<floating,long double>)
+	{
+	if(!exponent)
+		return {mantissa,1-static_cast<exponentType>(floating_traits<floating>::bias+floating_traits<floating>::mantissa_bits+1)};
+	return {mantissa,
+		static_cast<exponentType>(exponent-static_cast<exponentType>(floating_traits<floating>::bias+floating_traits<floating>::mantissa_bits+1))};
+	}
+	else
+	{
 	if(!exponent)
 		return {mantissa,1-static_cast<exponentType>(floating_traits<floating>::bias+floating_traits<floating>::mantissa_bits+2)};
 	return {static_cast<mantissaType>((static_cast<mantissaType>(1)<<floating_traits<floating>::mantissa_bits)|mantissa),
 		static_cast<exponentType>(exponent-static_cast<exponentType>(floating_traits<floating>::bias+floating_traits<floating>::mantissa_bits+2))};
+	}
 }
 
 template<bool uppercase_e=false,std::size_t mode=0,bool int_hint=false,
@@ -30,7 +40,6 @@ inline constexpr Iter output_shortest(
 	bool const sign((bits >> (floating_trait::mantissa_bits + floating_trait::exponent_bits)) & 1u);
 	mantissa_type const mantissa(bits & ((static_cast<mantissa_type>(1u) << floating_trait::mantissa_bits) - 1u));
 	exponent_type const exponent(static_cast<exponent_type>(((bits >> floating_trait::mantissa_bits) & floating_trait::exponent_max)));
-
 	// Case distinction; exit early for the easy cases.
 	if(exponent == floating_trait::exponent_max)
 		return easy_case(result,sign,mantissa);
@@ -52,7 +61,7 @@ inline constexpr Iter output_shortest(
 		}
 		return result;
 	}
-	if constexpr(int_hint)//scientific integer hint?? Is that useless?
+	if constexpr(int_hint&&sizeof(F)!=16)//scientific integer hint?? Is that useless?
 	{
 		auto const r2(init_rep<F,false>(mantissa,static_cast<signed_exponent_type>(exponent)));
 		if(-static_cast<std::int32_t>(floating_trait::mantissa_bits)<=r2.e&&r2.e<=0)[[likely]]
@@ -162,12 +171,17 @@ inline constexpr Iter output_shortest(
 	{
 		exponent_type q(log10_pow2(r2.e));
 		if constexpr(!std::same_as<floating_type,float>)
-			q-=-(3<r2.e);
+			q-=(3<r2.e);
 		e10=static_cast<signed_exponent_type>(q);
 		signed_exponent_type const k(floating_trait::pow5_inv_bitcount + pow5bits(q) - 1);
 		signed_exponent_type const i(-r2.e+static_cast<signed_exponent_type>(q)+k);
 		if constexpr(std::same_as<std::remove_cvref_t<F>,long double>)
-			vr=mul_shift_all(r2.m,compute_pow5_inv(q),i,vp,vm,mm_shift);
+		{
+			auto pow5arr{generic_compute_pow5_inv(q)};
+			vr = mul_shift_generic(mv, pow5arr, i);
+			vp = mul_shift_generic(mv+2, pow5arr, i);
+			vm = mul_shift_generic(mv-1-mm_shift, pow5arr, i);
+		}
 		else if constexpr(std::same_as<floating_type,double>)
 			vr=mul_shift_all(r2.m,pow5<F,true>::inv_split[q],i,vp,vm,mm_shift);
 		else if constexpr(std::same_as<floating_type,float>)
@@ -196,14 +210,19 @@ inline constexpr Iter output_shortest(
 		exponent_type abs_e2(static_cast<exponent_type>(-r2.e));
 		exponent_type q(log10_pow5(abs_e2));
 		if constexpr(!std::same_as<floating_type,float>)
-			q-=1<abs_e2;	
+			q-=1<abs_e2;
 		signed_exponent_type const signed_q(static_cast<signed_exponent_type>(q));
 		e10=signed_q+r2.e;
 		signed_exponent_type const i(-r2.e-signed_q);
 		signed_exponent_type const k(pow5bits(i)-floating_trait::pow5_bitcount);
 		signed_exponent_type j(signed_q-k);
 		if constexpr(std::same_as<floating_type,long double>)
-			vr=mul_shift_all(r2.m,compute_pow5(i),j,vp,vm,mm_shift);
+		{
+			auto pow5arr{generic_compute_pow5(i)};
+			vr = mul_shift_generic(mv, pow5arr, j);
+			vp = mul_shift_generic(mv+2, pow5arr, j);
+			vm = mul_shift_generic(mv-1-mm_shift, pow5arr, j);
+		}
 		else if constexpr(std::same_as<floating_type,double>)
 			vr=mul_shift_all(r2.m,pow5<F,true>::split[i],j,vp,vm,mm_shift);
 		else if constexpr(std::same_as<floating_type,float>)
@@ -370,7 +389,7 @@ inline constexpr Iter output_shortest(
 		if(scientific_length<fixed_length)
 		{
 			result+=fp_output_unsigned_point(decmpt,vr,result);
-			return output_exp<uppercase_e>(static_cast<std::int32_t>(real_exp),result);
+			return output_exp<uppercase_e,sizeof(mantissa_type)==16>(static_cast<std::int32_t>(real_exp),result);
 		}
 		switch(this_case)
 		{
@@ -504,7 +523,7 @@ inline constexpr Iter output_shortest(
 				result[1]=decimal_point;
 			result+=olength+1;
 		}
-		return output_exp<uppercase_e>(static_cast<std::int32_t>(real_exp),result);
+		return output_exp<uppercase_e,sizeof(mantissa_type)==16>(static_cast<std::int32_t>(real_exp),result);
 	}
 }
 
