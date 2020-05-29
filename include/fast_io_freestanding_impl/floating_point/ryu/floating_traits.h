@@ -22,8 +22,10 @@ struct floating_traits<float>
 	static inline constexpr exponent_type pow5_bitcount= 61;
 	static inline constexpr exponent_type floor_log5 = 9;
 	static inline constexpr exponent_type bound = 31;//ryu to do. use a tigher bound
-	static inline constexpr exponent_type digits10=8;
+	static inline constexpr exponent_type digits10=9;
 	static inline constexpr mantissa_type carry10=0x989680;
+	static inline constexpr int32_t minimum_exp=-45;
+	static inline constexpr int32_t maximum_exp=39;
 };
 
 template<>	
@@ -59,6 +61,8 @@ struct floating_traits<long double>
 	static inline constexpr exponent_type floor_log5 = 55;
 	static inline constexpr exponent_type bound = 127;//ryu to do. use a tigher bound
 	static inline constexpr exponent_type digits10=21;
+	static inline constexpr int32_t minimum_exp=-4950;
+	static inline constexpr int32_t maximum_exp=4931;
 //	static inline constexpr mantissa_type carry10=10000000000000000ull;
 };
 #endif

@@ -35,14 +35,20 @@ template<buffer_input_stream input,std::floating_point T>
 inline constexpr void space_scan_define(input& in,T &t)
 {
 	auto igen{igenerator(in)};
-	t=static_cast<std::remove_cvref_t<T>>(details::ryu::input_floating<u8'.',double>(begin(igen),end(igen)));
+	if constexpr(std::same_as<std::remove_cvref_t<T>,long double>)
+		t=static_cast<std::remove_cvref_t<T>>(details::ryu::input_floating<u8'.',double>(begin(igen),end(igen)));
+	else
+		t=details::ryu::input_floating<u8'.',std::remove_cvref_t<T>>(begin(igen),end(igen));
 }
 
 template<char32_t dec,buffer_input_stream input,std::floating_point T>
 inline constexpr void space_scan_define(input& in,manip::decimal_point<T&,dec> t)
 {
 	auto igen{igenerator(in)};
-	t.value=static_cast<std::remove_cvref_t<T>>(details::ryu::input_floating<dec,double>(begin(igen),end(igen)));
+	if constexpr(std::same_as<std::remove_cvref_t<T>,long double>)
+		t.value=static_cast<std::remove_cvref_t<T>>(details::ryu::input_floating<dec,double>(begin(igen),end(igen)));
+	else
+		t.value=details::ryu::input_floating<dec,std::remove_cvref_t<T>>(begin(igen),end(igen));
 }
 
 template<manip::floating_formats fm,bool uppercase,std::floating_point T,char32_t dec>
