@@ -4,6 +4,9 @@
 #include<thread>
 #include<condition_variable>
 #include"fast_io_hosted.h"
+#if !defined(__WINNT__) && !defined(_MSC_VER)
+#include <netinet/in.h>
+#endif
 #include"fast_io_network/network.h"
 
 namespace fast_io

@@ -38,7 +38,7 @@ inline constexpr void print(T&& t,Args&& ...args)
 		fast_io::print(std::forward<T>(t),std::forward<Args>(args)...);
 	else
 	{
-		fast_io::c_io_observer c_stdout(stdout);
+		fast_io::c_io_observer c_stdout{stdout};
 		fast_io::print(c_stdout,std::forward<T>(t),std::forward<Args>(args)...);
 	}
 }
@@ -50,7 +50,7 @@ inline constexpr void println(T&& t,Args&& ...args)
 		fast_io::println(std::forward<T>(t),std::forward<Args>(args)...);
 	else
 	{
-		fast_io::c_io_observer c_stdout(stdout);
+		fast_io::c_io_observer c_stdout{stdout};
 		fast_io::println(c_stdout,std::forward<T>(t),std::forward<Args>(args)...);
 	}
 }
@@ -66,7 +66,7 @@ inline constexpr void debug_print(T&& t,Args&& ...args)
 		fast_io::debug_print(std::forward<T>(t),std::forward<Args>(args)...);
 	else
 	{
-		fast_io::c_io_observer c_stdout(stdout);
+		fast_io::c_io_observer c_stdout{stdout};
 		fast_io::debug_print(c_stdout,std::forward<T>(t),std::forward<Args>(args)...);
 	}
 }
@@ -78,7 +78,7 @@ inline constexpr void debug_println(T&& t,Args&& ...args)
 		fast_io::debug_println(std::forward<T>(t),std::forward<Args>(args)...);
 	else
 	{
-		fast_io::c_io_observer c_stdout(stdout);
+		fast_io::c_io_observer c_stdout{stdout};
 		fast_io::debug_println(c_stdout,std::forward<T>(t),std::forward<Args>(args)...);
 	}
 }
@@ -92,7 +92,7 @@ inline constexpr auto scan(T&& t,Args&& ...args)
 		return fast_io::scan<report_eof>(std::forward<T>(t),std::forward<Args>(args)...);
 	else
 	{
-		fast_io::c_io_observer c_stdin(stdin);
+		fast_io::c_io_observer c_stdin{stdin};
 		return scan<report_eof>(c_stdin,std::forward<T>(t),std::forward<Args>(args)...);
 	}
 }

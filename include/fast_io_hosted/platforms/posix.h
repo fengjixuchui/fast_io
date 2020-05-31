@@ -9,6 +9,11 @@
 #ifdef __linux__
 #include<sys/sendfile.h>
 #endif
+#ifdef __BSD_VISIBLE
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/uio.h>
+#endif
 
 namespace fast_io
 {
@@ -313,8 +318,12 @@ inline std::common_type_t<std::int64_t, std::size_t> seek(basic_posix_io_observe
 	auto ret(
 #if defined(__linux__)&&defined(__x86_64__)
 		system_call<8,std::ptrdiff_t>
-#else
+#elif defined(__linux__)
 		::lseek64
+#elif defined(__WINNT__) || defined(_MSC_VER)
+		::_lseeki64
+#else
+		::lseek
 #endif
 		(h.native_handle(),seek_precondition<std::int64_t,T,ch_type>(i),static_cast<int>(s)));
 	system_call_throw_error(ret);
@@ -333,7 +342,7 @@ inline void flush(basic_posix_io_observer<ch_type>)
 //			throw posix_error();
 }
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__BSD_VISIBLE)
 template<std::integral ch_type>
 inline auto zero_copy_in_handle(basic_posix_io_observer<ch_type> h)
 {
@@ -634,36 +643,35 @@ using wposix_pipe=basic_posix_pipe<wchar_t>;
 inline int constexpr posix_stdin_number = 0;
 inline int constexpr posix_stdout_number = 1;
 inline int constexpr posix_stderr_number = 2;
-#ifdef __linux__
+#if defined(__linux__)||defined(__BSD_VISIBLE)
 
 //zero copy IO for linux
+
+//To verify whether other BSD platforms support sendfile
 namespace details
 {
-
 
 template<bool random_access=false,bool report_einval=false,zero_copy_output_stream output,zero_copy_input_stream input>
 inline std::conditional_t<report_einval,std::pair<std::size_t,bool>,std::size_t>
 	zero_copy_transmit_once(output& outp,input& inp,std::size_t bytes,std::intmax_t offset)
 {
+#ifdef __linux__
 	std::intmax_t *np{};
 	if constexpr(random_access)
 		np=std::addressof(offset);
 	auto transmitted_bytes(::sendfile(zero_copy_out_handle(outp),zero_copy_in_handle(inp),np,bytes));
+#else
+	off_t np{};
+	if constexpr(random_access)
+		np=static_cast<off_t>(offset);
+	auto transmitted_bytes(::sendfile(zero_copy_out_handle(outp),zero_copy_in_handle(inp),np,bytes,nullptr,nullptr,0));
+	//it looks like BSD platforms supports async I/O for sendfile. To do
+#endif
 	if(transmitted_bytes==-1)
 	{
 		if constexpr(report_einval)
 		{
-			auto const eno(errno);
-			if(eno==EINVAL)
-				return {0,true};
-			else
-			{
-			#ifdef __cpp_exceptions
-				throw posix_error(eno);
-			#else
-				fast_terminate();
-			#endif
-			}
+			return {0,true};
 		}
 		else
 		{
@@ -749,30 +757,30 @@ inline std::conditional_t<report_einval,std::pair<std::uintmax_t,bool>,std::uint
 
 inline constexpr posix_io_observer posix_stdin()
 {
-	return posix_io_observer(posix_stdin_number);
+	return {posix_stdin_number};
 }
 inline constexpr posix_io_observer posix_stdout()
 {
-	return posix_io_observer(posix_stdout_number);
+	return {posix_stdout_number};
 } 
 inline constexpr posix_io_observer posix_stderr()
 {
-	return posix_io_observer(posix_stderr_number);
+	return {posix_stderr_number};
 }
 #if !defined(__WINNT__) && !defined(_MSC_VER)
 inline constexpr posix_io_observer native_stdin()
 {
-	return  posix_io_observer(posix_stdin_number);
+	return  {posix_stdin_number};
 }
 
 inline constexpr posix_io_observer native_stdout()
 {
-	return posix_io_observer(posix_stdout_number);
+	return {posix_stdout_number};
 }
 
 inline constexpr posix_io_observer native_stderr()
 {
-	return posix_io_observer(posix_stderr_number);
+	return {posix_stderr_number};
 }
 #endif
 template<output_stream output,std::integral intg>

@@ -13,13 +13,9 @@ int main()
 	{
 	fast_io::timer t("output");
 	fast_io::posix_file pf("boost_fdstream.txt",fast_io::open_mode::binary|fast_io::open_mode::out);
-
-	boost::iostreams::stream_buffer<boost::iostreams::file_descriptor_sink> fdstreambuf
-	{boost::iostreams::file_descriptor_sink(pf.native_handle(),boost::iostreams::never_close_handle)};
-	std::ofstream out;
-	out.std::ostream::rdbuf(&fdstreambuf);
+	boost::iostreams::stream<boost::iostreams::file_descriptor_sink> fdstream{boost::iostreams::file_descriptor_sink(pf.native_handle(),boost::iostreams::never_close_handle)};
 	for(std::size_t i{};i!=N;++i)
-		out<<i<<'\n';
+		fdstream<<i<<'\n';
 	}
 	std::vector<std::size_t> vec(N);
 	{

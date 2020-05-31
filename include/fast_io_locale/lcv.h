@@ -165,7 +165,7 @@ inline constexpr caiter print_reserve_define(print_reserve_type_t<manip::lcv<cha
 {
 	return details::process_lcv_floating_output<details::cal_floating_len<fp_type,manip::floating_formats::general>(),char_type>(outiter,ref.storage,[value=ref.reference](auto dec,auto iter)
 	{
-		if constexpr(std::same_as<std::remove_cvref_t<T>,long double>&&sizeof(long double)!=16)
+		if constexpr(std::same_as<std::remove_cvref_t<fp_type>,long double>&&sizeof(long double)!=16)
 			return details::ryu::output_shortest<false,0,true>(dec,iter,static_cast<double>(value));
 		else
 			return details::ryu::output_shortest<false,0,true>(dec,iter,value);

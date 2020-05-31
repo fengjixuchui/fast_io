@@ -7,6 +7,8 @@
 //#include"nt_fork.h"
 #include"win32.h"
 #else
+#include <sys/types.h>
+#include <sys/wait.h>
 #include"posix_exec.h"
 #include"posix.h"
 #endif

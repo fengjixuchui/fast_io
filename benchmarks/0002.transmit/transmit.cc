@@ -41,6 +41,7 @@ try
 		fast_io::c_file csf("large_file_ibuf_to_c_file.txt","wb");
 		transmit(csf,ib);
 	}
+/*
 	{
 		fast_io::timer tm("spec enc 128 128 ctr crypt obuf file <= ibuf_file");
 		std::array<unsigned char, 16> key{1,2,3,4,5,6,7,8,1,2,3,4,5,6,7,8};
@@ -60,7 +61,7 @@ try
 		ob(std::piecewise_construct,std::forward_as_tuple("aes_ctr_encrypt.txt"),
 		std::forward_as_tuple(std::as_writable_bytes(std::span(key)), std::as_writable_bytes(std::span(iv))));
 		transmit(ob,ib);
-	}
+	}*/
 }
 catch(std::exception const& e)
 {

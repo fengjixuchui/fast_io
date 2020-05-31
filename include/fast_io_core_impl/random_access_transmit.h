@@ -5,7 +5,7 @@ namespace fast_io
 namespace details
 {
 
-#ifdef __linux__
+#if defined(__linux__)||defined(__BSD_VISIBLE)
 template<output_stream output,input_stream input>
 inline constexpr std::uintmax_t zero_copy_random_access_transmit_impl(output& outp,input& inp,std::intmax_t offset)
 {
@@ -60,7 +60,7 @@ inline constexpr auto random_access_transmit_impl(output& outp,input& inp,std::i
 			}
 			if constexpr(buffer_output_stream<output>)
 				flush(outp);
-#ifdef __linux__
+#if defined(__linux__)||defined(__BSD_VISIBLE)
 			return zero_copy_random_access_transmit_impl(outp,inp,offset,std::forward<Args>(args)...);
 #else
 			return zero_copy_transmit<true>(outp,inp,offset,std::forward<Args>(args)...);

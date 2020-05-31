@@ -32,6 +32,14 @@ public:
 	{
 		return rdb;
 	}
+	inline constexpr auto rdbuf() noexcept
+	{
+		return rdb;
+	}
+	inline constexpr auto rdbuf() const noexcept
+	{
+		return rdb;
+	}
 #if defined(__GLIBCXX__) || defined(__LIBCPP_VERSION)  || defined(_MSVC_STL_UPDATE)
 	explicit operator basic_c_io_observer_unlocked<char_type>()
 	{
@@ -127,6 +135,14 @@ requires zero_copy_output_stream<basic_c_io_observer_unlocked<ch_type>>
 inline constexpr decltype(auto) zero_copy_out_handle(basic_filebuf_io_observer<ch_type,Traits> h)
 {
 	return zero_copy_out_handle(static_cast<basic_c_io_observer_unlocked<ch_type>>(h));
+}
+
+template<std::integral ch_type,typename Traits,typename... Args>
+inline auto seek(basic_filebuf_io_observer<ch_type,Traits> h,Args&& ...args)
+{
+	h.rdb->flush();
+	h.rdb->clear();
+	return seek(static_cast<basic_c_io_observer_unlocked<ch_type>>(h),std::forward<Args>(args)...);
 }
 
 template<std::integral ch_type,typename... Args>
