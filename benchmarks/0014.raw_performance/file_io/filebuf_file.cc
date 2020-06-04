@@ -1,13 +1,15 @@
 #include"../../../include/fast_io.h"
-#include"../../../include/fast_io_device.h"
+#include"../../../include/fast_io_legacy.h"
 #include"../../timer.h"
 
 int main()
 {
 	constexpr std::size_t N{100000000};
-	fast_io::timer tm("obuf_file mutex");
+	{
+	fast_io::timer tm("filebuf_file");
+	fast_io::filebuf_file cfl("filebuf_file.txt","wb");
 	constexpr std::string_view view("Hello World\n");
-	fast_io::obuf_file_mutex obf("obuf_file_mutex.txt");
 	for(std::size_t i{};i!=N;++i)
-		print(obf,view);
+		print(cfl,view);
+	}
 }

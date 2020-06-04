@@ -184,59 +184,75 @@ concept write_read_punned_constraints = (std::contiguous_iterator<Iter>&&sizeof(
 namespace details
 {
 template<std::size_t buffer_size,bool punning=false,typename T,typename Iter>
-inline constexpr Iter ibuf_read(T& ib,Iter begin,Iter end)
+requires std::same_as<std::iter_value_t<Iter>,typename std::remove_cvref_t<T>::char_type>
+inline constexpr Iter ibuf_read_cold(T& ib,Iter begin,Iter end)
 {
-	std::size_t const buffer_remain(ib.ibuffer.end-ib.ibuffer.curr);
-
 	std::size_t n(end-begin);
-	if(buffer_remain<n)			//cache miss
+	std::size_t const buffer_remain(ib.ibuffer.end-ib.ibuffer.curr);
+	if(ib.ibuffer.end==nullptr)
 	{
-		if(ib.ibuffer.end==nullptr)
+		if(buffer_size<=n)
 		{
-			if(buffer_size<=n)
-			{
-				return read(ib.native_handle(),begin,end);
-			}
-			ib.ibuffer.init_space();
-			ib.ibuffer.curr=ib.ibuffer.end=ib.ibuffer.beg;
+			return read(ib.native_handle(),begin,end);
 		}
-		if constexpr(punning)
-		{
-			std::memcpy(begin,ib.ibuffer.curr,buffer_remain);
-			begin+=buffer_remain;
-		}
-		else
-			begin=std::copy_n(ib.ibuffer.curr,buffer_remain,begin);
-		if(begin+buffer_size<end)
-		{
-//			if constexpr(std::contiguous_iterator<Iter>)
-				begin=read(ib.native_handle(),begin,end);
-/*			else
-			{
-				
-			}*/
-			if(begin!=end)
-			{
-				ib.ibuffer.end=ib.ibuffer.curr=ib.ibuffer.beg;
-				return begin;
-			}
-		}
-		ib.ibuffer.end=read(ib.native_handle(),ib.ibuffer.beg,ib.ibuffer.beg+buffer_size);
-		ib.ibuffer.curr=ib.ibuffer.beg;
-		n=end-begin;
-		std::size_t const sz(ib.ibuffer.end-ib.ibuffer.beg);
-		if(sz<n)
-			n=sz;
+		ib.ibuffer.init_space();
+		ib.ibuffer.curr=ib.ibuffer.end=ib.ibuffer.beg;
 	}
 	if constexpr(punning)
 	{
-		std::memcpy(begin,ib.ibuffer.curr,n);
+		std::memcpy(begin,ib.ibuffer.curr,buffer_remain*sizeof(std::iter_value_t<Iter>));
+		begin+=buffer_remain;
+	}
+	else
+		begin=std::copy_n(ib.ibuffer.curr,buffer_remain,begin);
+	if(begin+buffer_size<end)
+	{
+//			if constexpr(std::contiguous_iterator<Iter>)
+			begin=read(ib.native_handle(),begin,end);
+/*			else
+		{
+			
+		}*/
+		if(begin!=end)
+		{
+			ib.ibuffer.end=ib.ibuffer.curr=ib.ibuffer.beg;
+			return begin;
+		}
+	}
+	ib.ibuffer.end=read(ib.native_handle(),ib.ibuffer.beg,ib.ibuffer.beg+buffer_size);
+	ib.ibuffer.curr=ib.ibuffer.beg;
+	n=end-begin;
+	std::size_t const sz(ib.ibuffer.end-ib.ibuffer.beg);
+	if(sz<n)
+		n=sz;
+	if constexpr(punning)
+	{
+		std::memcpy(begin,ib.ibuffer.curr,n*sizeof(std::iter_value_t<Iter>));
 		begin+=n;
 	}
 	else
 		begin=std::copy_n(ib.ibuffer.curr,n,begin);
 	ib.ibuffer.curr+=n;
 	return begin;
+}
+
+template<std::size_t buffer_size,bool punning=false,typename T,typename Iter>
+requires std::same_as<std::iter_value_t<Iter>,typename std::remove_cvref_t<T>::char_type>
+inline constexpr Iter ibuf_read(T& ib,Iter begin,Iter end)
+{
+	std::size_t n(end-begin);
+	if(ib.ibuffer.curr+n<ib.ibuffer.end)[[unlikely]]			//cache miss
+		return ibuf_read_cold<buffer_size,punning>(ib,begin,end);
+	if constexpr(punning)
+	{
+		std::memcpy(begin,ib.ibuffer.curr,n*sizeof(std::iter_value_t<Iter>));
+		begin+=n;
+	}
+	else
+		begin=std::copy_n(ib.ibuffer.curr,n,begin);
+	ib.ibuffer.curr+=n;
+	return begin;
+
 }
 }
 
@@ -246,7 +262,12 @@ inline constexpr Iter read(basic_ibuf<Ihandler,Buf>& ib,Iter begin,Iter end)
 {
 	using char_type = typename basic_ibuf<Ihandler,Buf>::char_type;
 	if constexpr(std::same_as<char_type,typename std::iterator_traits<Iter>::value_type>)
-		return details::ibuf_read<Buf::size>(ib,begin,end);
+	{
+		if(std::is_constant_evaluated())
+			return details::ibuf_read<Buf::size>(ib,std::to_address(begin),std::to_address(end));
+		else
+			return details::ibuf_read<Buf::size,true>(ib,std::to_address(begin),std::to_address(end));
+	}
 	else
 	{
 		auto b(reinterpret_cast<char const*>(std::to_address(begin)));
@@ -408,56 +429,65 @@ inline constexpr decltype(auto) ibuffer_set_curr(basic_obuf<Ohandler,Buf>& ob,ty
 namespace details
 {
 
-template<bool punning=false,typename T,typename Iter>
-inline constexpr void obuf_write(T& ob,Iter cbegin,Iter cend)
+template<bool punning=false,typename T,std::contiguous_iterator Iter>
+constexpr void obuf_write_cold(T& ob,Iter cbegin,Iter cend,std::size_t diff)
 {
-	std::size_t const n(ob.obuffer.end-ob.obuffer.curr);
-	std::size_t const diff(std::distance(cbegin,cend));
-	if(n<diff)[[unlikely]]
+	if(ob.obuffer.end==nullptr)		//cold buffer
 	{
-		if(ob.obuffer.end==nullptr)		//cold buffer
-		{
-			if(T::buffer_type::size<=diff)
-			{
-				write(ob.native_handle(),cbegin,cend);
-				return;
-			}
-			ob.obuffer.init_space();
-			ob.obuffer.end=(ob.obuffer.curr=ob.obuffer.beg)+T::buffer_type::size;
-			if constexpr(punning)
-				std::memcpy(ob.obuffer.curr,cbegin,diff);
-			else
-				std::copy_n(cbegin,diff,ob.obuffer.curr);
-			ob.obuffer.curr+=diff;
-			return;
-		}
-/*		if constexpr(punning)
-			std::memcpy(ob.obuffer.curr,cbegin,n);
-		else*/
-			std::copy_n(cbegin,n,ob.obuffer.curr);		
-		cbegin+=n;
-		write(ob.native_handle(),ob.obuffer.beg,ob.obuffer.end);
-		if(cbegin+(T::buffer_type::size)<cend)
+		if(T::buffer_type::size<=diff)
 		{
 			write(ob.native_handle(),cbegin,cend);
-			ob.obuffer.curr=ob.obuffer.beg;
+			return;
 		}
+		ob.obuffer.init_space();
+		ob.obuffer.end=(ob.obuffer.curr=ob.obuffer.beg)+T::buffer_type::size;
+		if constexpr(punning)
+			memcpy(ob.obuffer.curr,cbegin,diff*sizeof(std::iter_value_t<Iter>));
 		else
-		{
-			std::size_t const df(cend-cbegin);
-			if constexpr(punning)
-				std::memcpy(ob.obuffer.beg,cbegin,df);
-			else
-				std::copy_n(cbegin,df,ob.obuffer.beg);
-			ob.obuffer.curr=ob.obuffer.beg+df;
-		}
+			std::copy_n(cbegin,diff,ob.obuffer.curr);
+		ob.obuffer.curr+=diff;
 		return;
 	}
+	std::size_t n(ob.obuffer.end-ob.obuffer.curr);
 	if constexpr(punning)
-		std::memcpy(ob.obuffer.curr,cbegin,diff);
+		memcpy(ob.obuffer.curr,cbegin,n*sizeof(std::iter_value_t<Iter>));
 	else
-		std::copy_n(cbegin,diff,ob.obuffer.curr);
-	ob.obuffer.curr+=diff;
+		std::copy_n(cbegin,n,ob.obuffer.curr);		
+	cbegin+=n;
+	write(ob.native_handle(),ob.obuffer.beg,ob.obuffer.end);
+	if(cbegin+(T::buffer_type::size)<cend)
+	{
+		write(ob.native_handle(),cbegin,cend);
+		ob.obuffer.curr=ob.obuffer.beg;
+	}
+	else
+	{
+		std::size_t const df(cend-cbegin);
+		if constexpr(punning)
+			memcpy(ob.obuffer.beg,cbegin,df*sizeof(std::iter_value_t<Iter>));
+		else
+			std::copy_n(cbegin,df,ob.obuffer.beg);
+		ob.obuffer.curr=ob.obuffer.beg+df;
+	}
+}
+
+template<bool punning=false,typename T,std::contiguous_iterator Iter>
+requires std::same_as<std::iter_value_t<Iter>,typename std::remove_cvref_t<T>::char_type>
+inline constexpr void obuf_write(T& ob,Iter cbegin,Iter cend)
+{
+	std::size_t const diff(cend-cbegin);
+	auto curr{ob.obuffer.curr};
+	auto e{curr+diff};
+	if(e<ob.obuffer.end)[[likely]]
+	{
+		if constexpr(punning)
+			memcpy(curr,cbegin,diff*sizeof(std::iter_value_t<Iter>));
+		else
+			std::copy_n(cbegin,diff,ob.obuffer.curr);
+		ob.obuffer.curr=e;
+		return;
+	}
+	obuf_write_cold<punning>(ob,cbegin,cend,diff);
 }
 
 }
@@ -468,7 +498,12 @@ inline constexpr void write(basic_obuf<Ohandler,Buf>& ob,Iter cbegini,Iter cendi
 {
 	using char_type = typename basic_obuf<Ohandler,Buf>::char_type;
 	if constexpr(std::same_as<char_type,typename std::iterator_traits<Iter>::value_type>)
-		details::obuf_write<false>(ob,std::to_address(cbegini),std::to_address(cendi));
+	{
+		if(std::is_constant_evaluated())
+			details::obuf_write<false>(ob,std::to_address(cbegini),std::to_address(cendi));
+		else
+			details::obuf_write<true>(ob,std::to_address(cbegini),std::to_address(cendi));
+	}
 	else
 		details::obuf_write<true>(ob,reinterpret_cast<char const*>(std::to_address(cbegini)),
 					reinterpret_cast<char const*>(std::to_address(cendi)));

@@ -31,7 +31,7 @@ constexpr std::size_t cal_floating_len()
 }
 }
 
-template<buffer_input_stream input,std::floating_point T>
+template<character_input_stream input,std::floating_point T>
 inline constexpr void space_scan_define(input& in,T &t)
 {
 	auto igen{igenerator(in)};
@@ -41,7 +41,7 @@ inline constexpr void space_scan_define(input& in,T &t)
 		t=details::ryu::input_floating<u8'.',std::remove_cvref_t<T>>(begin(igen),end(igen));
 }
 
-template<char32_t dec,buffer_input_stream input,std::floating_point T>
+template<char32_t dec,character_input_stream input,std::floating_point T>
 inline constexpr void space_scan_define(input& in,manip::decimal_point<T&,dec> t)
 {
 	auto igen{igenerator(in)};

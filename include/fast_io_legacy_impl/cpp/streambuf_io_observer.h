@@ -69,25 +69,14 @@ public:
 };
 
 template<typename T,std::contiguous_iterator Iter>
-inline Iter read(basic_general_streambuf_io_observer<T>& t,Iter begin,Iter end)
+inline Iter read(basic_general_streambuf_io_observer<T> t,Iter begin,Iter end)
 {
 	using char_type = typename T::char_type;
 	return begin+(t.rdb->sgetn(static_cast<char_type*>(static_cast<void*>(std::to_address(begin))),(end-begin)*sizeof(*begin)/sizeof(char_type))*sizeof(char_type)/sizeof(*begin));
 }
 
 template<typename T,std::contiguous_iterator Iter>
-inline Iter write(basic_general_streambuf_io_observer<T>& t,Iter begin,Iter end)
-{
-	using char_type = typename T::char_type;
-/*
-	if(!t.rdb->sputn(static_cast<char_type const*>(static_cast<void const*>(std::to_address(begin))),(end-begin)*sizeof(*begin)/sizeof(char_type)))
-#ifdef __cpp_exceptions
-		throw posix_error(EIO);
-#else
-		fast_terminate();
-#endif*/
-	return begin+(t.rdb->sputn(static_cast<char_type const*>(static_cast<void const*>(std::to_address(begin))),(end-begin)*sizeof(*begin)/sizeof(char_type)))*sizeof(char_type)/sizeof(*begin);
-}
+inline Iter write(basic_general_streambuf_io_observer<T> t,Iter begin,Iter end);
 
 template<typename T>
 inline void flush(basic_general_streambuf_io_observer<T> h)
@@ -164,3 +153,27 @@ inline constexpr void print_define(output& out,basic_general_streambuf_io_observ
 #if defined(__GLIBCXX__) || defined(__LIBCPP_VERSION) || defined(_MSVC_STL_UPDATE)
 #include"general.h"
 #endif
+
+
+namespace fast_io
+{
+
+template<typename T,std::contiguous_iterator Iter>
+inline Iter write(basic_general_streambuf_io_observer<T> t,Iter begin,Iter end)
+{
+	using char_type = typename T::char_type;
+	std::size_t const count(end-begin);
+	std::size_t const total_bytes_to_write(count*sizeof(*begin));
+	std::size_t const total_count(total_bytes_to_write/sizeof(char_type));
+	auto curr{obuffer_curr(t)};
+	auto ed{obuffer_end(t)};
+	if(curr+total_count<ed)[[likely]]
+	{
+		memcpy(curr,std::to_address(begin),total_bytes_to_write);
+		obuffer_set_curr(t,curr+total_count);
+		return end;
+	}
+	return begin+(t.rdb->sputn(static_cast<char_type const*>(static_cast<void const*>(std::to_address(begin))),(end-begin)*sizeof(*begin)/sizeof(char_type)))*sizeof(char_type)/sizeof(*begin);
+}
+
+}
