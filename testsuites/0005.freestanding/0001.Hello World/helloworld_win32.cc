@@ -2,8 +2,8 @@
 
 extern "C" int __stdcall wWinMain() noexcept
 {
-	fast_io::out=fast_io::native_stdout();
-	print("Hello World\n");
+	auto out{fast_io::win32_stdout()};
+	print(out,"Hello World\n");
 	return 0;
 }
 

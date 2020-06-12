@@ -82,7 +82,10 @@ inline void overflow(c_io_observer_unlocked cio,char ch)
 #endif
 }
 
-
+inline constexpr bool obuffer_is_active(c_io_observer_unlocked cio)
+{
+	return cio.fp->_base;
+}
 
 [[gnu::may_alias]] inline wchar_t* ibuffer_begin(wc_io_observer_unlocked cio)
 {
@@ -146,7 +149,15 @@ inline void overflow(wc_io_observer_unlocked cio,wchar_t ch)
 		fast_terminate();
 #endif
 }
+
+inline constexpr bool obuffer_is_active(wc_io_observer_unlocked cio)
+{
+	return cio.fp->_base;
+}
+
 static_assert(buffer_io_stream<c_io_observer_unlocked>);
+static_assert(maybe_buffer_output_stream<c_io_observer_unlocked>);
 static_assert(buffer_io_stream<wc_io_observer_unlocked>);
+static_assert(maybe_buffer_output_stream<wc_io_observer_unlocked>);
 static_assert(!buffer_io_stream<basic_c_io_observer_unlocked<char8_t>>);
 }

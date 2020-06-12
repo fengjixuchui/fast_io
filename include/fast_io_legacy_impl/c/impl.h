@@ -361,7 +361,11 @@ inline auto seek(basic_c_io_observer_unlocked<ch_type> cfhd,seek_type_t<T>,U i,s
 		fseek
 #endif
 	(cfhd.native_handle(),seek_precondition<long,T,char>(i),static_cast<int>(s)))
+#ifdef __cpp_exceptions
 		throw posix_error(); 
+#else
+		fast_terminate();
+#endif
 	auto val(std::ftell(cfhd.native_handle()));
 	if(val<0)
 #ifdef __cpp_exceptions
@@ -676,7 +680,11 @@ public:
 #if defined(_GNU_SOURCE) || defined(__MUSL__)
 		std::unique_ptr<stm> up{std::make_unique<std::remove_cvref_t<stm>>(std::forward<std::remove_cvref_t<stm>>(args)...)};
 		if(!(this->native_handle()=fopencookie(up.get(),mode.data(),c_io_cookie_functions<std::remove_cvref_t<stm>>.native_functions)))[[unlikely]]
-			throw posix_error();
+#ifdef __cpp_exceptions
+               		throw posix_error();
+#else
+			fast_terminate();
+#endif
 		up.release();
 #elif defined(__BSD_VISIBLE) || defined(__BIONIC__)
 		std::unique_ptr<stm> up{std::make_unique<std::remove_cvref_t<stm>>(std::forward<Args>(args)...)};
@@ -696,7 +704,11 @@ public:
 	{
 #if defined(_GNU_SOURCE) || defined(__MUSL__)
 		if(!(this->native_handle()=fopencookie(std::addressof(reff),mode.data(),c_io_cookie_functions<stm&>.native_functions)))[[unlikely]]
-			throw posix_error();
+#ifdef __cpp_exceptions
+               		throw posix_error();
+#else
+			fast_terminate();
+#endif
 #elif defined(__BSD_VISIBLE) || defined(__BIONIC__)
 		this->native_handle()=details::funopen_wrapper<stm&>(std::addressof(reff));
 #else

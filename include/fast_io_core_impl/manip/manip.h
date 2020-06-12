@@ -149,7 +149,7 @@ template<typename T>
 struct code_cvt
 {
 	using manip_tag = manip_tag_t;
-	T& reference;
+	T reference;
 };
 
 template<typename T,typename Func>
@@ -255,9 +255,6 @@ inline constexpr manip::follow_character<T,ch_type> follow(T &f,ch_type ch){retu
 
 template<typename T,std::integral ch_type>
 inline constexpr manip::follow_character<T const,ch_type> follow(T const &f,ch_type ch){return {f,ch};}
-
-template<typename T>
-inline constexpr manip::code_cvt<T const> code_cvt(T const&f){return {f};}
 
 /*template<status_stream stm,typename T>
 inline constexpr manip::status_tag<typename stm::status_type,T const> status(stm const& t,T ch)

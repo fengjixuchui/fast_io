@@ -9,6 +9,7 @@
 #include"win32.h"
 #include"win32_mapping.h"
 #include"win32_scheduling.h"
+//#include"com_error.h"
 #endif
 #if defined(__linux__)
 #ifdef __x86_64__

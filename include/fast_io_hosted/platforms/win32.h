@@ -74,13 +74,13 @@ inline void* create_file_a_impl(std::string_view path,Args&& ...args)
 	if(path.size()<511)[[likely]]
 	{
 		std::array<wchar_t,512> buffer;
-		*code_cvt_from_utf8_to_utf16(path.data(),path.data()+path.size(),buffer.data())=0;
+		*utf_code_convert(path.data(),path.data()+path.size(),buffer.data())=0;
 		return create_file_a_impld<inherit>(buffer.data(),std::forward<Args>(args)...);
 	}
 	else
 	{
 		details::temp_unique_arr_ptr<wchar_t> buffer(path.size()+1);
-		*code_cvt_from_utf8_to_utf16(path.data(),path.data()+path.size(),buffer.ptr)=0;
+		*utf_code_convert(path.data(),path.data()+path.size(),buffer.ptr)=0;
 		return create_file_a_impld<inherit>(buffer.ptr,std::forward<Args>(args)...);
 	}
 }

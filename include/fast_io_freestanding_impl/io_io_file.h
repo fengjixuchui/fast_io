@@ -59,7 +59,11 @@ public:
 		if constexpr(input_stream<value_type>)
 			return read(io,b,e);
 		else
+#ifdef __cpp_exceptions
 			throw posix_error(EOPNOTSUPP);
+#else
+			fast_terminate();
+#endif
 	}
 #if __cpp_constexpr >= 201907L
 	constexpr
@@ -79,7 +83,11 @@ public:
 			}			
 		}
 		else
+#ifdef __cpp_exceptions
 			throw posix_error(EOPNOTSUPP);
+#else
+			fast_terminate();
+#endif
 	}
 #if __cpp_constexpr >= 201907L
 	constexpr
@@ -92,7 +100,11 @@ public:
 				flush(io);
 		}
 		else
+#ifdef __cpp_exceptions
 			throw posix_error(EOPNOTSUPP);
+#else
+			fast_terminate();
+#endif
 	}
 #if __cpp_constexpr >= 201907L
 	constexpr
@@ -102,7 +114,11 @@ public:
 		if constexpr(random_access_stream<value_type>)
 			return seek(io,seek_type<char_type>,off,dir);
 		else
+#ifdef __cpp_exceptions
 			throw posix_error(EOPNOTSUPP);
+#else
+			fast_terminate();
+#endif
 	}
 #if __cpp_constexpr >= 201907L
 	constexpr
@@ -112,7 +128,11 @@ public:
 		if constexpr(std::is_reference_v<stm>||std::copyable<stm>)
 			return new derv(std::in_place_type<stm>,this->io);
 		else
+#ifdef __cpp_exceptions
 			throw posix_error(EOPNOTSUPP);
+#else
+			fast_terminate();
+#endif
 	}
 };
 
@@ -153,7 +173,7 @@ class basic_io_io_handle:public basic_io_io_observer<ch_type>
 {
 public:
 	using char_type = ch_type;
-	using native_handle_type = basic_io_io_observer<ch_type>::native_handle_type;
+	using native_handle_type = typename basic_io_io_observer<ch_type>::native_handle_type;
 	constexpr basic_io_io_handle() = default;
 	constexpr basic_io_io_handle(native_handle_type io_ptr):basic_io_io_observer<ch_type>{io_ptr}{}
 #if __cpp_constexpr >= 201907L
@@ -193,7 +213,7 @@ class basic_io_file:public basic_io_io_handle<ch_type>
 {
 public:
 	using char_type = ch_type;
-	using native_handle_type = basic_io_io_observer<ch_type>::native_handle_type;
+	using native_handle_type = typename basic_io_io_observer<ch_type>::native_handle_type;
 	constexpr basic_io_file()=default;
 	constexpr basic_io_file(native_handle_type ptr):basic_io_io_handle<ch_type>(ptr){}
 	template<stream smt,typename... Args>

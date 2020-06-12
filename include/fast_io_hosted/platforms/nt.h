@@ -28,13 +28,13 @@ inline void nt_create_file_impl(std::string_view path,Args&& ...args)
 	if(path.size()<512)[[likely]]		//YES TO NO NULL TERMINATOR C-STYLE STRING! I ABSOLUTELY LOVE IT.
 	{
 		std::array<wchar_t,512> buffer;
-		std::span sp{buffer.data(),code_cvt_from_utf8_to_utf16(path.data(),path.data()+path.size(),buffer.data())};
+		std::span sp{buffer.data(),utf_code_convert(path.data(),path.data()+path.size(),buffer.data())};
 		nt_create_file_impl(sp,std::forward<Args>(args)...);
 	}
 	else
 	{
 		details::temp_unique_arr_ptr<wchar_t> buffer(path.size());
-		std::span sp{buffer.ptr,code_cvt_from_utf8_to_utf16(path.data(),path.data()+path.size(),buffer.ptr)};
+		std::span sp{buffer.ptr,utf_code_convert(path.data(),path.data()+path.size(),buffer.ptr)};
 		if(32767<sp.size())
 			throw nt_error(0xC0000106);
 		nt_create_file_impl(sp,std::forward<Args>(args)...);
@@ -289,7 +289,7 @@ public:
 		win32::nt::unicode_string nt_name;
 		{
 		details::temp_unique_arr_ptr<wchar_t> buffer(filename.size()+1);
-		*code_cvt_from_utf8_to_utf16(filename.data(),filename.data()+filename.size(),buffer.data())=0;
+		*utf_code_convert(filename.data(),filename.data()+filename.size(),buffer.data())=0;
 		if(!win32::nt::rtl_dos_path_name_to_nt_path_name_u(buffer.data(),std::addressof(nt_name),std::addressof(part_name),std::addressof(relative_name)))
 			details::throw_win32_error();
 		}

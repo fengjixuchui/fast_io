@@ -19,6 +19,21 @@ inline void write(basic_c_io_observer_unlocked<T> cfhd,Iter begin,Iter end)
 			obuffer_set_curr(cfhd,curr+total_count);
 			return;
 		}
+
+#if defined(__WINNT__) || defined(_MSC_VER)
+		if constexpr(maybe_buffer_output_stream<basic_c_io_observer_unlocked<T>>)
+		{
+			if(!obuffer_is_active(cfhd))[[unlikely]]
+			{
+				basic_posix_io_observer<T> piob(cfhd);
+				if(_isatty(piob.fd))
+				{
+					write(piob,begin,end);
+					return;
+				}
+			}
+		}
+#endif
 	}
 	if(
 #if defined(_MSC_VER)||defined(_UCRT)

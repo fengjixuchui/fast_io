@@ -39,7 +39,14 @@ inline bool underflow(basic_general_streambuf_io_observer<T> cio)
 {
 	ibuffer_set_curr(cio,ibuffer_end(cio));
 	using traits_type = typename T::traits_type;
-	return cio.rdb->sgetc()!=traits_type::eof();
+	bool test{cio.rdb->sgetc()!=traits_type::eof()};
+	if(test&&ibuffer_begin(cio)==ibuffer_end(cio))[[unlikely]]
+#if __cpp_exceptions
+		throw posix_error(EIO);
+#else
+		fast_terminate();
+#endif
+	return test;
 }
 
 template<typename T>

@@ -13,14 +13,18 @@ private:
 	map_handle_type fm;
 	void close_impl() noexcept
 	{
+#ifdef __cpp_exceptions
 		try
 		{
+#endif
 			fm.close();
 			if(hd)
 				truncate(hd,current_position);
+#ifdef __cpp_exceptions
 		}
 		catch(...)
 		{}
+#endif
 	}
 public:
 	std::size_t current_position{};

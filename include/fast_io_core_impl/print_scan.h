@@ -283,6 +283,40 @@ inline constexpr void receive(input &in,Args&& ...args)
 		normal_receive(in,std::forward<Args>(args)...);
 }
 
+namespace details
+{
+template<bool line,output_stream output,typename ...Args>
+inline constexpr void print_fallback(output &out,Args&& ...args)
+{
+	internal_temporary_buffer<typename output::char_type> buffer;
+	if constexpr(line)
+	{
+		if constexpr((sizeof...(Args)==1)&&(reserve_printable<Args>&&...))
+		{
+			((details::print_control_line(buffer,std::forward<Args>(args))),...);
+		}
+		else
+		{
+			((details::print_control(buffer,std::forward<Args>(args))),...);
+			put(buffer,u8'\n');
+		}
+	}
+	else
+	{
+		(details::print_control(buffer,std::forward<Args>(args)),...);
+	}
+	write(out,buffer.beg_ptr,buffer.end_ptr);
+}
+}
+
+template<output_stream output,typename callback>
+inline constexpr void print_transaction(output &out,callback func)
+{
+	internal_temporary_buffer<typename output::char_type> buffer;
+	func(buffer);
+	write(out,buffer.beg_ptr,buffer.end_ptr);
+}
+
 template<output_stream output,typename ...Args>
 inline constexpr void print(output &out,Args&& ...args)
 {
@@ -296,14 +330,20 @@ inline constexpr void print(output &out,Args&& ...args)
 		print_status_define(out,std::forward<Args>(args)...);
 	else if constexpr(((printable<output,Args>||reserve_printable<Args>)&&...)&&(sizeof...(Args)==1||buffer_output_stream<output>))
 	{
-		(details::print_control(out,std::forward<Args>(args)),...);
+		if constexpr(sizeof...(Args)==1||(!maybe_buffer_output_stream<output>))
+			(details::print_control(out,std::forward<Args>(args)),...);
+		else
+		{
+			if(!obuffer_is_active(out))[[unlikely]]
+			{
+				details::print_fallback<false>(out,std::forward<Args>(args)...);
+				return;
+			}
+			(details::print_control(out,std::forward<Args>(args)),...);
+		}
 	}
 	else
-	{
-		internal_temporary_buffer<typename output::char_type> buffer;
-		(details::print_control(buffer,std::forward<Args>(args)),...);
-		write(out,buffer.beg_ptr,buffer.end_ptr);
-	}
+		details::print_fallback<false>(out,std::forward<Args>(args)...);
 }
 
 template<output_stream output,typename ...Args>
@@ -321,29 +361,23 @@ inline constexpr void println(output &out,Args&& ...args)
 	((printable<output,Args>&&...)&&buffer_output_stream<output>&&character_output_stream<output>))
 	{
 		if constexpr((sizeof...(Args)==1)&&(reserve_printable<Args>&&...))
-		{
 			((details::print_control_line(out,std::forward<Args>(args))),...);
-		}
 		else
 		{
+			if constexpr(maybe_buffer_output_stream<output>)
+			{
+				if(!obuffer_is_active(out))[[unlikely]]
+				{
+					details::print_fallback<true>(out,std::forward<Args>(args)...);
+					return;
+				}
+			}
 			((details::print_control(out,std::forward<Args>(args))),...);
 			put(out,u8'\n');
 		}
 	}
 	else
-	{
-		internal_temporary_buffer<typename output::char_type> buffer;
-		if constexpr((sizeof...(Args)==1)&&(reserve_printable<Args>&&...))
-		{
-			((details::print_control_line(buffer,std::forward<Args>(args))),...);
-		}
-		else
-		{
-			((details::print_control(buffer,std::forward<Args>(args))),...);
-			put(buffer,u8'\n');
-		}
-		write(out,buffer.beg_ptr,buffer.end_ptr);
-	}
+		details::print_fallback<true>(out,std::forward<Args>(args)...);
 }
 
 template<output_stream output,typename ...Args>

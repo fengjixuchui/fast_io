@@ -410,7 +410,7 @@ class basic_posix_file:public basic_posix_io_handle<ch_type>
 #endif
 public:
 	using char_type = ch_type;
-	using native_handle_type = basic_posix_io_handle<char_type>::native_handle_type;
+	using native_handle_type = typename basic_posix_io_handle<char_type>::native_handle_type;
 	using basic_posix_io_handle<ch_type>::native_handle;
 	constexpr basic_posix_file() noexcept = default;
 	constexpr basic_posix_file(int fd) noexcept: basic_posix_io_handle<ch_type>(fd){}

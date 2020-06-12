@@ -18,7 +18,8 @@ int main()
 You can download the latest GCC compiler for windows here. https://bitbucket.org/ejsvifq_mabmip/mingw-gcc/src/master/ 
 For Linux, you can watch this video to help you install the latest GCC easily. https://www.youtube.com/watch?v=qFToZjo2x24
 - VS 19.26
-- No Clang since Clang has not yet correctly support Concepts
+- Clang 11 with libstdc++. No Clang with libc++ yet since libc++ has not supported concepts and ranges headers.
+- Todo: Intel C++ Compiler
 
 ## Platform Support
 - Windows

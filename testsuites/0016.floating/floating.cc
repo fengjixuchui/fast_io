@@ -74,6 +74,8 @@ int main()
 	check(200.0f);
 	check(3.3554432E7f);
 	check(1.26217745E-29f);
+	check(1.1754944e-38f);
+	check(1.17549430e-38f);
 	test_speciail_case<float>();
 	print("\n\n-----------------double--------------\n\n");
 //double

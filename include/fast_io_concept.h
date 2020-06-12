@@ -93,6 +93,11 @@ concept buffer_output_stream_impl = requires(T& out,typename T::char_type ch)
 	overflow(out,ch);
 };
 template<typename T>
+concept maybe_buffer_output_stream_impl = requires(T& out)
+{
+	{obuffer_is_active(out)}->std::convertible_to<bool>;
+};
+template<typename T>
 concept flush_output_stream_impl = requires(T& out)
 {
 	flush(out);
@@ -196,6 +201,11 @@ concept contiguous_input_stream = input_stream<T>&&details::contiguous_input_str
 
 template<typename T>
 concept buffer_output_stream = output_stream<T>&&details::buffer_output_stream_impl<T>;
+
+
+//Unfortunately, FILE* is a mess here. We have to support this to prevent the operating system not buffering anything
+template<typename T>
+concept maybe_buffer_output_stream = buffer_output_stream<T>&&details::maybe_buffer_output_stream_impl<T>;
 
 template<typename T>
 concept buffer_io_stream = buffer_input_stream<T>&&buffer_output_stream<T>&&io_stream<T>;

@@ -18,7 +18,11 @@ inline constexpr std::size_t receive_size(input& in)
 		if(ch<limit)
 			return temp;
 	}
-	throw fast_io_text_error(reinterpret_cast<char const*>(u8"size is out of std::size_t range"));
+#ifdef __cpp_exceptions
+		throw fast_io_text_error("size is out of std::size_t range");
+#else
+		fast_terminate();
+#endif
 }
 
 template<character_output_stream output>

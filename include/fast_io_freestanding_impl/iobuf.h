@@ -9,13 +9,39 @@ struct io_aligned_allocator
 	using value_type = T;
 	using size_type = std::size_t;
 	using difference_type = std::ptrdiff_t;
-	[[nodiscard]] inline T* allocate(std::size_t n)
+	[[nodiscard]] inline
+	#if __cpp_lib_is_constant_evaluated >= 201811L && __cpp_constexpr_dynamic_alloc >= 201907L
+		constexpr
+	#endif
+	T* allocate(std::size_t n)
 	{
-		return static_cast<T*>(operator new(n*sizeof(T),std::align_val_t{alignment}));
+	#if __cpp_lib_is_constant_evaluated >= 201811L && __cpp_constexpr_dynamic_alloc >= 201907L
+		if(std::is_constant_evaluated())
+			return new T[n];
+		else
+	#endif
+	#if __cpp_sized_deallocation >=	201309L && __cpp_aligned_new >= 201606L
+			return static_cast<T*>(operator new(n*sizeof(T),std::align_val_t{alignment}));
+	#else
+			return new T[n];
+	#endif
 	}
-	inline void deallocate(T* p, std::size_t n) noexcept
+	inline
+	#if __cpp_lib_is_constant_evaluated >= 201811L && __cpp_constexpr_dynamic_alloc >= 201907L
+		constexpr
+	#endif
+	void deallocate(T* p, std::size_t n) noexcept
 	{
-		operator delete(p,n*sizeof(T),std::align_val_t{alignment});
+	#if __cpp_lib_is_constant_evaluated >= 201811L && __cpp_constexpr_dynamic_alloc >= 201907L
+		if(std::is_constant_evaluated())
+			delete[] p;
+		else
+	#endif
+	#if __cpp_sized_deallocation >=	201309L && __cpp_aligned_new >= 201606L
+			operator delete(p,n*sizeof(T),std::align_val_t{alignment});
+	#else
+			delete[] p;
+	#endif
 	}
 };
 
@@ -32,6 +58,7 @@ template<std::integral CharT,std::size_t buffer_size = ((
 65536
 #endif
 /sizeof(CharT)),typename Allocator = io_aligned_allocator<CharT>>
+requires (buffer_size!=0)
 class basic_buf_handler
 {
 	Allocator alloc;

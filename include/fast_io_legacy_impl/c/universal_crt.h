@@ -247,7 +247,20 @@ inline void overflow(wc_io_observer_unlocked cio,wchar_t ch)
 		fast_terminate();
 #endif
 }
+
+inline bool obuffer_is_active(c_io_observer_unlocked cio)
+{
+	return details::ucrt_hack::get_fp_base(cio.fp);
+}
+
+inline bool obuffer_is_active(wc_io_observer_unlocked cio)
+{
+	return details::ucrt_hack::get_fp_base(cio.fp);
+}
+
 static_assert(buffer_io_stream<c_io_observer_unlocked>);
 static_assert(buffer_io_stream<wc_io_observer_unlocked>);
+static_assert(maybe_buffer_output_stream<c_io_observer_unlocked>);
+static_assert(maybe_buffer_output_stream<wc_io_observer_unlocked>);
 static_assert(!buffer_io_stream<basic_c_io_observer_unlocked<char8_t>>);
 }

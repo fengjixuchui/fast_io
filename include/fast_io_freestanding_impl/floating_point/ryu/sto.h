@@ -46,7 +46,11 @@ inline constexpr F input_floating(It_First iter,It_Second ed)
 			if(ch==decimal_point_value_after_minus_zero)
 			{
 				if(dot_index!=-1)
+#ifdef __cpp_exceptions
 					throw fast_io_text_error("malformed input");
+#else
+					fast_terminate();
+#endif
 				dot_index=index;
 				++index;
 				continue;
@@ -88,13 +92,21 @@ inline constexpr F input_floating(It_First iter,It_Second ed)
 	{
 		e_index=index;
 		if(++iter==ed)[[unlikely]]
+#ifdef __cpp_exceptions
 			throw fast_io_text_error("malformed input");
+#else
+			fast_terminate();
+#endif
 		++index;
 		if((*iter==u8'+')||(*iter==u8'-'))[[likely]]
 		{
 			exp_negative=(*iter==u8'-');
 			if(++iter==ed)[[unlikely]]
+#ifdef __cpp_exceptions
 				throw fast_io_text_error("malformed input");
+#else
+				fast_terminate();
+#endif
 			++index;
 		}
 		for(;iter!=ed&&*iter==u8'0';++iter)
@@ -112,7 +124,11 @@ inline constexpr F input_floating(It_First iter,It_Second ed)
 	}
 	detect_overflow<10>(ue10,ue10digits);
 	if((ue10+=extra_e10)<extra_e10)[[unlikely]]
+#ifdef __cpp_exceptions
 		throw fast_io_text_error("exp part integer overflow");
+#else
+		fast_terminate();
+#endif
 	signed_exponent_type e10(static_cast<signed_exponent_type>(ue10));
 	if(exp_negative)
 		e10=-e10;
@@ -168,9 +184,18 @@ inline constexpr F input_floating(It_First iter,It_Second ed)
 	bool last_removed_bit((m2>>(shift-1))&1);
 	bool round_up((last_removed_bit) && (!trailing_zeros || ((m2 >> shift) & 1)));
 	mantissa_type ieee_m2((m2 >> shift) + round_up);
-	if(ieee_m2 == (static_cast<mantissa_type>(1) << (floating_trait::mantissa_bits + 1)))
-		++ieee_e2;
-	ieee_m2&=((static_cast<mantissa_type>(1) << floating_trait::mantissa_bits) - 1);
+	if(std::same_as<floating_type,float>)
+	{
+		ieee_m2 &= ((static_cast<mantissa_type>(1) << floating_trait::mantissa_bits) - 1);
+		if (ieee_m2 == 0 && round_up)
+			++ieee_e2;
+	}
+	else
+	{
+		if(ieee_m2 == (static_cast<mantissa_type>(1) << (floating_trait::mantissa_bits + 1)))
+			++ieee_e2;
+		ieee_m2&=((static_cast<mantissa_type>(1) << floating_trait::mantissa_bits) - 1);
+	}
 	return bit_cast<F>(((((static_cast<mantissa_type>(negative)) << floating_trait::exponent_bits) | static_cast<mantissa_type>(ieee_e2)) << 
 		floating_trait::mantissa_bits)|(((m2 >> shift) + round_up) & ((static_cast<mantissa_type>(1) << floating_trait::mantissa_bits) - 1)));
 }

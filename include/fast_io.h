@@ -7,9 +7,13 @@
 namespace fast_io
 {
 
-static inline constexpr posix_io_observer in(posix_stdin());
-static inline constexpr posix_io_observer out(posix_stdout());
-static inline constexpr posix_io_observer err(posix_stderr());
+static inline constexpr posix_io_observer in{posix_stdin_number};
+static inline constexpr posix_io_observer out{posix_stdout_number};
+static inline constexpr posix_io_observer err{posix_stderr_number};
+
+static inline constexpr wposix_io_observer wout{posix_stdout_number};
+static inline constexpr wposix_io_observer werr{posix_stderr_number};
+
 
 using in_buf_type = basic_ibuf<native_io_observer>;
 using log_type = basic_obuf<native_io_observer>;

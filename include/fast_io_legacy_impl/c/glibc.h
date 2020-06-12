@@ -49,7 +49,7 @@ inline constexpr void obuffer_set_curr(c_io_observer_unlocked cio,char* ptr) noe
 	cio.fp->_IO_write_ptr=ptr;
 }
 
-extern "C" int __overflow (FILE *,int) noexcept;
+//extern "C" int __overflow (FILE *,int) noexcept;
 
 inline void overflow(c_io_observer_unlocked cio,char ch)
 {

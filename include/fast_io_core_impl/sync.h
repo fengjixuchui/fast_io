@@ -89,12 +89,18 @@ class basic_fsync:public basic_sync<output,ostr>
 {
 	bool need_sync = true;
 	void sync()
+	{
+#ifdef __cpp_exceptions
 	try
 	{
+#endif
 		if(need_sync)
 			flush(static_cast<basic_sync<output,ostr>&>(*this));
+#ifdef __cpp_exceptions
 	}
 	catch(...){}
+#endif
+	}
 public:
 	using native_handle_type = output;
 	using char_type = typename native_handle_type::char_type;

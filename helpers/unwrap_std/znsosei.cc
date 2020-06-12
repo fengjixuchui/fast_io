@@ -110,3 +110,8 @@ extern "C" std::istream& __wrap__ZNSi10_M_extractIfEERSiRT_(std::istream& in,flo
 {
 	return fast_io::wrapped_in_function(in,v);
 }
+
+extern "C" std::ostream& __wrap__ZNSo5flushEv(std::ostream& out)
+{
+	return out;
+}
