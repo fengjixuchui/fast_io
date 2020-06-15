@@ -6,8 +6,9 @@ namespace fast_io
 
 namespace details
 {
+
 template<output_stream output,typename Func>
-constexpr void reserve_write_cold_path(output& out,std::size_t required_size,Func& func)
+constexpr void reserve_write_extremely_cold_path(output& out,std::size_t required_size,Func& func)
 {
 	if(required_size<=1024)[[likely]]
 	{
@@ -19,6 +20,24 @@ constexpr void reserve_write_cold_path(output& out,std::size_t required_size,Fun
 		details::temp_unique_arr_ptr<typename output::char_type> temp_buffer(required_size);
 		write_all(out,temp_buffer.data(),func(temp_buffer.data()));
 	}
+}
+template<output_stream output,typename Func>
+constexpr void reserve_write_cold_path(output& out,std::size_t required_size,Func& func)
+{
+	if constexpr(dynamic_buffer_output_stream<output>)
+	{
+		if constexpr(std::same_as<std::remove_cvref_t<decltype(oallocator(out))>,std::allocator<typename output::char_type>>)
+		{
+			if(ocan_takeover(out))[[likely]]
+			{
+				details::temp_unique_allocator_ptr<typename output::char_type> temp_buffer(required_size+1);//leave one space for potential null terminator
+				otakeover(out,temp_buffer.data(),func(temp_buffer.data()),temp_buffer.data()+required_size+1);
+				temp_buffer.ptr=nullptr;
+				return;
+			}
+		}
+	}
+	reserve_write_extremely_cold_path(out,required_size,func);
 }
 
 template<input_stream input,typename Func>

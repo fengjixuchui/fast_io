@@ -34,6 +34,7 @@
 
 #include"fast_io_core_impl/memptr.h"
 #include"fast_io_core_impl/internal_temporary_buffer.h"
+#include"fast_io_core_impl/vector_buffer.h"
 #include"fast_io_core_impl/fast_io_error.h"
 #include"fast_io_core_impl/eof.h"
 #include"fast_io_core_impl/manip/impl.h"
@@ -50,8 +51,6 @@
 #include"fast_io_core_impl/istring_view.h"
 #include"fast_io_core_impl/ospan.h"
 // Provide template prototype for custom string types
-#include"fast_io_core_impl/ostring.h"
-#include"fast_io_core_impl/ostring_ref.h"
 #include"fast_io_core_impl/skip.h"
 
 //#include"fast_io_core_impl/istack.h"
@@ -61,7 +60,6 @@
 #include"fast_io_core_impl/read_write_ranges.h"
 
 #include"fast_io_core_impl/seek.h"
-#include"fast_io_core_impl/sync.h"
 #include"fast_io_core_impl/tie.h"
 #include"fast_io_core_impl/transmit.h"
 #include"fast_io_core_impl/random_access_transmit.h"
@@ -70,5 +68,5 @@
 #include"fast_io_core_impl/wrapper.h"
 #include"fast_io_core_impl/flush.h"
 #include"fast_io_core_impl/read_write_all.h"
-
+#include"fast_io_core_impl/crtp/crtp.h"
 // Transformers

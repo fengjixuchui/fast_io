@@ -1,7 +1,6 @@
 #pragma once
 
 #include"utf_util_table.h"
-
 #ifdef __SSE__
 #include <emmintrin.h>
 #include <immintrin.h>
@@ -125,14 +124,14 @@ inline void convert_ascii_with_sse(T*& pSrc, U*& pDst) noexcept
 template<std::input_iterator input>
 constexpr inline uint32_t advance_with_big_table(input& pSrc, input pSrcEnd, char32_t& cdpt) noexcept
 {
-	std::array<char8_t,2> const info{utf_util_table<>::first_unit_info[*pSrc]};
+	std::array<char8_t,2> const info{utf_util_table<>::first_unit_info[static_cast<char8_t>(*pSrc)]};
 	cdpt = info.front();                                //- From it, get the initial code point value
 	std::int32_t curr{info.back()};                                 //- From it, get the second state
 	for(++pSrc;12<curr;)
 	{
 		if (pSrc < pSrcEnd)[[likely]]
 		{
-			auto const unit{*pSrc};
+			char8_t const unit(*pSrc);
 			++pSrc;                                 //- Cache the current code unit
 			cdpt = (cdpt << 6) | (unit & 0x3F);             //- Adjust code point with continuation bits
 			curr = utf_util_table<>::transitions[curr + utf_util_table<>::octet_category[unit]];
@@ -144,21 +143,12 @@ constexpr inline uint32_t advance_with_big_table(input& pSrc, input pSrcEnd, cha
 	return curr;
 }
 
-}
-
-/*
-
-Todo in the future, detect EBCDIC compiler for code_cvt
-
-Assume little endian first until I create a good interface
-*/
-
-template<std::contiguous_iterator from_iter,std::contiguous_iterator to_iter>
+template<bool stream=false,std::contiguous_iterator from_iter,std::contiguous_iterator to_iter>
 requires (
 sizeof(std::iter_value_t<from_iter>)<=4&&sizeof(std::iter_value_t<to_iter>)<=4&&sizeof(std::iter_value_t<from_iter>)!=sizeof(std::iter_value_t<to_iter>)
 &&((sizeof(std::iter_value_t<from_iter>)==1&&std::integral<std::iter_value_t<from_iter>>)||std::unsigned_integral<std::iter_value_t<from_iter>>)
 &&((sizeof(std::iter_value_t<to_iter>)==1&&std::integral<std::iter_value_t<to_iter>>)||std::unsigned_integral<std::iter_value_t<to_iter>>))
-inline constexpr to_iter utf_code_convert(from_iter p_src_begin_iter,from_iter p_src_end_iter,to_iter p_dst_iter)
+inline constexpr to_iter utf_code_convert_details(from_iter& p_src_begin_iter,from_iter p_src_end_iter,to_iter p_dst_iter)
 {
 	auto p_src{std::to_address(p_src_begin_iter)};
 	auto p_src_end{std::to_address(p_src_end_iter)};
@@ -175,8 +165,10 @@ inline constexpr to_iter utf_code_convert(from_iter p_src_begin_iter,from_iter p
 #endif
 		while (p_src + sizeof(__m128i)< p_src_end)
 		{
-			if (*p_src < 0x80)
+			if (static_cast<char8_t>(*p_src) < 0x80)
+			{
 				details::utf::convert_ascii_with_sse(p_src, p_dst);
+			}
 			else
 			{
 				if (details::utf::advance_with_big_table(p_src, p_src_end, cdpt) != 12)[[likely]]
@@ -203,9 +195,10 @@ inline constexpr to_iter utf_code_convert(from_iter p_src_begin_iter,from_iter p
 #endif
 #endif
 		}
-		while (p_src < p_src_end)
+		constexpr std::size_t offset(stream?4:0);
+		while (p_src + offset < p_src_end)
 		{
-			if (*p_src < 0x80)
+			if (static_cast<char8_t>(*p_src) < 0x80)
 			{
 				*p_dst = *p_src;
 				++p_dst;
@@ -231,19 +224,11 @@ inline constexpr to_iter utf_code_convert(from_iter p_src_begin_iter,from_iter p
 #endif
 			}
 		}
-	}
-	else
-	{
-		if constexpr(sizeof(std::iter_value_t<from_iter>)==4)
+		if constexpr(stream)
 		{
-			for(;p_src!=p_src_end;++p_src)
-				p_dst+=utf_get_code_units(*p_src, p_dst);	
-		}
-		else
-		{
-			for(char32_t cdpt;p_src<p_src_end;)
+			while (p_src < p_src_end)
 			{
-				if (*p_src < 0x80)[[likely]]
+				if (static_cast<char8_t>(*p_src) < 0x80)
 				{
 					*p_dst = *p_src;
 					++p_dst;
@@ -251,19 +236,47 @@ inline constexpr to_iter utf_code_convert(from_iter p_src_begin_iter,from_iter p
 				}
 				else
 				{
-					if (details::utf::advance_with_big_table(p_src, p_src_end, cdpt) != 12)[[likely]]
-						p_dst+=utf_get_code_units(cdpt, p_dst);
+					auto newp_src{p_src};
+					if (details::utf::advance_with_big_table(newp_src, p_src_end, cdpt) != 12)[[likely]]
+					{
+						if constexpr(sizeof(std::iter_value_t<to_iter>)==4)
+						{
+							*p_dst=cdpt;
+							++p_dst;
+						}
+						else
+							p_dst+=utf_get_code_units(cdpt, p_dst);
+						p_src=newp_src;
+					}
 					else
-#ifdef __cpp_exceptions
-						throw fast_io_text_error("illegal utf8");
-#else
-						fast_terminate();
-#endif
+						break;
 				}
 			}
 		}
 	}
+	else
+	{
+		for(;p_src!=p_src_end;++p_src)
+			p_dst+=utf_get_code_units(*p_src, p_dst);
+	}
+	if constexpr(stream)
+		p_src_begin_iter=p_src-std::to_address(p_src_begin_iter)+p_src_begin_iter;
 	return p_dst-std::to_address(p_dst_iter) + p_dst_iter;
+}
+
+}
+
+/*
+
+Todo in the future, detect EBCDIC compiler for code_cvt
+
+Assume little endian first until I create a good interface
+*/
+
+template<std::contiguous_iterator from_iter,std::contiguous_iterator to_iter>
+inline constexpr to_iter utf_code_convert(from_iter p_src_begin_iter,from_iter p_src_end_iter,to_iter p_dst_iter)
+{
+	return details::utf::utf_code_convert_details<false>(p_src_begin_iter,p_src_end_iter,p_dst_iter);
 }
 
 template<std::ranges::contiguous_range rg>
@@ -271,16 +284,12 @@ requires (std::integral<std::ranges::range_value_t<rg>>&&std::convertible_to<rg,
 inline constexpr manip::code_cvt<std::basic_string_view<std::ranges::range_value_t<rg>>> code_cvt(rg&& f){return {{std::forward<rg>(f)}};}
 
 template<output_stream output,std::integral ch_type>
-requires (
-sizeof(typename output::char_type)<=4&&sizeof(ch_type)<=4&&sizeof(typename output::char_type)!=sizeof(ch_type)
-&&((sizeof(typename output::char_type)==1&&std::integral<typename output::char_type>)||std::unsigned_integral<typename output::char_type>)
-&&((sizeof(ch_type)==1&&std::integral<ch_type>)||std::unsigned_integral<ch_type>))
 inline constexpr void print_define(output& out,manip::code_cvt<std::basic_string_view<ch_type>> view)
 {
 	constexpr std::size_t coff{sizeof(typename output::char_type)<sizeof(ch_type)?2:0};
-	reserve_write(out,view.reference.size()<<coff,[&](std::contiguous_iterator auto ptr)
+	reserve_write(out,view.reference.size()<<coff,[&](auto ptr)
 	{
-		return utf_code_convert(view.reference.data(),view.reference.data()+view.reference.size(),ptr);
+		return details::utf::utf_code_convert_details<false>(view.reference.data(),view.reference.data()+view.reference.size(),ptr);
 	});
 }
 

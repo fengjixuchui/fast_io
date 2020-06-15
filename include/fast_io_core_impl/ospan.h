@@ -29,7 +29,7 @@ template<typename T>
 }
 
 template<typename T>
-[[nodiscard]] inline constexpr auto oreserve(basic_ospan<T>& ob,std::size_t size)
+[[nodiscard]] inline constexpr auto oreserve(basic_ospan<T>& ob,std::size_t) noexcept
 {
 	return ob.internal_pointer;
 }

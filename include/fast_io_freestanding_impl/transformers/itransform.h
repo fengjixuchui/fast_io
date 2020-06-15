@@ -79,7 +79,7 @@ inline constexpr auto write(itransform<input,func,ch_type,sz,rac>& ob,Iter cbegi
 }
 
 template<output_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>
-inline constexpr void flush(itransform<input,func,ch_type,sz,rac>& ob)
+inline constexpr void flush(itransform<input,func,ch_type,sz,rac>&)
 {
 //	flush(ob.handle.first);
 }
@@ -138,7 +138,7 @@ inline constexpr decltype(auto) obuffer_end(itransform<input,func,ch_type,sz,rac
 template<buffer_output_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac,typename U>
 inline constexpr void obuffer_set_curr(itransform<input,func,ch_type,sz,rac>& ib,U ptr)
 {
-	obuffer_set_curr(ib.handle.first,ib.position);
+	obuffer_set_curr(ib.handle.first,ptr);
 }
 
 template<buffer_output_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>

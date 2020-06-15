@@ -67,6 +67,12 @@ concept buffer_input_stream_impl = requires(T& in)
 };
 
 template<typename T>
+concept refill_buffer_input_stream_impl = requires(T& in)
+{
+	{irefill(in)}->std::convertible_to<bool>;
+};
+
+template<typename T>
 concept contiguous_input_stream_impl = requires(T& in)
 {
 	iremove_prefix(in,static_cast<std::size_t>(0));
@@ -104,9 +110,18 @@ concept flush_output_stream_impl = requires(T& out)
 };
 
 template<typename T>
-concept dynamic_buffer_output_stream_impl = requires(T& out,std::size_t size)
+concept fill_nc_output_stream_impl = requires(T& out,std::size_t n,typename T::char_type ch)
 {
+	fill_nc_define(out,n,ch);
+};
+
+template<typename T>
+concept dynamic_buffer_output_stream_impl = requires(T& out,std::size_t size,typename T::char_type* ptr)
+{
+	oallocator(out);
 	ogrow(out,size);
+	otakeover(out,ptr,ptr,ptr);
+	{ocan_takeover(out)}->std::convertible_to<bool>;
 };
 
 template<typename T>
@@ -197,11 +212,16 @@ template<typename T>
 concept buffer_input_stream = input_stream<T>&&details::buffer_input_stream_impl<T>;
 
 template<typename T>
+concept refill_buffer_input_stream = buffer_input_stream<T>&&details::refill_buffer_input_stream_impl<T>;
+
+template<typename T>
 concept contiguous_input_stream = input_stream<T>&&details::contiguous_input_stream_impl<T>;
 
 template<typename T>
 concept buffer_output_stream = output_stream<T>&&details::buffer_output_stream_impl<T>;
 
+template<typename T>
+concept fill_nc_output_stream = output_stream<T>&&details::fill_nc_output_stream_impl<T>;
 
 //Unfortunately, FILE* is a mess here. We have to support this to prevent the operating system not buffering anything
 template<typename T>
@@ -286,6 +306,12 @@ concept reserve_printable=requires(T&& t,char8_t* ptr)
 	{print_reserve_size(print_reserve_type<std::remove_cvref_t<T>>)}->std::convertible_to<std::size_t>;
 	{print_reserve_define(print_reserve_type<std::remove_cvref_t<T>>,ptr,t)}->std::same_as<char8_t*>;
 };
+
+template<typename T>
+concept reserve_print_testable=requires(T&& t)
+{
+	{print_reserve_test<static_cast<std::size_t>(0)>(print_reserve_type<std::remove_cvref_t<T>>,std::forward<T>(t))}->std::convertible_to<bool>;
+}&&reserve_printable<T>;
 
 template<typename output,typename T>
 concept printable=output_stream<output>&&requires(output& out,T&& t)

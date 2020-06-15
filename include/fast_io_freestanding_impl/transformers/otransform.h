@@ -239,7 +239,7 @@ inline constexpr decltype(auto) ibuffer_end(otransform<input,func,ch_type,sz,rac
 template<buffer_input_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac,typename U>
 inline constexpr void ibuffer_set_curr(otransform<input,func,ch_type,sz,rac>& ib,U ptr)
 {
-	ibuffer_set_curr(ib.handle.first,ib.position);
+	ibuffer_set_curr(ib.handle.first,ptr);
 }
 
 template<buffer_input_stream input,typename func,std::integral ch_type,std::size_t sz,bool rac>

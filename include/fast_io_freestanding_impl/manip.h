@@ -79,12 +79,13 @@ template<input_stream input>
 inline void scan_define(input& in,manip::whole<std::basic_string<typename input::char_type>> r)
 {
 	r.reference.clear();
-	fast_io::basic_ostring_ref<std::basic_string<typename input::char_type>> ostrf(r.reference);
-	transmit(ostrf,in);
+	fast_io::ostring_ref osf{r.reference};
+//	fast_io::basic_ostring_ref<std::basic_string<typename input::char_type>> ostrf(r.reference);
+	transmit(osf,in);
 }
 
 template<buffer_input_stream input>
-inline bool scan_define(input& in,manip::line<std::basic_string<typename input::char_type>> ref)
+inline bool scan_define(input& in,manip::line<std::basic_string<typename input::char_type>&> ref)
 {
 	auto& str{ref.reference};
 	if constexpr(buffer_input_stream<input>)

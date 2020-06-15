@@ -541,7 +541,9 @@ public:
 	using native_handle_type = basic_win32_io_handle<ch_type>::native_handle_type;
 	using basic_win32_io_handle<ch_type>::native_handle;
 	explicit constexpr basic_win32_file()=default;
-	explicit constexpr basic_win32_file(native_handle_type handle) noexcept:basic_win32_io_handle<ch_type>(handle){}
+	template<typename native_hd>
+	requires std::same_as<native_handle_type,std::remove_cvref_t<native_hd>>
+	explicit constexpr basic_win32_file(native_hd handle) noexcept:basic_win32_io_handle<ch_type>(handle){}
 	template<typename ...Args>
 	requires requires(Args&& ...args)
 	{
@@ -618,9 +620,6 @@ public:
 	}
 	basic_win32_file(std::string_view file,std::string_view mode,perms pm=static_cast<perms>(420)):
 		basic_win32_file(file,fast_io::from_c_mode(mode),pm){}
-	basic_win32_file(io_async_t) requires(std::same_as<char_type,char>):basic_win32_io_handle<char_type>(details::create_io_completion_port(bit_cast<void*>(static_cast<std::uintptr_t>(-1)),nullptr,0,0))
-	{
-	}
 	template<typename... Args>
 	basic_win32_file(io_async_t,basic_win32_io_observer<char> iob,Args&& ...args):basic_win32_file(std::forward<Args>(args)...)
 	{

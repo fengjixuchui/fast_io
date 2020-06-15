@@ -68,7 +68,7 @@ inline constexpr std::uintmax_t bufferred_transmit_impl(output& outp,input& inp,
 				}
 			}
 		}
-		while(iflush(inp));
+		while(underflow(inp));
 		return transmitted_bytes;
 	}
 	else

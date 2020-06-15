@@ -3,86 +3,88 @@
 namespace fast_io
 {
 
-enum class operating_system
+namespace transforms
 {
-	win32,
-	posix,
+
+enum class eol
+{
+lf,
+crlf,
 #if defined(__WINNT__) || defined(_MSC_VER)
-	native=win32,
+native=crlf,
 #else
-	native=posix
+native=lf
 #endif
 };
 
-template<bool sys=false>
-class binary_to_text
+template<eol el=eol::native>
+struct text_to_binary
 {
-public:
-template<buffer_output_stream output,std::contiguous_iterator Iter>
-inline constexpr Iter write_proxy(output& out,Iter begin,Iter end)
-{
-	if constexpr(!sys||operating_system::native==operating_system::win32)
-		for(auto iter(begin);iter!=end;++iter)
-			if(*iter==u8'\n')
-			{
-				write(out,begin,iter);
-				put(out,u8'\r');
-				begin=iter;
-			}
-	write(out,begin,end);
-	return end;
-}
-};
-
-template<bool sys=false>
-class text_to_binary
-{
-public:
-template<character_input_stream input,std::contiguous_iterator Iter>
-inline constexpr Iter read_proxy(input& inp,Iter ib,Iter ie)
-{
-	if constexpr(!sys||operating_system::native==operating_system::win32)
+	template<output_stream opstm,std::contiguous_iterator Iter>
+	requires std::same_as<typename opstm::char_type,std::iter_value_t<Iter>>
+	constexpr auto operator()(opstm& obuf,Iter begin,Iter end)
 	{
-		auto ig{igenerator(inp)};
-		auto b{begin(ig)};
-		auto e{end(ig)};
-		for(;b!=e&&ib!=ie;++b)
+		if constexpr(el==eol::crlf)
 		{
-			if(*b==u8'\r')[[unlikely]]
+			reserve_write(obuf,(end-begin),[&](auto ptr)
 			{
-				if(++b==e)[[unlikely]]
+				for(;begin!=end;++begin)
 				{
-					*ib=u8'\r';
-					return ++ib;
+					if(*begin==u8'\r')
+					{
+						if(begin+1==end)[[unlikely]]
+							break;
+						else if(begin[1]==u8'\n')[[likely]]
+							++begin;
+					}
+					*ptr=*begin;
+					++ptr;
 				}
-				else if(*b==u8'\n')
-					*ib=u8'\n';
-				else
-				{
-					*ib=u8'\r';
-					if(++ib==ie)[[unlikely]]
-						return ie;
-					*ib=*b;
-				}
-			}
-			else
-				*ib=*b;
-			++ib;
+				return ptr;
+			});
+			return begin;
 		}
-		return ib;
+		else
+			write(obuf,begin,end);
 	}
-	else
-		return read(inp,ib,ie);
-}
 };
 
-template<buffer_output_stream T,std::integral ch_type=typename T::char_type,std::size_t sz=4096>
-using obinary_to_text=otransform_function_default_construct<T,binary_to_text<false>,ch_type,sz>;
-template<buffer_output_stream T,std::integral ch_type=typename T::char_type,std::size_t sz=4096>
-using obinary_to_native_text=otransform_function_default_construct<T,binary_to_text<true>,ch_type,sz>;
+template<eol el=eol::native>
+struct binary_to_text
+{
+	template<output_stream opstm,std::contiguous_iterator Iter>
+	requires std::same_as<typename opstm::char_type,std::iter_value_t<Iter>>
+	constexpr void operator()(opstm& obuf,Iter begin,Iter end)
+	{
+		if constexpr(el==eol::crlf)
+		{
+			reserve_write(obuf,(end-begin)<<1,[&](auto ptr)
+			{
+				for(;begin!=end;++begin)
+				{
+					if(*begin==u8'\n')[[unlikely]]
+					{
+						if constexpr(sizeof(std::iter_value_t<Iter>)==1)
+							memcpy(ptr,u8"\r\n",2);
+						else
+						{
+							*ptr=u8'\r';
+							ptr[1]=u8'\n';
+						}
+						ptr+=2;
+						continue;
+					}
+					*ptr=*begin;
+					++ptr;
+				}
+				return ptr;
+			});
+		}
+		else
+			write(obuf,begin,end);
+	}
+};
 
-template<buffer_input_stream T,std::integral ch_type=typename T::char_type,std::size_t sz=4096>
-using itext_to_binary=itransform_function_default_construct<T,text_to_binary<false>,ch_type,sz>;
-template<buffer_input_stream T,std::integral ch_type=typename T::char_type,std::size_t sz=4096>
-using inative_text_to_binary=itransform_function_default_construct<T,text_to_binary<true>,ch_type,sz>;
+}
+
 }

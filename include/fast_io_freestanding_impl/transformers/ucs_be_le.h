@@ -3,9 +3,8 @@
 namespace fast_io
 {
 
-class ucs_be_le
+struct ucs_be_le
 {
-public:
 	template<std::unsigned_integral ch_type>
 	requires (sizeof(ch_type)==2||sizeof(ch_type)==4)
 	inline static constexpr ch_type endian_reverse(ch_type ch)
@@ -29,49 +28,17 @@ public:
 		{
 			*it=endian_reverse(*it);
 		}
-	inline static constexpr auto write_proxy(output& out,Iter begin,Iter end)
+	inline constexpr void operator()(output& out,Iter begin,Iter end)
 	{
-		if constexpr (buffer_output_stream<output>)
+		reserve_write(out,end-begin,[&](auto ptr)
 		{
-			auto p(oreserve(end-begin));
-			if constexpr(std::is_pointer_v<std::remove_cvref_t<decltype(p)>>)
+			for(;begin!=end;++begin)
 			{
-				if(p)
-				{
-					for(Iter iter(begin);iter!=end;++iter)
-					{
-						*p=endian_reverse(*iter);
-						++p;
-					}
-					return end;
-				}
+				*ptr=endian_reverse(*begin);
+				++ptr;
 			}
-			else
-			{
-				for(Iter iter(begin);iter!=end;++iter)
-				{
-					*p=endian_reverse(*iter);
-					++p;
-				}
-				return end;
-			}
-		}
-		for(Iter iter(begin);iter!=end;++iter)
-			*iter=endian_reverse(*iter);
-		return write(out,begin,end);
-	}
-	template<input_stream input,std::contiguous_iterator Iter>
-	requires (sizeof(typename std::iterator_traits<Iter>::value_type)==sizeof(typename input::char_type))&&
-		requires(Iter it)
-		{
-			*it=endian_reverse(*it);
-		}
-	inline static constexpr auto read_proxy(input& inp,Iter begin,Iter end)
-	{
-		auto v(read(inp,begin,end));
-		for(Iter it(begin);it!=v;++it)
-			*it=endian_reverse(*it);
-		return v;
+			return ptr;
+		});
 	}
 };
 

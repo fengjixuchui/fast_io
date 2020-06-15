@@ -162,7 +162,7 @@ inline constexpr contiguous_input_stream_generator_iterator<T> begin(contiguous_
 	return {gen.ptr_s};
 }
 template<contiguous_input_stream T>
-inline constexpr std::default_sentinel_t end(contiguous_input_stream_generator<T>& gen)
+inline constexpr std::default_sentinel_t end(contiguous_input_stream_generator<T>&)
 {
 	return {};
 }
@@ -172,7 +172,7 @@ inline constexpr contiguous_input_stream_generator_iterator<T> cbegin(contiguous
 	return {gen.ptr_s};
 }
 template<contiguous_input_stream T>
-inline constexpr std::default_sentinel_t cend(contiguous_input_stream_generator<T> const& gen)
+inline constexpr std::default_sentinel_t cend(contiguous_input_stream_generator<T> const&)
 {
 	return {};
 }
@@ -182,7 +182,7 @@ inline constexpr contiguous_input_stream_generator_iterator<T> begin(contiguous_
 	return {gen.ptr_s};
 }
 template<contiguous_input_stream T>
-inline constexpr std::default_sentinel_t end(contiguous_input_stream_generator<T> const& gen)
+inline constexpr std::default_sentinel_t end(contiguous_input_stream_generator<T> const&)
 {
 	return {};
 }

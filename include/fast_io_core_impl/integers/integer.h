@@ -122,4 +122,5 @@ inline constexpr caiter print_reserve_define(print_reserve_type_t<manip::base_t<
 {
 	return details::process_integer_output<base,uppercase>(iter,ref.reference);
 }
+
 }

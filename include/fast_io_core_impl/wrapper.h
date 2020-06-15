@@ -10,7 +10,9 @@ public:
 	using char_type = typename T::char_type;
 	using native_handle_type = typename T::native_handle_type;
 	constexpr basic_file_wrapper()=default;
-	constexpr basic_file_wrapper(native_handle_type hd):T(hd){}
+	template<typename native_hd>
+	requires std::same_as<native_handle_type,std::remove_cvref_t<native_hd>>
+	constexpr basic_file_wrapper(native_hd hd):T(hd){}
 	template<typename ...Args>
 	constexpr basic_file_wrapper(native_interface_t,Args&& ...args):
 		T(native_interface,std::forward<Args>(args)...){}
@@ -48,6 +50,8 @@ public:
 	template<open_mode om>
 	constexpr basic_wrapper(open_interface_t<om>):T(open_interface<om|interface_mode>){}
 	constexpr basic_wrapper():T(open_interface<interface_mode>){}
+	template<typename native_hd>
+	requires std::same_as<native_handle_type,std::remove_cvref_t<native_hd>>
 	constexpr basic_wrapper(open_mode m):T(m|interface_mode){}
 	constexpr basic_wrapper(std::string_view mode):basic_wrapper(from_c_mode(mode)){}
 };

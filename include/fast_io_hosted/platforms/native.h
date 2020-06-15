@@ -47,6 +47,12 @@ using wnative_pipe = wwin32_pipe;
 using native_file_map = win32_file_map;
 template<std::integral ch_type>
 using basic_native_io_observer = basic_win32_io_observer<ch_type>;
+template<std::integral ch_type>
+using basic_native_io_handle = basic_win32_io_handle<ch_type>;
+template<std::integral ch_type>
+using basic_native_file = basic_win32_file<ch_type>;
+template<std::integral ch_type>
+using basic_native_pipe = basic_win32_pipe<ch_type>;
 
 
 #else
@@ -69,6 +75,12 @@ using wnative_pipe = wposix_pipe;
 using native_file_map = posix_file_map;
 template<std::integral ch_type>
 using basic_native_io_observer = basic_posix_io_observer<ch_type>;
+template<std::integral ch_type>
+using basic_native_io_handle = basic_posix_io_handle<ch_type>;
+template<std::integral ch_type>
+using basic_native_file = basic_posix_file<ch_type>;
+template<std::integral ch_type>
+using basic_native_pipe = basic_posix_pipe<ch_type>;
 
 #endif
 

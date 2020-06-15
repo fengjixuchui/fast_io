@@ -7,57 +7,6 @@ namespace fast_io
 
 namespace details
 {
-template<typename T,bool ln,typename U>
-inline constexpr T deal_with_one(U&& t)
-{
-	using value_type = typename T::value_type;
-	using no_cvref = std::remove_cvref_t<U>;
-
-	constexpr auto size{print_reserve_size(print_reserve_type<no_cvref>)+static_cast<std::size_t>(ln)};
-#ifdef __GLIBCXX__
-//hack libstdc++ internal implementation for sso
-//https://github.com/gcc-mirror/gcc/blob/master/libstdc++-v3/include/bits/basic_string.h
-	if constexpr(std::is_standard_layout_v<T>&&size<=15/sizeof(value_type))
-	{
-		T str;//RVO
-		using allocator_type = typename T::allocator_type;
-		using traits_type = typename T::traits_type;
-		struct libstdcpp_alloc_hider
-		{
-		[[no_unique_address]] allocator_type alloc;
-		typename T::pointer mptr;
-		};
-		auto p {print_reserve_define(print_reserve_type<no_cvref>,str.data(),std::forward<U>(t))};
-		if constexpr(ln)
-		{
-			*p=u8'\n';
-			++p;
-		}
-		traits_type::assign(*p, value_type());	//null terminator
-		*reinterpret_cast<typename T::size_type*>(reinterpret_cast<char*>(std::addressof(str))
-			+sizeof(libstdcpp_alloc_hider))=p-str.data();
-		return str;
-	}
-	else
-	{
-#endif
-		std::array<value_type,size> array;
-	//https://github.com/gcc-mirror/gcc/blob/41d6b10e96a1de98e90a7c0378437c3255814b16/libstdc%2B%2B-v3/include/ext/string_conversions.h	
-		if constexpr(ln)
-		{
-			auto p {print_reserve_define(print_reserve_type<no_cvref>,array.data(),std::forward<U>(t))};
-			*p=u8'\n';
-			return T(array.data(),++p);
-		}
-		else
-		{
-			return T(array.data(),
-			print_reserve_define(print_reserve_type<no_cvref>,array.data(),std::forward<U>(t)));
-		}
-#ifdef __GNUG__
-	}
-#endif
-}
 
 template <typename T>
 struct is_std_string
@@ -70,45 +19,118 @@ struct is_std_string<std::basic_string<T, Traits, Alloc>>
 {
 inline static constexpr bool value{true};
 };
+
+template<bool ln,typename T,typename U,typename... Args>
+inline constexpr bool test_one()
+{
+	using no_cvref = std::remove_cvref_t<U>;
+	if constexpr(!reserve_printable<no_cvref>)
+		return false;
+	else
+	{
+		constexpr auto size{print_reserve_size(print_reserve_type<no_cvref>)+static_cast<std::size_t>(ln)};
+		return string_hack::local_capacity<T>()<size;
+	}
+}
+
+template<typename T,bool ln,typename U>
+inline constexpr T deal_with_one(U&& t)
+{
+	using value_type = typename T::value_type;
+	using no_cvref = std::remove_cvref_t<U>;
+
+	constexpr auto size{print_reserve_size(print_reserve_type<no_cvref>)+static_cast<std::size_t>(ln)};
+	std::array<value_type,size> array;
+	if constexpr(ln)
+	{
+		auto p {print_reserve_define(print_reserve_type<no_cvref>,array.data(),std::forward<U>(t))};
+		*p=u8'\n';
+		return T(array.data(),++p);
+	}
+	else
+	{
+		return T(array.data(),
+		print_reserve_define(print_reserve_type<no_cvref>,array.data(),std::forward<U>(t)));
+	}
+}
+
+template<typename T,typename U,typename... Args>
+inline constexpr bool test_first_is_string_rvalue_reference()
+{
+	if constexpr(std::is_rvalue_reference_v<U>)
+	{
+		using no_cvref_t = std::remove_cvref_t<U>;
+		if constexpr(is_std_string<no_cvref_t>::value&&std::same_as<no_cvref_t,T>)
+			return true;
+	}
+	return false;
+}
+
+
+template<bool ln,typename T,typename U,typename... Args>
+inline constexpr decltype(auto) deal_with_first_is_string_rvalue_reference(U&& u,Args&& ...args)
+{
+	if constexpr(!ln&&sizeof...(Args)==0)
+		return std::forward<U>(u);
+	else
+	{
+		ostring_ref t{u};
+		if constexpr(ln)
+			println(t,std::forward<Args>(args)...);
+		else
+			print(t,std::forward<Args>(args)...);
+		return std::forward<U>(u);
+	}
+}
+
 }
 
 template<typename T=std::string,typename... Args>
 inline constexpr T concat(Args&& ...args)
 {
-	if constexpr(sizeof...(Args)==1&&(reserve_printable<Args>&...)&&details::is_std_string<T>::value)
+	if constexpr(sizeof...(Args)==0)
+		return {};
+	else if constexpr(sizeof...(Args)==1&&details::test_one<false,T,Args...>())
+	{
 		return details::deal_with_one<T,false>(std::forward<Args>(args)...);
+	}
 	else
 	{
-		T v;
-		basic_ostring_ref<T> t(v);
-		print(t,std::forward<Args>(args)...);
-		return std::move(v);
+		if constexpr(details::test_first_is_string_rvalue_reference<T,Args&&...>())
+			return details::deal_with_first_is_string_rvalue_reference<false,T>(std::forward<Args>(args)...);
+		else
+		{
+			T v;
+			ostring_ref ref{v};
+			print(ref,std::forward<Args>(args)...);
+			return v;
+		}
 	}
 }
 
 template<typename T=std::string,typename... Args>
 inline constexpr T concatln(Args&& ...args)
 {
-	if constexpr(sizeof...(Args)==1&&(reserve_printable<Args>&...)&&details::is_std_string<T>::value)
+	if constexpr(sizeof...(Args)==0)
+		return T(1,u8'\n');
+	else if constexpr(sizeof...(Args)==1&&details::test_one<true,T,Args...>())
+	{
 		return details::deal_with_one<T,true>(std::forward<Args>(args)...);
+	}
 	else
 	{
-		T v;
-		basic_ostring_ref<T> t(v);
-		println(t,std::forward<Args>(args)...);
-		return std::move(v);
+		if constexpr(details::test_first_is_string_rvalue_reference<T,Args&&...>())
+			return details::deal_with_first_is_string_rvalue_reference<true,T>(std::forward<Args>(args)...);
+		else
+		{
+			T v;
+			ostring_ref t{v};
+			println(t,std::forward<Args>(args)...);
+			return v;
+		}
 	}
 }
-/*
-template<typename T=std::string,typename... Args>
-inline constexpr T format(std::string_view format,Args&& ...args)
-{
-	T v;
-	basic_ostring_ref<T> t(v);
-	fprint(t,format,std::forward<Args>(args)...);
-	return std::move(v);
-}
-*/
+
 template<typename T,typename... Args>
 inline
 #if __cpp_lib_constexpr_string >= 201907L
@@ -116,9 +138,10 @@ constexpr
 #endif
 void in_place_to(T& t,Args&& ...args)
 {
-	basic_ostring<std::string> os;
-	print(os,std::forward<Args>(args)...);
-	basic_istring_view<std::string_view> is(os.str());
+	std::string str;
+	ostring_ref ref{str};
+	print(ref,std::forward<Args>(args)...);
+	basic_istring_view<std::string_view> is(str);
 	scan(is,t);		//Todo. no_decoration
 }
 
@@ -129,16 +152,18 @@ constexpr
 #endif
 void in_place_to(std::string& t,Args&& ...args)
 {
-	basic_ostring_ref<std::string> os(t);
-	os.clear();
-	print(os,std::forward<Args>(args)...);
+	t.clear();
+	ostring_ref ref{t};
+	print(ref,std::forward<Args>(args)...);
 }
 
 template<typename T,typename... Args>
 inline constexpr T to(Args&& ...args)
 {
 	if constexpr(details::is_std_string<T>::value)
-		return details::deal_with_one<T,false>(std::forward<Args>(args)...);
+	{
+		return fast_io::concat<T>(std::forward<Args>(args)...);
+	}
 	else if constexpr(std::same_as<T,std::runtime_error>||
 		std::same_as<T,std::logic_error>||std::same_as<T,std::domain_error>||
 		std::same_as<T,std::invalid_argument>||std::same_as<T,std::length_error>||
@@ -149,7 +174,7 @@ inline constexpr T to(Args&& ...args)
 	{
 		T t;
 		in_place_to(t,std::forward<Args>(args)...);
-		return std::move(t);
+		return t;
 	}
 }
 }

@@ -41,8 +41,6 @@ inline std::size_t output_unsigned(Iter str,U value)
 	constexpr std::size_t bytes4{4*sizeof(ch_type)};
 	if constexpr(sizeof(U)==16)
 	{
-		using ch_type = std::remove_cvref_t<decltype(*str)>;
-		constexpr std::size_t bytes4{4*sizeof(ch_type)};
 		constexpr auto zero39{fast_io::details::compile_pow10<U,38>()};
 		using namespace fast_io::details::jiaendu;
 		if(value>=zero39)
