@@ -75,4 +75,6 @@ inline constexpr caiter print_reserve_define(print_reserve_type_t<hmac<T>>,caite
 }
 
 using hmac_sha1=hmac<sha1>;
+using hmac_sha256=hmac<sha256>;
+using hmac_sha512=hmac<sha512>;
 }

@@ -1,8 +1,10 @@
 #pragma once
 
-#ifdef __x86_64__
-//requires -maes -msse2
+#ifdef __SSE4_1__
+//requires -maes -msse4.1 -msse2
 #include <immintrin.h>  // for intrinsics for sha1 function
+#endif
+
 
 namespace fast_io
 {
@@ -361,5 +363,3 @@ public:
 };
 
 }
-
-#endif
