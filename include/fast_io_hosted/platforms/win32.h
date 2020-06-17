@@ -817,7 +817,7 @@ inline win32_io_observer native_stderr()
 template<output_stream output,std::integral intg>
 inline constexpr void print_define(output& out,basic_win32_io_observer<intg> iob)
 {
-	print(out,fast_io::unsigned_view(iob.native_handle()));
+	print(out,iob.native_handle());
 }
 
 

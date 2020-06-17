@@ -317,7 +317,7 @@ static_assert(output_stream<bio_file>);
 template<output_stream output,std::integral ch_type>
 constexpr void print_define(output& out,basic_bio_io_observer<ch_type> bio)
 {
-	print(out,fast_io::unsigned_view(bio.native_handle()));
+	print(out,bio.native_handle());
 }
 
 template<output_stream output,std::integral ch_type>

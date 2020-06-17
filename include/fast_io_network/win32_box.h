@@ -15,57 +15,57 @@ private:
 	std::basic_string_view<char_type> view;
 public:
 	constexpr basic_win32_box(std::basic_string_view<char_type> view):view(view.data()){}
-	constexpr std::basic_string_view<char_type>& title()
+	constexpr std::basic_string_view<char_type> title() const noexcept
 	{
 		return view;
 	}
 };
 
-template<std::integral ch_type,std::contiguous_iterator Iter>
-requires (std::same_as<ch_type,typename std::iterator_traits<Iter>::value_type>)
-inline void write(basic_win32_box<ch_type>& box,Iter a,Iter b)
+namespace details
 {
-	fast_io::details::win32_library const user32_dll(L"user32.dll");
-	if constexpr(std::same_as<ch_type,char>)
+
+template<typename func,std::integral char_type,std::contiguous_iterator Iter>
+inline void win32_box_write_impl(func func_ptr,char_type const* title,Iter begin,Iter end)
+{
+	if(func_ptr==nullptr)
+#ifdef __cpp_exceptions
+		throw win32_error();
+#else
+		fast_terminate();
+#endif
+	std::basic_string<char_type> str(begin,end);
+	std::erase_if(str,[](auto ch)
 	{
-		auto MessageBoxA(bit_cast<int(*)(void*,char const*,char const*,std::uint32_t)>
-			(::GetProcAddress(user32_dll.get(),"MessageBoxA")));
-		if(MessageBoxA==nullptr)
+		return ch==0;
+	});
+	if(!func_ptr(nullptr,str.c_str(),title,0x00000040L/*MB_ICONINFORMATION*/))
 #ifdef __cpp_exceptions
-			throw win32_error();
+		throw win32_error();
 #else
-			fast_terminate();
+		fast_terminate();
 #endif
-		std::string str(a,b);
-		if(!MessageBoxA(nullptr,str.c_str(),box.title().data(),0x00000040L/*MB_ICONINFORMATION*/))
-#ifdef __cpp_exceptions
-			throw win32_error();
-#else
-			fast_terminate();
-#endif
-	}
-	else
-	{
-		auto MessageBoxW(bit_cast<int(*)(void*,wchar_t const*,wchar_t const*,std::uint32_t)>
-			(::GetProcAddress(user32_dll.get(),"MessageBoxW")));
-		if(MessageBoxW==nullptr)
-#ifdef __cpp_exceptions
-			throw win32_error();
-#else
-			fast_terminate();
-#endif
-		std::wstring str(a,b);
-		if(!MessageBoxW(nullptr,str.c_str(),box.title().data(),0x00000040L))
-#ifdef __cpp_exceptions
-			throw win32_error();
-#else
-			fast_terminate();
-#endif
-	}
 }
 
-template<std::integral ch_type>
-inline constexpr void flush(basic_win32_box<ch_type>&){}
+}
+
+template<std::integral ch_type,std::contiguous_iterator Iter>
+requires (std::same_as<ch_type,std::iter_value_t<Iter>>||std::same_as<ch_type,char>)
+inline void write(basic_win32_box<ch_type> box,Iter b,Iter e)
+{
+	if constexpr(std::same_as<ch_type,std::iter_value_t<Iter>>)
+	{
+		fast_io::details::win32_library const user32_dll(L"user32.dll");
+		if constexpr(std::same_as<ch_type,char>)
+			details::win32_box_write_impl(bit_cast<int(*)(void*,char const*,char const*,std::uint32_t)>
+				(::GetProcAddress(user32_dll.get(),"MessageBoxA")),box.title().data(),b,e);
+		else
+			details::win32_box_write_impl(bit_cast<int(*)(void*,wchar_t const*,wchar_t const*,std::uint32_t)>
+				(::GetProcAddress(user32_dll.get(),"MessageBoxW")),box.title().data(),b,e);
+	}
+	else
+		write(box,reinterpret_cast<ch_type const*>(std::to_address(b)),
+			reinterpret_cast<ch_type const*>(std::to_address(e)));
+}
 
 template<std::integral ch_type>
 using basic_native_box = basic_win32_box<ch_type>;

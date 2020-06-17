@@ -124,3 +124,5 @@ inline constexpr caiter print_reserve_define(print_reserve_type_t<manip::base_t<
 }
 
 }
+
+#include"pointer.h"

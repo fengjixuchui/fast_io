@@ -104,7 +104,9 @@ class fast_io_error
 :public std::exception
 #endif
 {
+#ifndef FAST_IO_ERROR_DISABLE_STD_EXCEPTION
 	details::temp_unique_arr_ptr<char> mutable uptr;
+#endif
 public:
 	virtual
 #if __cpp_constexpr >= 201907L

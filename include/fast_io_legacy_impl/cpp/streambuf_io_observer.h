@@ -145,7 +145,7 @@ inline decltype(auto) io_control(basic_filebuf_io_observer<ch_type> h,Args&& ...
 template<output_stream output,typename T>
 inline constexpr void print_define(output& out,basic_general_streambuf_io_observer<T> iob)
 {
-	print(out,fast_io::unsigned_view(iob.native_handle()));
+	print(out,iob.native_handle());
 }
 }
 
