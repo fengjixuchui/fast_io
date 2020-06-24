@@ -169,20 +169,20 @@ inline constexpr void print_define(output& os,manip::base_t<base,uppercase,T> e)
 		if(maximum_zero_start)
 			print(os,fast_io::base<base,uppercase>(storage.front()));
 		for(std::size_t i(1);i<maximum_zero_start;++i)
-			print(os,fast_io::char_view(0x3a),fast_io::base<base,uppercase>(storage[i]));
+			print(os,fast_io::chvw(0x3a),fast_io::base<base,uppercase>(storage[i]));
 		print(os,u8"::");
 		std::size_t const maximum_zero_end(maximum_zero_start+maximum_zero_size);
 		if(maximum_zero_end==storage.size())
 			return;
 		print(os,fast_io::base<base,uppercase>(storage[maximum_zero_end]));
 		for(std::size_t i(maximum_zero_end+1);i<storage.size();++i)
-			print(os,fast_io::char_view(0x3a),fast_io::base<base,uppercase>(storage[i]));
+			print(os,fast_io::chvw(0x3a),fast_io::base<base,uppercase>(storage[i]));
 	}
 	else
 	{
 		print(os, fast_io::hex(storage.front()));
 		for (auto i(storage.cbegin() + 1); i != storage.cend(); ++i)
-			print(os,fast_io::char_view(0x3a),fast_io::base<base,uppercase>(*i));
+			print(os,fast_io::chvw(0x3a),fast_io::base<base,uppercase>(*i));
 	}
 }
 

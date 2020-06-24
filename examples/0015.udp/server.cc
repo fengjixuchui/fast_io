@@ -11,16 +11,16 @@ try
 	try
 	{
 		fast_io::acceptor_buf accept(hd);
-		println(fast_io::out,u8"a client connect to this server");
+		println(fast_io::out(),u8"a client connect to this server");
 		print_flush(accept,u8"hello world\n");
 	}
 	catch(std::exception const & e)
 	{
-		println(fast_io::err,e);
+		perrln(e);
 	}
 }
 catch(std::exception const & e)
 {
-	println(fast_io::err,e);
+	perrln(e);
 	return 1;
 }

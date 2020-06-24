@@ -7,8 +7,6 @@ namespace fast_io
 {
 namespace details::sha512
 {
-namespace
-{
 inline constexpr std::uint64_t K512[] =
 {
 0x428a2f98d728ae22, 0x7137449123ef65cd,
@@ -85,73 +83,7 @@ inline constexpr uint64_t B2U64(std::byte val, uint8_t sh)
 
 inline constexpr void process(std::span<std::uint64_t,8> state,std::span<std::byte const,128> blocks)
 {
-	uint64_t a, b, c, d, e, f, g, h, s0, s1, T1, T2;
-	uint64_t X[16];
-	a = state[0];
-	b = state[1];
-	c = state[2];
-	d = state[3];
-	e = state[4];
-	f = state[5];
-	g = state[6];
-	h = state[7];
-	auto data=blocks.data();
-	std::uint32_t i{};
-	for (; i < 16; ++i)
-	{
-		X[i] = B2U64(data[0], 56) | B2U64(data[1], 48) | B2U64(data[2], 40) | B2U64(data[3], 32) |
-			B2U64(data[4], 24) | B2U64(data[5], 16) | B2U64(data[6], 8) | B2U64(data[7], 0);
-		data += 8;
 
-		T1 = h;
-		T1 += Sigma1(e);
-		T1 += Ch(e, f, g);
-		T1 += K512[i];
-		T1 += X[i];
-
-		T2 = Sigma0(a);
-		T2 += Maj(a, b, c);
-
-		h = g;
-		g = f;
-		f = e;
-		e = d + T1;
-		d = c;
-		c = b;
-		b = a;
-		a = T1 + T2;
-	}
-
-	for (i = 16; i < 80; ++i)
-	{
-		s0 = X[(i + 1) & 0x0f];
-		s0 = sigma0(s0);
-		s1 = X[(i + 14) & 0x0f];
-		s1 = sigma1(s1);
-
-		T1 = X[i & 0xf] += s0 + s1 + X[(i + 9) & 0xf];
-		T1 += h + Sigma1(e) + Ch(e, f, g) + K512[i];
-		T2 = Sigma0(a) + Maj(a, b, c);
-
-		h = g;
-		g = f;
-		f = e;
-		e = d + T1;
-		d = c;
-		c = b;
-		b = a;
-		a = T1 + T2;
-	}
-
-	state[0] += a;
-	state[1] += b;
-	state[2] += c;
-	state[3] += d;
-	state[4] += e;
-	state[5] += f;
-	state[6] += g;
-	state[7] += h;
-}
 }
 }
 class sha512_function
@@ -162,7 +94,145 @@ public:
 	static inline constexpr std::size_t block_size{128};
 	void operator()(std::span<std::uint64_t,8> state,std::span<std::byte const,128> blocks)
 	{
-		details::sha512::process(state,blocks);
+		using namespace details::sha512;
+		uint64_t a, b, c, d, e, f, g, h, s0, s1, T1, T2;
+		uint64_t X[16];
+		a = state[0];
+		b = state[1];
+		c = state[2];
+		d = state[3];
+		e = state[4];
+		f = state[5];
+		g = state[6];
+		h = state[7];
+		auto data=blocks.data();
+		std::uint32_t i{};
+		for (; i < 16; ++i)
+		{
+			X[i] = B2U64(data[0], 56) | B2U64(data[1], 48) | B2U64(data[2], 40) | B2U64(data[3], 32) |
+				B2U64(data[4], 24) | B2U64(data[5], 16) | B2U64(data[6], 8) | B2U64(data[7], 0);
+			data += 8;
+
+			T1 = h;
+			T1 += Sigma1(e);
+			T1 += Ch(e, f, g);
+			T1 += K512[i];
+			T1 += X[i];
+
+			T2 = Sigma0(a);
+			T2 += Maj(a, b, c);
+
+			h = g;
+			g = f;
+			f = e;
+			e = d + T1;
+			d = c;
+			c = b;
+			b = a;
+			a = T1 + T2;
+		}
+
+		for (i = 16; i < 80; ++i)
+		{
+			s0 = X[(i + 1) & 0x0f];
+			s0 = sigma0(s0);
+			s1 = X[(i + 14) & 0x0f];
+			s1 = sigma1(s1);
+
+			T1 = X[i & 0xf] += s0 + s1 + X[(i + 9) & 0xf];
+			T1 += h + Sigma1(e) + Ch(e, f, g) + K512[i];
+			T2 = Sigma0(a) + Maj(a, b, c);
+
+			h = g;
+			g = f;
+			f = e;
+			e = d + T1;
+			d = c;
+			c = b;
+			b = a;
+			a = T1 + T2;
+		}
+
+		state[0] += a;
+		state[1] += b;
+		state[2] += c;
+		state[3] += d;
+		state[4] += e;
+		state[5] += f;
+		state[6] += g;
+		state[7] += h;
+	}
+	void operator()(std::span<std::uint64_t,8> state,std::span<std::byte const> blocks)
+	{
+		using namespace details::sha512;
+		uint64_t a, b, c, d, e, f, g, h, s0, s1, T1, T2;
+		uint64_t X[16];
+		for(auto data(blocks.data()),ed(blocks.data()+blocks.size());data!=ed;)
+		{
+			a = state[0];
+			b = state[1];
+			c = state[2];
+			d = state[3];
+			e = state[4];
+			f = state[5];
+			g = state[6];
+			h = state[7];
+			std::uint32_t i{};
+			for (; i < 16; ++i)
+			{
+				X[i] = B2U64(data[0], 56) | B2U64(data[1], 48) | B2U64(data[2], 40) | B2U64(data[3], 32) |
+					B2U64(data[4], 24) | B2U64(data[5], 16) | B2U64(data[6], 8) | B2U64(data[7], 0);
+				data += 8;
+
+				T1 = h;
+				T1 += Sigma1(e);
+				T1 += Ch(e, f, g);
+				T1 += K512[i];
+				T1 += X[i];
+
+				T2 = Sigma0(a);
+				T2 += Maj(a, b, c);
+
+				h = g;
+				g = f;
+				f = e;
+				e = d + T1;
+				d = c;
+				c = b;
+				b = a;
+				a = T1 + T2;
+			}
+
+			for (i = 16; i < 80; ++i)
+			{
+				s0 = X[(i + 1) & 0x0f];
+				s0 = sigma0(s0);
+				s1 = X[(i + 14) & 0x0f];
+				s1 = sigma1(s1);
+
+				T1 = X[i & 0xf] += s0 + s1 + X[(i + 9) & 0xf];
+				T1 += h + Sigma1(e) + Ch(e, f, g) + K512[i];
+				T2 = Sigma0(a) + Maj(a, b, c);
+
+				h = g;
+				g = f;
+				f = e;
+				e = d + T1;
+				d = c;
+				c = b;
+				b = a;
+				a = T1 + T2;
+			}
+
+			state[0] += a;
+			state[1] += b;
+			state[2] += c;
+			state[3] += d;
+			state[4] += e;
+			state[5] += f;
+			state[6] += g;
+			state[7] += h;
+		}
 	}
 };
 

@@ -17,7 +17,7 @@ public:
 #endif
 	void report(error_reporter& report) const override
 	{
-		print(report,strerror(ecd));
+		print(report,std::string_view(strerror(ecd)));
 	}
 };
 

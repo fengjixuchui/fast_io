@@ -7,5 +7,5 @@ try
 }
 catch(std::exception const& e)
 {
-	println(fast_io::err,e);
+	perrln(e);
 }

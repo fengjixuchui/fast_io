@@ -84,6 +84,8 @@ A general purpose I/O library to replace stdio.h and iostream
 - Round-trip floating point algorithm
 - Network
 - Intrinsic SHA-1, Intrinsic HMAC-SHA1, Intrinsic SHA-256, Intrinsic HMAC-SHA256, SHA-512, HMAC-SHA512
+- zlib compression/decompression support
+- Non crypto hash algorithms support. Jenkins Hash
 
 ## Post C++20 Plan
   1. Module support
@@ -91,7 +93,6 @@ A general purpose I/O library to replace stdio.h and iostream
   3. Improve and refactor code once [Zero-overhead deterministic exceptions](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0709r0.pdf) are added to the standard
 
 ## Possible Improvements
-  1. Compression/Decompression
   2. Interfaces for cloud computing algorithms like MapReduce
 
 I'm aiming for this to be in the C++ standard library in the future :)
@@ -145,6 +146,13 @@ Notice: I modified libstdc++'s BUFSIZ 1048576 due to BUFSIZE is too small (512 b
 | fast_io::iobuf_utf8_file_char32|      0.110999s       |   0.111011s             | UTF-32=>UTF-8 with SSE|
 | std::wofstream             |      2.64s       |   3.843735s             | wofstream with std::locale codecvt. Extremely slow tbh.|
 | fast_io::wfilebuf_io_observer  |      2.415692s       |   2.497704s         | wofstream with std::locale codecvt. This proves fstream can never get fixed.|
+| Rust language  |      0.483s       |             |  RUST IS SLOW. Also Rust does not deal with locale. Think how bad it is.  |
+| Rust itoa library 0.4.6 | > 0.165s | | I ignore the \n part for it to ensure no bias. |
+
+
+RUST I/O IS FUCKING STUPID. ONLY LOSERS USE SUCH A SLOW AND GARBAGE LANGUAGE. 10x slower than fast\_io. + binary bloat
+Rust itoa library is still extremely slow and usable for me. It is still 3x slower than fast\_io.
+
 
 Run the same test on MSVC 19.26.28805.
 

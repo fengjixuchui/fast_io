@@ -14,39 +14,39 @@ namespace details
 {
 
 template<typename T>
-concept stream_char_type_requirement = requires(T&)
+concept stream_char_type_requirement = requires(T&&)
 {
-	typename T::char_type;
+	typename std::remove_cvref_t<T>::char_type;
 };
 
 template<typename T>
-concept input_stream_impl = stream_char_type_requirement<T>&&requires(T& in,typename T::char_type* b)
+concept input_stream_impl = stream_char_type_requirement<T>&&requires(T&& in,typename std::remove_cvref_t<T>::char_type* b)
 {
 	read(in,b,b);
 };
 
 template<typename T>
-concept output_stream_impl = stream_char_type_requirement<T>&&requires(T& out,typename T::char_type const* b)
+concept output_stream_impl = stream_char_type_requirement<T>&&requires(T&& out,typename std::remove_cvref_t<T>::char_type const* b)
 {
 	{write(out,b,b)};
 };
 
 template<typename T>
-concept mutex_stream_impl = requires(T& t)
+concept mutex_stream_impl = requires(T&& t)
 {
-	typename T::lock_guard_type;
+	typename std::remove_cvref_t<T>::lock_guard_type;
 	mutex(t);
 	unlocked_handle(t);
 };
 
 template<typename T>
-concept character_input_stream_impl = requires(T& in)
+concept character_input_stream_impl = requires(T&& in)
 {
 	igenerator(in);
 };
 
 template<typename T>
-concept character_output_stream_impl = requires(T& out,typename T::char_type ch)
+concept character_output_stream_impl = requires(T&& out,typename std::remove_cvref_t<T>::char_type ch)
 {
 	put(out,ch);
 };
@@ -58,16 +58,16 @@ concept random_access_stream_impl = requires(T& t)
 };
 
 template<typename T>
-concept buffer_input_stream_impl = requires(T& in)
+concept buffer_input_stream_impl = requires(T&& in)
 {
-	{ibuffer_begin(in)}->std::convertible_to<typename T::char_type*>;
+	{ibuffer_begin(in)}->std::convertible_to<typename std::remove_cvref_t<T>::char_type*>;
 	ibuffer_set_curr(in,ibuffer_curr(in));
-	{ibuffer_end(in)}->std::convertible_to<typename T::char_type*>;
+	{ibuffer_end(in)}->std::convertible_to<typename std::remove_cvref_t<T>::char_type*>;
 	{underflow(in)}->std::convertible_to<bool>;
 };
 
 template<typename T>
-concept refill_buffer_input_stream_impl = requires(T& in)
+concept refill_buffer_input_stream_impl = requires(T&& in)
 {
 	{irefill(in)}->std::convertible_to<bool>;
 };
@@ -91,10 +91,10 @@ concept reserve_output_stream_impl = requires(T& out,std::size_t n)
 };
 
 template<typename T>
-concept buffer_output_stream_impl = requires(T& out,typename T::char_type ch)
+concept buffer_output_stream_impl = requires(T&& out,typename std::remove_cvref_t<T>::char_type ch)
 {
-	{obuffer_begin(out)}->std::convertible_to<typename T::char_type*>;
-	{obuffer_end(out)}->std::convertible_to<typename T::char_type*>;
+	{obuffer_begin(out)}->std::convertible_to<typename std::remove_cvref_t<T>::char_type*>;
+	{obuffer_end(out)}->std::convertible_to<typename std::remove_cvref_t<T>::char_type*>;
 	obuffer_set_curr(out,obuffer_curr(out));
 	overflow(out,ch);
 };
@@ -110,13 +110,13 @@ concept flush_output_stream_impl = requires(T& out)
 };
 
 template<typename T>
-concept fill_nc_output_stream_impl = requires(T& out,std::size_t n,typename T::char_type ch)
+concept fill_nc_output_stream_impl = requires(T&& out,std::size_t n,typename std::remove_cvref_t<T>::char_type ch)
 {
 	fill_nc_define(out,n,ch);
 };
 
 template<typename T>
-concept dynamic_buffer_output_stream_impl = requires(T& out,std::size_t size,typename T::char_type* ptr)
+concept dynamic_buffer_output_stream_impl = requires(T&& out,std::size_t size,typename std::remove_cvref_t<T>::char_type* ptr)
 {
 	oallocator(out);
 	ogrow(out,size);
@@ -155,9 +155,9 @@ concept memory_map_output_stream_impl = requires(T& out)
 };
 
 template<typename T>
-concept status_stream_impl = requires(T stm)
+concept status_stream_impl = requires(T&& stm)
 {
-	typename T::status_type;
+	typename std::remove_cvref_t<T>::char_type::status_type;
 };
 
 }
@@ -305,6 +305,13 @@ concept reserve_printable=requires(T&& t,char8_t* ptr)
 {
 	{print_reserve_size(print_reserve_type<std::remove_cvref_t<T>>)}->std::convertible_to<std::size_t>;
 	{print_reserve_define(print_reserve_type<std::remove_cvref_t<T>>,ptr,t)}->std::same_as<char8_t*>;
+};
+
+
+template<typename T>
+concept reverse_reserve_printable=reserve_printable<T>&&requires(T&& t,char8_t* ptr)
+{
+	{print_reverse_reserve_define(print_reserve_type<std::remove_cvref_t<T>>,ptr,t)}->std::same_as<char8_t*>;
 };
 
 template<typename T>

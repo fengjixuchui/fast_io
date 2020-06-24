@@ -225,6 +225,6 @@ int main(int argc,char** argv)
     }
     else
     {
-        println(fast_io::err,"Not supported copy method: " , args[1]);
+        perrln("Not supported copy method: " , args[1]);
     } 	
 }

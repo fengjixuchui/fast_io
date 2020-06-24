@@ -12,19 +12,20 @@
 #include"fast_io_freestanding_impl/concat.h"
 #include"fast_io_freestanding_impl/manip.h"
 #include"fast_io_freestanding_impl/exception.h"
+#include"fast_io_freestanding_impl/reserve_read_write.h"
+#include"fast_io_freestanding_impl/code_cvt/utf.h"
+#include"fast_io_freestanding_impl/posix_error.h"
 //compile floating point is slow since it requires algorithms like ryu
 #include"fast_io_freestanding_impl/floating_point/floating.h"
-#include"fast_io_freestanding_impl/posix_error.h"
 #include"fast_io_freestanding_impl/iobuf.h"
 #include"fast_io_freestanding_impl/io_io_file.h"
 #include"fast_io_freestanding_impl/send_receive.h"
 #include"fast_io_freestanding_impl/natural.h"
-#include"fast_io_freestanding_impl/reserve_read_write.h"
-#include"fast_io_freestanding_impl/code_cvt/utf.h"
 
 #include"fast_io_freestanding_impl/transformers/transformers.h"
 #include"fast_io_freestanding_impl/indirect_ibuffer.h"
 #include"fast_io_freestanding_impl/indirect_obuffer.h"
+#include"fast_io_freestanding_impl/ovector.h"
 //#include"fast_io_freestanding_impl/ucs.h"
 #if __cpp_coroutines >= 201902
 #include<coroutine>		//coroutine is freestanding
@@ -33,19 +34,18 @@
 
 namespace fast_io
 {
-/*
-using ostring = basic_ostring<std::string>;
-using u8ostring = basic_ostring<std::u8string>;
 
-using ostring_ref = basic_ostring_ref<std::string>;
-using u8ostring_ref = basic_ostring_ref<std::u8string>;
-*/
 template<std::integral char_type>
 using basic_iobuf_io_io_observer = basic_iobuf<basic_io_io_observer<char_type>>;
 template<std::integral char_type>
 using basic_iobuf_io_io_handle = basic_iobuf<basic_io_io_handle<char_type>>;
 template<std::integral char_type>
 using basic_iobuf_io_file = basic_iobuf<basic_io_file<char_type>>;
+
+template<std::integral char_type>
+using basic_io_files = basic_ovector<basic_io_file<char_type>>;
+
+using io_files = basic_io_files<char>;
 
 using iobuf_io_io_observer = basic_iobuf_io_io_observer<char>;
 using iobuf_io_io_handle = basic_iobuf_io_io_handle<char>;

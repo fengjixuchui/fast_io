@@ -36,5 +36,5 @@ int main()
 	}
 	else
 		++buffer_iter;
-	write(fast_io::out,buffer_iter,buffer.data()+buffer.size());
+	write(fast_io::out(),buffer_iter,buffer.data()+buffer.size());
 }

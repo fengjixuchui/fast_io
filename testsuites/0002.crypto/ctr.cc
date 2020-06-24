@@ -16,7 +16,7 @@ int main()
         fast_io::crypto::ictr_little_endian<fast_io::ibuf_file, fast_io::crypto::speck::speck_enc_128_128> 
             ib(std::piecewise_construct,std::forward_as_tuple("text.txt"),
             std::forward_as_tuple(std::as_bytes(std::span(key)), std::as_bytes(std::span(nonce))));
-        transmit(fast_io::out,ib);
+        transmit(fast_io::out(),ib);
     }
 /*    {
         fast_io::crypto::octr_big_endian<fast_io::obuf_file, fast_io::crypto::speck::speck_enc_128_128> 
@@ -28,6 +28,6 @@ int main()
         fast_io::crypto::ictr_big_endian<fast_io::ibuf_file, fast_io::crypto::speck::speck_enc_128_128> 
             ib(std::piecewise_construct,std::forward_as_tuple("text.txt"),
             std::forward_as_tuple(std::as_bytes(std::span(key)), std::as_bytes(std::span(nonce))));
-        transmit(fast_io::out,ib);
+        transmit(fast_io::out(),ib);
     }*/
 }

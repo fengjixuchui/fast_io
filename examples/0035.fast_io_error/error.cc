@@ -9,6 +9,6 @@ try
 }
 catch(fast_io::fast_io_error const& e)
 {
-	println(fast_io::err,e);
+	perrln(e);
 	return 1;
 }

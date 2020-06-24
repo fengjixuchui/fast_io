@@ -1,4 +1,3 @@
-#include"../../include/fast_io_legacy.h"
 #include"../../include/fast_io.h"
 #include<cstdio>
 

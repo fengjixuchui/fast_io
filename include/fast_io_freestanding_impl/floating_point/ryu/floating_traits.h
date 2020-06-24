@@ -26,6 +26,7 @@ struct floating_traits<float>
 	static inline constexpr mantissa_type carry10=0x989680;
 	static inline constexpr int32_t minimum_exp=-45;
 	static inline constexpr int32_t maximum_exp=39;
+	static inline constexpr std::size_t required_buffer_size{105};
 };
 
 template<>	
@@ -45,6 +46,7 @@ struct floating_traits<double>
 	static inline constexpr mantissa_type carry10=0x2386F26FC10000;
 	static inline constexpr int32_t minimum_exp=-323;
 	static inline constexpr int32_t maximum_exp=309;
+	static inline constexpr std::size_t required_buffer_size{769};
 };
 #ifdef __SIZEOF_INT128__
 template<>

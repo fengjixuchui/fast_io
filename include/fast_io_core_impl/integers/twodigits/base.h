@@ -13,7 +13,7 @@ inline constexpr auto output_base_number_impl(Iter iter,U a)
 //number: 0:48 9:57
 //upper: 65 :A 70: F
 //lower: 97 :a 102 :f
-	constexpr auto &table(details::shared_static_base_table<base,uppercase>::table);
+	constexpr auto &table(details::shared_static_base_table<std::iter_value_t<Iter>,base,uppercase>::table);
 	constexpr std::uint32_t pw(static_cast<std::uint32_t>(table.size()));
 	constexpr std::size_t chars(table.front().size());
 	for(;pw<=a;)
@@ -151,12 +151,24 @@ inline constexpr bool is_space(T const u)
 
 namespace twodigits
 {
-template<char8_t base=10,bool uppercase=false,std::random_access_iterator Iter,my_unsigned_integral U>
-inline constexpr std::size_t output_unsigned(Iter str,U value)
+//THIS IS OBJECTIVELY STUPID. FMT AUTHOR IS A LOSER
+template<std::contiguous_iterator Iter,my_unsigned_integral U>
+constexpr inline auto output_unsigned_reverse(Iter i,U value)
 {
-	std::size_t const len{chars_len<base>(value)};
-	output_base_number_impl<base,uppercase>(str+=len,value);
-	return len;
+	constexpr auto tb_ptr(details::shared_static_base_table<std::iter_value_t<Iter>,10,false>::table.data());
+	constexpr std::uint32_t val_size(2*sizeof(std::iter_value_t<Iter>));
+	for(;100<=value;)
+	{
+		memcpy(std::to_address(i-=2),tb_ptr+static_cast<std::uint32_t>(value%100),val_size);
+		value/=100;
+	}
+	if(value<10)
+	{
+		*--i=static_cast<std::make_unsigned_t<std::iter_value_t<Iter>>>(value+u8'0');
+		return i;
+	}
+	memcpy(std::to_address(i-=2),tb_ptr+static_cast<std::uint32_t>(value),val_size);
+	return i;
 }
 
 }

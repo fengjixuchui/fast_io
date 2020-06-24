@@ -2,6 +2,7 @@
 #include<openssl/bio.h>
 #include<openssl/ssl.h>
 #include<openssl/err.h>
+#include <openssl/sha.h>
 #include<typeinfo>
 
 #include"../fast_io_hosted.h"
@@ -13,3 +14,4 @@
 #include"openssl_driver/openssl_context.h"
 #include"openssl_driver/context.h"
 #include"openssl_driver/ssl.h"
+#include"openssl_driver/sha.h"

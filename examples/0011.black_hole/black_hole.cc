@@ -3,5 +3,5 @@
 int main()
 {
 	fast_io::black_hole<char> black_hole;
-	transmit(black_hole,fast_io::in);
+	transmit(black_hole,fast_io::in());
 }

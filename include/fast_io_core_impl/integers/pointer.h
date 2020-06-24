@@ -4,13 +4,15 @@ namespace fast_io
 {
 
 template<output_stream output,std::integral array_value_type,std::size_t n>
-requires (std::same_as<typename output::char_type,std::remove_cvref_t<array_value_type>>&&n!=0)	//array cannot be zero size. but we do the check too
+requires (std::same_as<typename output::char_type,std::remove_cvref_t<array_value_type>>||
+(std::same_as<typename output::char_type,char>&&std::same_as<std::remove_cvref_t<array_value_type>,char8_t>)
+&&n!=0)	//array cannot be zero size. but we do the check too
 constexpr void print_define(output& out,array_value_type (&s)[n])
 {
 	if constexpr(1<n)
 	{
 		if constexpr(n==2&&character_output_stream<output>)
-			put(out,*s);
+			put(out,static_cast<typename output::char_type>(*s));
 		else
 			write(out,s,s+(n-1));
 	}

@@ -9,16 +9,16 @@ try
 	if(is_child(process))
 	{
 		pipe.in().close();
-		fast_io::out=pipe.out();
+		fast_io::out()=pipe.out();
 		pipe.out().close();
 		fast_io::posix_exec("/usr/local/bin/g++",{"--version"});
 	}
 	pipe.out().close();
-	transmit(fast_io::out,pipe);
+	transmit(fast_io::out(),pipe);
 	println("Process ID:",process.id());
 }
 catch(std::exception const& e)
 {
-	println(fast_io::err,e);
+	perrln(e);
 	return 1;
 }

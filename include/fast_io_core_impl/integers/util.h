@@ -26,9 +26,33 @@ inline constexpr auto compile_pow5()
 	return value;
 }
 
-template<std::uint32_t base,bool ryu_mode=false,my_unsigned_integral U>
-inline constexpr std::size_t chars_len(U value) noexcept
+template<std::unsigned_integral uint_type>
+inline constexpr auto power10_table_generator()
 {
+	constexpr std::size_t digits10(std::numeric_limits<uint_type>::digits10+1);
+	std::array<uint_type,digits10> array{};
+	uint_type v{1};
+	for(std::size_t i{1};i!=digits10;++i)
+		array[i]=(v*=static_cast<uint_type>(10));
+	return array;
+}
+
+template<std::unsigned_integral uint_type>
+inline constexpr auto power10table{power10_table_generator<uint_type>()};
+
+template<std::uint32_t base,bool ryu_mode=false,my_unsigned_integral U>
+inline constexpr std::uint32_t chars_len(U value) noexcept
+{
+/*
+#ifdef FAST_IO_FMT_BENCHMARK
+	if constexpr(base==10&&sizeof(U)<=8)
+	{
+		std::uint32_t t{static_cast<std::uint32_t>(std::bit_width(static_cast<std::remove_cvref_t<U>>(value|1)))*1233 >> 12};
+		return t-(value<power10table<std::remove_cvref_t<U>>[t]) + 1;
+	}
+	else
+#endif
+*/
 	if constexpr(base==10&&sizeof(U)<=16)
 	{
 		if constexpr(15<sizeof(U))

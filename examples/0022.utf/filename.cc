@@ -12,5 +12,5 @@ int main()
 
 	auto wstr{fast_io::concat<std::u16string>(fast_io::code_cvt(u8"std_to_chars_obuf_file.txt"sv))};
 	for(auto const & e : wstr)
-		println(fast_io::c_stdout,e);
+		println(e);
 }

@@ -96,7 +96,7 @@ inline constexpr void print_define(output& outp,manip::random_access_transmissio
 
 template<output_stream output,std::integral offset_type,input_stream input>
 requires fast_io::random_access_stream<input>
-inline constexpr std::uintmax_t random_access_transmit(output& outp,offset_type offset,input& in)
+inline constexpr std::uintmax_t random_access_transmit(output&& outp,offset_type offset,input&& in)
 {
 	std::uintmax_t transmitted{};
 	print(outp,manip::random_access_transmission<input,offset_type,std::uintmax_t>(transmitted,offset,in));
@@ -105,7 +105,7 @@ inline constexpr std::uintmax_t random_access_transmit(output& outp,offset_type 
 
 template<output_stream output,std::integral offset_type,input_stream input,std::integral sz_type>
 requires fast_io::random_access_stream<input>
-inline constexpr sz_type random_access_transmit(output& outp,offset_type offset,input& in,sz_type bytes)
+inline constexpr sz_type random_access_transmit(output&& outp,offset_type offset,input&& in,sz_type bytes)
 {
 	sz_type transmitted{};
 	print(outp,manip::random_access_transmission_with_size<input,offset_type,std::uintmax_t>(transmitted,offset,in,bytes));

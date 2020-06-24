@@ -1,7 +1,6 @@
 #include"../../include/fast_io.h"
 #include"../../include/fast_io_device.h"
 #include"../../include/fast_io_network.h"
-#include"../../include/fast_io_legacy.h"
 
 int main()
 try
@@ -14,11 +13,11 @@ try
 		"Connection:close\r\n\r\n");
 	fast_io::http_status status;
 	scan(hd,status);
-	println(fast_io::c_stdout,u8"http version:",status.version,u8"\tcode is ",status.code);
+	println(u8"http version:",status.version,u8"\tcode is ",status.code);
 	std::size_t content_length{};
 	for(auto line:scan_http_header(hd))
 	{
-		println(fast_io::c_stdout,u8"key:",line.key,u8"\tvalue:",line.value);
+		println(u8"key:",line.key,u8"\tvalue:",line.value);
 		if(line.key=="Content-Length")
 			content_length=fast_io::to<std::size_t>(line.value);
 	}
@@ -29,10 +28,10 @@ try
 	fast_io::http_request_status request_status;
 	scan(ib, request_status);
 
-	println(fast_io::c_stdout, request_status);
+	println(request_status);
 }
 catch(std::exception const& e)
 {
-	println(fast_io::err,e);
+	perrln(e);
 	return 1;
 }

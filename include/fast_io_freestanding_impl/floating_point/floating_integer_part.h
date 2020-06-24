@@ -80,6 +80,49 @@ inline constexpr std::size_t fp_output_unsigned_point([[maybe_unused]]compile_ti
 		return 1;
 	}
 }
+
+
+namespace transparent
+{
+template<char8_t start=0,std::random_access_iterator Iter,my_unsigned_integral U>
+requires (start==0)
+inline constexpr std::size_t output_unsigned(Iter str,U value)
+{
+	using char_type = std::iter_value_t<Iter>;
+	std::size_t len{chars_len<10,true>(value)};
+	str+=len-1;
+	for(std::size_t i{};i!=len;++i)
+	{
+		U const temp(value/10);
+		char_type const res(value%10);
+		*str=start;
+	}
+	return len;
+}
+}
+
+template<std::contiguous_iterator Iter,my_unsigned_integral U>
+inline constexpr std::size_t fp_output_unsigned_trans(Iter iter,U i)
+{
+	if(std::is_constant_evaluated())
+	{
+		return transparent::output_unsigned<0>(iter,static_cast<std::remove_cvref_t<U>>(i));
+	}
+	else
+	{
+
+		namespace algo_decision = 
+#ifdef FAST_IO_OPTIMIZE_SIZE
+			transparent;
+#else
+			jiaendu::fp;
+#endif
+		return algo_decision::output_unsigned<0>(iter,static_cast<std::remove_cvref_t<U>>(i));
+	}
+}
+
+
+
 }
 
 }

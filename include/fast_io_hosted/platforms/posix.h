@@ -754,33 +754,37 @@ inline std::conditional_t<report_einval,std::pair<std::uintmax_t,bool>,std::uint
 }
 
 #endif
-
-inline constexpr posix_io_observer posix_stdin()
+template<std::integral char_type=char>
+inline constexpr basic_posix_io_observer<char_type> posix_stdin()
 {
 	return {posix_stdin_number};
 }
-inline constexpr posix_io_observer posix_stdout()
+template<std::integral char_type=char>
+inline constexpr basic_posix_io_observer<char_type> posix_stdout()
 {
-	return {posix_stdout_number};
-} 
-inline constexpr posix_io_observer posix_stderr()
-{
-	return {posix_stderr_number};
+	return basic_posix_io_observer<char_type>{posix_stdout_number};
 }
+template<std::integral char_type=char>
+inline constexpr basic_posix_io_observer<char_type> posix_stderr()
+{
+	return basic_posix_io_observer<char_type>{posix_stderr_number};
+}
+
 #if !defined(__WINNT__) && !defined(_MSC_VER)
-inline constexpr posix_io_observer native_stdin()
+template<std::integral char_type=char>
+inline constexpr basic_posix_io_observer<char_type> native_stdin()
 {
-	return  {posix_stdin_number};
+	return {posix_stdin_number};
 }
-
-inline constexpr posix_io_observer native_stdout()
+template<std::integral char_type=char>
+inline constexpr basic_posix_io_observer<char_type> native_stdout()
 {
-	return {posix_stdout_number};
+	return basic_posix_io_observer<char_type>{posix_stdout_number};
 }
-
-inline constexpr posix_io_observer native_stderr()
+template<std::integral char_type=char>
+inline constexpr basic_posix_io_observer<char_type> native_stderr()
 {
-	return {posix_stderr_number};
+	return basic_posix_io_observer<char_type>{posix_stderr_number};
 }
 #endif
 template<output_stream output,std::integral intg>

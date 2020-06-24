@@ -5,10 +5,10 @@ int main()
 try
 {
 	fast_io::client hd(fast_io::dns_once("localhost"),2000,fast_io::sock::type::datagrams);
-	transmit(fast_io::out,hd);
+	transmit(fast_io::out(),hd);
 }
 catch(std::exception const & e)
 {
-	println(fast_io::err,e);
+	perrln(e);
 	return 1;
 }

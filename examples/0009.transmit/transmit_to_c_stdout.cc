@@ -2,10 +2,10 @@
 
 int main()
 {
-	transmit(fast_io::c_stdout,fast_io::in);
+	transmit(fast_io::c_stdout(),fast_io::in());
 }
 /*
-Transmit from fast_io::in to C stdout (Which means exploit the internal implementation of C stdout's buffer)
+Transmit from fast_io::in() to C stdout (Which means exploit the internal implementation of C stdout's buffer)
 
 Should be zero copy IO on linux.
 

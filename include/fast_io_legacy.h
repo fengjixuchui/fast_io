@@ -7,7 +7,6 @@
 #include"fast_io_legacy_impl/cpp/streambuf_io_observer.h"
 #include"fast_io_legacy_impl/cpp/filebuf_file.h"
 #include"fast_io_legacy_impl/fast_io_streambuf.h"
-#include"fast_io_legacy_impl/std_locale.h"
 
 /*
 #include<iostream>
@@ -24,16 +23,3 @@
 #include"fast_io_legacy_impl/stream_file.h"
 #endif
 */
-namespace fast_io
-{
-
-static inline c_io_observer c_stdin{stdin};
-static inline c_io_observer c_stdout{stdout};
-static inline c_io_observer c_stderr{stderr};
-
-static inline wc_io_observer wc_stdin{stdin};
-static inline wc_io_observer wc_stdout{stdout};
-static inline wc_io_observer wc_stderr{stderr};
-//inline stream_view cpp_clog(std::clog);
-
-}

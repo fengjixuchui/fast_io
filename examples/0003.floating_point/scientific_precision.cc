@@ -4,5 +4,5 @@ int main()
 {
 	double d;
 	scan(d);
-	println(fast_io::scientific<6>(d));
+	println(fast_io::scientific(d,60));
 }

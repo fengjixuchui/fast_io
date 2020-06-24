@@ -3,6 +3,6 @@
 
 int main()
 {
-	fast_io::nt_io_observer ob{static_cast<fast_io::nt_io_observer>(fast_io::out)};
+	fast_io::nt_io_observer ob{static_cast<fast_io::nt_io_observer>(fast_io::out())};
 	print(ob,"Hello World\n");
 }

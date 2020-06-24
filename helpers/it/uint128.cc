@@ -61,5 +61,5 @@ int main()
 	std::array<char,1000> buffer;
 	std::size_t pos{uint128_t_output(buffer.data(),(static_cast<__uint128_t>(10000000000000000000ULL)))};
 	buffer[pos]=u8'\n';
-	write(fast_io::out,buffer.data(),buffer.data()+pos+1);
+	write(fast_io::out(),buffer.data(),buffer.data()+pos+1);
 }

@@ -6,14 +6,14 @@ try
 {
 	if(argc!=2)
 	{
-		println(fast_io::err,u8"Usage: ",*argv,u8" <domain>");
+		perrln(u8"Usage: ",std::string_view(*argv),u8" <domain>");
 		return 1;
 	}
 	for(auto const& address:fast_io::dns(argv[1]))
-		println(fast_io::out, address);
+		println(fast_io::out(), address);
 }
 catch(std::exception const & e)
 {
-	println(fast_io::err,e);
+	perrln(e);
 	return 1;
 }

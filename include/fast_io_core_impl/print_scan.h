@@ -255,11 +255,11 @@ inline constexpr raiter print_reserve_define(print_reserve_type_t<manip::line<T>
 }
 
 template<bool report_eof=false,input_stream input,typename ...Args>
-inline constexpr auto scan(input &in,Args&& ...args)
+inline constexpr auto scan(input &&in,Args&& ...args)
 {
 	if constexpr(mutex_input_stream<input>)
 	{
-		typename input::lock_guard_type lg{mutex(in)};
+		typename std::remove_cvref_t<input>::lock_guard_type lg{mutex(in)};
 		decltype(auto) uh(unlocked_handle(in));
 		return scan<report_eof>(uh,std::forward<Args>(args)...);
 	}
@@ -267,20 +267,6 @@ inline constexpr auto scan(input &in,Args&& ...args)
 		return scan_status_define<report_eof>(in,std::forward<Args>(args)...);
 	else
 		return details::normal_scan<report_eof>(in,std::forward<Args>(args)...);
-}
-
-template<input_stream input,typename ...Args>
-requires (sizeof...(Args)!=0)
-inline constexpr void receive(input &in,Args&& ...args)
-{
-	if constexpr(mutex_input_stream<input>)
-	{
-		typename input::lock_guard_type lg{mutex(in)};
-		decltype(auto) uh(unlocked_handle(in));
-		receive(uh,std::forward<Args>(args)...);
-	}
-	else
-		normal_receive(in,std::forward<Args>(args)...);
 }
 
 namespace details
@@ -310,7 +296,7 @@ inline constexpr void print_fallback(output &out,Args&& ...args)
 }
 
 template<output_stream output,typename callback>
-inline constexpr void print_transaction(output &out,callback func)
+inline constexpr void print_transaction(output &&out,callback func)
 {
 	internal_temporary_buffer<typename output::char_type> buffer;
 	func(buffer);
@@ -318,11 +304,11 @@ inline constexpr void print_transaction(output &out,callback func)
 }
 
 template<output_stream output,typename ...Args>
-inline constexpr void print(output &out,Args&& ...args)
+inline constexpr void print(output &&out,Args&& ...args)
 {
 	if constexpr(mutex_output_stream<output>)
 	{
-		typename output::lock_guard_type lg{mutex(out)};
+		typename std::remove_cvref_t<output>::lock_guard_type lg{mutex(out)};
 		decltype(auto) uh(unlocked_handle(out));
 		print(uh,std::forward<Args>(args)...);
 	}
@@ -347,11 +333,11 @@ inline constexpr void print(output &out,Args&& ...args)
 }
 
 template<output_stream output,typename ...Args>
-inline constexpr void println(output &out,Args&& ...args)
+inline constexpr void println(output &&out,Args&& ...args)
 {
 	if constexpr(mutex_output_stream<output>)
 	{
-		typename output::lock_guard_type lg{mutex(out)};
+		typename std::remove_cvref_t<output>::lock_guard_type lg{mutex(out)};
 		decltype(auto) uh(unlocked_handle(out));
 		println(uh,std::forward<Args>(args)...);
 	}
@@ -379,7 +365,7 @@ inline constexpr void println(output &out,Args&& ...args)
 	else
 		details::print_fallback<true>(out,std::forward<Args>(args)...);
 }
-
+/*
 template<output_stream output,typename ...Args>
 requires (sizeof...(Args)!=0)
 inline constexpr void send(output &out,Args&& ...args)
@@ -401,27 +387,19 @@ inline constexpr void send(output &out,Args&& ...args)
 		write(out,buffer.beg_ptr,buffer.end_ptr);
 	}
 }
-
+*/
 #ifndef NDEBUG
 
-template<output_stream output,typename ...Args>
-requires requires(output& out,Args&& ...args)
+template<typename ...Args>
+inline constexpr void debug_print(Args&& ...args)
 {
-	fast_io::print(out,std::forward<Args>(args)...);
-}
-inline constexpr void debug_print(output &out,Args&& ...args)
-{
-	fast_io::print(out,std::forward<Args>(args)...);
+	fast_io::print(std::forward<Args>(args)...);
 }
 
-template<output_stream output,typename ...Args>
-requires requires(output& out,Args&& ...args)
+template<typename ...Args>
+inline constexpr void debug_println(Args&& ...args)
 {
-	fast_io::println(out,std::forward<Args>(args)...);
-}
-inline constexpr void debug_println(output &out,Args&& ...args)
-{
-	fast_io::println(out,std::forward<Args>(args)...);
+	fast_io::debug_println(std::forward<Args>(args)...);
 }
 
 #endif

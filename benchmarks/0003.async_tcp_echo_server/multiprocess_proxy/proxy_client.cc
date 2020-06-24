@@ -12,12 +12,12 @@ try
 	{
 		fast_io::timer tm1("some");
 		print(hd,"Hello World\n");
-		transmit_once(fast_io::out,hd);
+		transmit_once(fast_io::out(),hd);
 	}
 }
 catch(std::exception const& e)
 {
-	println(fast_io::err,e);
+	perrln(e);
 	return 1;
 }
 }

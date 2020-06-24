@@ -16,6 +16,6 @@ int main()
         fast_io::crypto::icbc_decrypt<fast_io::ibuf_file, fast_io::crypto::rc6::rc6_dec_128> 
             ib(std::piecewise_construct,std::forward_as_tuple("text.txt"),
             std::forward_as_tuple(std::as_bytes(std::span(key)), std::as_bytes(std::span(iv))));
-        transmit(fast_io::out,ib);
+        transmit(fast_io::out(),ib);
     }
 }

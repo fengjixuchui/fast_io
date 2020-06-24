@@ -97,7 +97,10 @@ public:
 			alloc.deallocate(beg,buffer_size);
 		end=curr=beg=nullptr;
 	}
-	constexpr ~basic_buf_handler()
+#if __cpp_lib_is_constant_evaluated >= 201811L && __cpp_constexpr_dynamic_alloc >= 201907L
+	constexpr
+#endif
+	~basic_buf_handler()
 	{
 		if(beg)[[likely]]
 			alloc.deallocate(beg,buffer_size);
@@ -425,6 +428,7 @@ constexpr void obuf_write_force_copy(basic_obuf<Ohandler,forcecopy,Buf>& ob,Iter
 	else
 	{
 		write(ob.native_handle(),cbegin,cend);
+		ob.obuffer.curr=ob.obuffer.beg;
 	}
 }
 
@@ -435,7 +439,7 @@ inline constexpr void overflow(basic_obuf<Ohandler,forcecopy,Buf>& ob,typename O
 {
 	if(ob.obuffer.beg)
 	{
-		details::obuf_write_force_copy<false>(ob,ob.obuffer.curr,ob.obuffer.end);
+		details::obuf_write_force_copy<false>(ob,ob.obuffer.beg,ob.obuffer.end);
 	}
 	else	//cold buffer
 	{

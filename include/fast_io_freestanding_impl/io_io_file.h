@@ -96,7 +96,7 @@ public:
 	{
 		if constexpr(output_stream<value_type>)
 		{
-			if(flush_output_stream<value_type>)
+			if constexpr(flush_output_stream<value_type>)
 				flush(io);
 		}
 		else

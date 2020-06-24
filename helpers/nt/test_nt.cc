@@ -10,12 +10,12 @@ try
 /*
 catch(fast_io::nt_error const& e)
 {
-	println(fast_io::err,e);
+	perrln(e);
 	return 1;
 }
 */
 catch(std::exception const& e)
 {
-	println(fast_io::err,e);
+	perrln(e);
 	return 1;
 }

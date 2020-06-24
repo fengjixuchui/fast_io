@@ -7,7 +7,7 @@ try
 {
 	if(argc<4)
 	{
-		print(fast_io::err,"Usage:",*argv," <process id> <base address> <output file path>\n");
+		perr("Usage:",std::string_view(*argv)," <process id> <base address> <output file path>\n");
 		return 1;
 	}
 	fast_io::win32_memory_file wmf(fast_io::win32_desired_access::process_all_access,
@@ -20,6 +20,6 @@ try
 }
 catch(std::exception const& e)
 {
-	println(fast_io::err,e);
+	perrln(e);
 	return 1;
 }

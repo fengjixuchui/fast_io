@@ -17,7 +17,7 @@ int main()
 	long double d(1.244563);//wrong 1e2
 	int n=generic_to_chars(long_double_to_fd128(d),array.data());
 	array[n++]='\n';
-	write(fast_io::out,array.data(),array.data()+n);
+	write(fast_io::out(),array.data(),array.data()+n);
 	print("\n\n\n\n");
 	println("my result:",d);
 

@@ -15,9 +15,12 @@ inline constexpr std::uintmax_t bufferred_transmit_impl(output& outp,input& inp)
 		{
 			auto b{ibuffer_curr(inp)};
 			auto e{std::to_address(ibuffer_end(inp))};
-			std::size_t transmitted_this_round(static_cast<std::size_t>(e-b));
-			write(outp,b,e);
-			transmitted_bytes+=transmitted_this_round;
+			if(b!=e)[[likely]]
+			{
+				std::size_t transmitted_this_round(static_cast<std::size_t>(e-b));
+				write(outp,b,e);
+				transmitted_bytes+=transmitted_this_round;
+			}
 		}
 		while(underflow(inp));
 		return transmitted_bytes;
@@ -179,7 +182,7 @@ inline constexpr void print_define(output& outp,manip::transmission_with_size<in
 }
 
 template<output_stream output,input_stream input,std::integral sz_type>
-inline constexpr sz_type transmit(output& outp,input& in,sz_type s)
+inline constexpr sz_type transmit(output&& outp,input&& in,sz_type s)
 {
 	sz_type transmitted{};
 	print(outp,manip::transmission_with_size<input,sz_type>{transmitted,in,s});
@@ -187,7 +190,7 @@ inline constexpr sz_type transmit(output& outp,input& in,sz_type s)
 }
 
 template<output_stream output,input_stream input>
-inline constexpr std::uintmax_t transmit(output& outp,input& in)
+inline constexpr std::uintmax_t transmit(output&& outp,input&& in)
 {
 	std::uintmax_t transmitted{};
 	print(outp,manip::transmission<input,std::uintmax_t>{transmitted,in});

@@ -13,5 +13,5 @@ int main()
 	0));
 	win32_http_send_request(request);
 	fast_io_examples::ibuf_win32_internet_io_observer internet_iob(request.handle);
-	transmit(fast_io::out,internet_iob);
+	transmit(fast_io::out(),internet_iob);
 }

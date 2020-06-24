@@ -4,7 +4,7 @@
 template<std::floating_point F>
 inline constexpr void test(std::string_view literal,F f)
 {
-	println(fast_io::c_stdout,u8"literal:",literal,u8"->scientific:",fast_io::scientific(f),u8"\tfixed:",fast_io::fixed(f),u8"\tgeneral:",f);
+	println(u8"literal:",literal,u8"->scientific:",fast_io::scientific(f),u8"\tfixed:",fast_io::fixed(f),u8"\tgeneral:",f);
 }
 
 int main()

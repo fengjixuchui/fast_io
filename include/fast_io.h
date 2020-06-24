@@ -7,16 +7,65 @@
 namespace fast_io
 {
 
-static inline constexpr posix_io_observer in{posix_stdin_number};
-static inline constexpr posix_io_observer out{posix_stdout_number};
-static inline constexpr posix_io_observer err{posix_stderr_number};
+inline c_io_observer c_stdin() noexcept
+{
+	return {stdin};
+}
 
-static inline constexpr wposix_io_observer wout{posix_stdout_number};
-static inline constexpr wposix_io_observer werr{posix_stderr_number};
+inline c_io_observer c_stdout() noexcept
+{
+	return {stdout};
+}
 
+inline c_io_observer c_stderr() noexcept
+{
+	return {stderr};
+}
+
+inline wc_io_observer wc_stdin() noexcept
+{
+	return {stdin};
+}
+
+inline wc_io_observer wc_stdout() noexcept
+{
+	return {stdout};
+}
+
+inline wc_io_observer wc_stderr() noexcept
+{
+	return {stderr};
+}
+
+inline
+#if !defined(__WINNT__) && !defined(_MSC_VER)
+constexpr
+#endif
+decltype(auto) in() noexcept
+{
+	return native_stdin();
+}
+
+inline 
+#if !defined(__WINNT__) && !defined(_MSC_VER)
+constexpr
+#endif
+decltype(auto) out() noexcept
+{
+	return native_stdout();
+}
+
+inline
+#if !defined(__WINNT__) && !defined(_MSC_VER)
+constexpr
+#endif
+decltype(auto) err() noexcept
+{
+	return native_stderr();
+}
 
 using in_buf_type = basic_ibuf<native_io_observer>;
-using log_type = basic_obuf<native_io_observer>;
+using out_buf_type = basic_obuf<native_io_observer>;
 
 inline auto in_buf()
 {
@@ -25,12 +74,12 @@ inline auto in_buf()
 
 inline auto out_buf()
 {
-	return log_type(native_stdout());
+	return out_buf_type(native_stdout());
 }
 
-inline auto log()
+inline auto err_buf()
 {
-	return log_type(native_stderr());
+	return out_buf_type(native_stderr());
 }
 
 }
@@ -41,10 +90,7 @@ inline constexpr void print(T&& t,Args&& ...args)
 	if constexpr(fast_io::output_stream<std::remove_cvref_t<T>>)
 		fast_io::print(std::forward<T>(t),std::forward<Args>(args)...);
 	else
-	{
-		fast_io::c_io_observer c_stdout{stdout};
-		fast_io::print(c_stdout,std::forward<T>(t),std::forward<Args>(args)...);
-	}
+		fast_io::print(fast_io::c_io_observer{stdout},std::forward<T>(t),std::forward<Args>(args)...);
 }
 
 template<typename T,typename... Args>
@@ -53,40 +99,57 @@ inline constexpr void println(T&& t,Args&& ...args)
 	if constexpr(fast_io::output_stream<std::remove_cvref_t<T>>)
 		fast_io::println(std::forward<T>(t),std::forward<Args>(args)...);
 	else
-	{
-		fast_io::c_io_observer c_stdout{stdout};
-		fast_io::println(c_stdout,std::forward<T>(t),std::forward<Args>(args)...);
-	}
+		fast_io::println(fast_io::c_io_observer{stdout},std::forward<T>(t),std::forward<Args>(args)...);
+}
+
+template<typename... Args>
+inline constexpr void perr(Args&&... args)
+{
+	fast_io::print(fast_io::err(),std::forward<Args>(args)...);
+}
+
+template<typename... Args>
+inline constexpr void perrln(Args&&... args)
+{
+	fast_io::println(fast_io::err(),std::forward<Args>(args)...);
 }
 
 
 //Allow debug print
 #ifndef NDEBUG
-
+#ifndef FAST_IO_BOOTSTRAP
+//bootstrap mode will automatically enable this since we need to use fast_io to debug fast_io. It requires bootstrap
+//With debugging. We output to POSIX fd or Win32 Handle directly instead of C's stdout.
 template<typename T,typename... Args>
 inline constexpr void debug_print(T&& t,Args&& ...args)
 {
 	if constexpr(fast_io::output_stream<std::remove_cvref_t<T>>)
-		fast_io::debug_print(std::forward<T>(t),std::forward<Args>(args)...);
+		fast_io::print(std::forward<T>(t),std::forward<Args>(args)...);
 	else
-	{
-		fast_io::c_io_observer c_stdout{stdout};
-		fast_io::debug_print(c_stdout,std::forward<T>(t),std::forward<Args>(args)...);
-	}
+		fast_io::println(fast_io::native_stdout(),std::forward<T>(t),std::forward<Args>(args)...);
 }
 
 template<typename T,typename... Args>
 inline constexpr void debug_println(T&& t,Args&& ...args)
 {
 	if constexpr(fast_io::output_stream<std::remove_cvref_t<T>>)
-		fast_io::debug_println(std::forward<T>(t),std::forward<Args>(args)...);
+		fast_io::println(std::forward<T>(t),std::forward<Args>(args)...);
 	else
-	{
-		fast_io::c_io_observer c_stdout{stdout};
-		fast_io::debug_println(c_stdout,std::forward<T>(t),std::forward<Args>(args)...);
-	}
+		fast_io::println(fast_io::native_stdout(),std::forward<T>(t),std::forward<Args>(args)...);
 }
 
+#endif
+template<typename... Args>
+inline constexpr void debug_perr(Args&&... args)
+{
+	::perr(std::forward<Args>(args)...);
+}
+
+template<typename... Args>
+inline constexpr void debug_perrln(Args&&... args)
+{
+	::perrln(std::forward<Args>(args)...);
+}
 #endif
 
 template<bool report_eof=false,typename T,typename... Args>
@@ -95,8 +158,5 @@ inline constexpr auto scan(T&& t,Args&& ...args)
 	if constexpr(fast_io::input_stream<std::remove_cvref_t<T>>)
 		return fast_io::scan<report_eof>(std::forward<T>(t),std::forward<Args>(args)...);
 	else
-	{
-		fast_io::c_io_observer c_stdin{stdin};
-		return scan<report_eof>(c_stdin,std::forward<T>(t),std::forward<Args>(args)...);
-	}
+		return scan<report_eof>(fast_io::c_io_observer{stdin},std::forward<T>(t),std::forward<Args>(args)...);
 }

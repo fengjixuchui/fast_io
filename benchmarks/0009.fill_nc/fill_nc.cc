@@ -6,7 +6,7 @@ int main(int argc, char** argv)
 {
 	if(argc!=2)
 	{
-		print(fast_io::err,"Usage: ", *argv," <filesize>\n");
+		perr("Usage: ", std::string_view(*argv)," <filesize>\n");
 		return 1;
 	}
 	auto bytes(fast_io::to<std::size_t>(argv[1]));

@@ -5,7 +5,7 @@
 
 int main()
 {
-	fast_io::openssl::bio_file bio(fast_io::io_cookie,fast_io::out);
+	fast_io::openssl::bio_file bio(fast_io::io_cookie,fast_io::out());
 	print(bio,"Hello World from fast_io::print\n");
 	BIO_printf(bio.native_handle(),"Hello World from BIO_printf\n");
 }

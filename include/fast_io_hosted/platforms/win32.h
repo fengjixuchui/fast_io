@@ -783,42 +783,40 @@ inline constexpr std::uint32_t win32_stdin_number(-10);
 inline constexpr std::uint32_t win32_stdout_number(-11);
 inline constexpr std::uint32_t win32_stderr_number(-12);
 
-
-inline win32_io_observer win32_stdin()
+template<std::integral char_type=char>
+inline basic_win32_io_observer<char_type> win32_stdin()
 {
-	return win32_io_observer{fast_io::win32::GetStdHandle(-10)};
+	return {fast_io::win32::GetStdHandle(-10)};
 }
-
-inline win32_io_observer win32_stdout()
+template<std::integral char_type=char>
+inline basic_win32_io_observer<char_type> win32_stdout()
 {
-	return win32_io_observer{fast_io::win32::GetStdHandle(-11)};
+	return basic_win32_io_observer<char_type>{fast_io::win32::GetStdHandle(-11)};
 }
-
-inline win32_io_observer win32_stderr()
+template<std::integral char_type=char>
+inline basic_win32_io_observer<char_type> win32_stderr()
 {
-	return win32_io_observer{fast_io::win32::GetStdHandle(-12)};
+	return basic_win32_io_observer<char_type>{fast_io::win32::GetStdHandle(-12)};
 }
-
-inline win32_io_observer native_stdin()
+template<std::integral char_type=char>
+inline basic_win32_io_observer<char_type> native_stdin()
 {
-	return win32_stdin();
+	return {fast_io::win32::GetStdHandle(-10)};
 }
-
-inline win32_io_observer native_stdout()
+template<std::integral char_type=char>
+inline basic_win32_io_observer<char_type> native_stdout()
 {
-	return win32_stdout();
+	return basic_win32_io_observer<char_type>{fast_io::win32::GetStdHandle(-11)};
 }
-
-inline win32_io_observer native_stderr()
+template<std::integral char_type=char>
+inline basic_win32_io_observer<char_type> native_stderr()
 {
-	return win32_stderr();
+	return basic_win32_io_observer<char_type>{fast_io::win32::GetStdHandle(-12)};
 }
-
 template<output_stream output,std::integral intg>
 inline constexpr void print_define(output& out,basic_win32_io_observer<intg> iob)
 {
 	print(out,iob.native_handle());
 }
-
 
 }

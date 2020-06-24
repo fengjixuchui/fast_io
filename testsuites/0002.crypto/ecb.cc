@@ -15,6 +15,6 @@ int main()
         fast_io::crypto::iecb<fast_io::ibuf_file, fast_io::crypto::speck::speck_dec_128_128> 
             ib(std::piecewise_construct,std::forward_as_tuple("text.txt"),
             std::forward_as_tuple(std::as_bytes(std::span(key))));
-        transmit(fast_io::out,ib);
+        transmit(fast_io::out(),ib);
     }
 }

@@ -5,10 +5,10 @@ namespace fast_io::manip
 
 enum class floating_formats
 {
+general=0,
 scientific=1,
 fixed=2,
-hexfloat=4,
-general=1|2
+hexfloat=3
 };
 
 template<floating_formats fm,bool uppercase,typename T>

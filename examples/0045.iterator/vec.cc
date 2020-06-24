@@ -1,5 +1,5 @@
 #include"../../include/fast_io.h"
-#include<iostream>
+#include<vector>
 
 int main()
 {

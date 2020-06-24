@@ -4,7 +4,7 @@
 template<std::floating_point F>
 inline constexpr void test(std::string_view literal,F f)
 {
-	println(fast_io::c_stdout,u8"literal:",literal,u8"->scientific:",fast_io::scientific(f),u8"\tfixed:",fast_io::fixed(f),u8"\tgeneral:",f);
+	println(u8"literal:",literal,u8"->scientific:",fast_io::scientific(f),u8"\tfixed:",fast_io::fixed(f),u8"\tgeneral:",f);
 }
 
 int main()
@@ -35,7 +35,7 @@ Precise value of 12342342347326446.0 is 12342342347326446
 We take the middle value of 12342342347326444 and 12342342347326446 is 12342342347326445
 So, for any value x, if 12342342347326445<x<=12342342347326446, it must be the same round-trip value of 12342342347326446
 for any value x, if 12342342347326444<=x<=12342342347326445, it must be the same round-trip value of 12342342347326445
-
+https://baseconvert.com/ieee-754-floating-point
 Binary representation of round-trip value of 12342342347326445.0 is
 0 10000110100 0101111011001010010111000001101001111000000111110110. The last digit is even, so we don't take it.  5 should not be carried
 */

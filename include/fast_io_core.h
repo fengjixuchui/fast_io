@@ -38,15 +38,47 @@
 #include"fast_io_core_impl/fast_io_error.h"
 #include"fast_io_core_impl/eof.h"
 #include"fast_io_core_impl/manip/impl.h"
+#include"fast_io_core_impl/mode.h"
+#include"fast_io_core_impl/perms.h"
+#include"fast_io_core_impl/seek.h"
 
 #include"fast_io_core_impl/print_scan.h"
+#include"fast_io_core_impl/print_reserver.h"
+
+
+#ifndef NDEBUG
+#ifdef FAST_IO_BOOTSTRAP
+#include"fast_io_freestanding_impl/reserve_read_write.h"
+#include"fast_io_freestanding_impl/code_cvt/utf.h"
+#include"fast_io_freestanding_impl/posix_error.h"
+//Unfortunately we need to debug fast_io itself with fast_io. We have to put some bootstrap layer here
+#include"fast_io_hosted/platforms/native_base.h"
+
+template<typename T,typename... Args>
+inline constexpr void debug_print(T&& t,Args&& ...args)
+{
+	if constexpr(fast_io::output_stream<std::remove_cvref_t<T>>)
+		fast_io::print(std::forward<T>(t),std::forward<Args>(args)...);
+	else
+		fast_io::println(fast_io::native_stdout(),std::forward<T>(t),std::forward<Args>(args)...);
+}
+
+template<typename T,typename... Args>
+inline constexpr void debug_println(T&& t,Args&& ...args)
+{
+	if constexpr(fast_io::output_stream<std::remove_cvref_t<T>>)
+		fast_io::println(std::forward<T>(t),std::forward<Args>(args)...);
+	else
+		fast_io::println(fast_io::native_stdout(),std::forward<T>(t),std::forward<Args>(args)...);
+}
+
+#endif
+#endif
 
 // This should provide an option macro to disable any generation for table in freestanding environments.
 #include"fast_io_core_impl/integers/integer.h"
 
 #include"fast_io_core_impl/igenerator.h"
-#include"fast_io_core_impl/mode.h"
-#include"fast_io_core_impl/perms.h"
 #include"fast_io_core_impl/black_hole.h"
 #include"fast_io_core_impl/istring_view.h"
 #include"fast_io_core_impl/ospan.h"
@@ -59,7 +91,6 @@
 #include"fast_io_core_impl/precondition.h"
 #include"fast_io_core_impl/read_write_ranges.h"
 
-#include"fast_io_core_impl/seek.h"
 #include"fast_io_core_impl/tie.h"
 #include"fast_io_core_impl/transmit.h"
 #include"fast_io_core_impl/random_access_transmit.h"

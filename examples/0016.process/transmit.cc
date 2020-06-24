@@ -2,5 +2,5 @@
 
 int main()
 {
-	transmit(fast_io::out,fast_io::in);
+	transmit(fast_io::out(),fast_io::in());
 }
