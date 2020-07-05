@@ -2,7 +2,7 @@
 
 extern "C" [[noreturn]] void _start() noexcept
 {
-	print(fast_io::out,"Hello World\n");
+	print(fast_io::out(),"Hello World\n");
 	fast_io::fast_exit(0);
 }
 

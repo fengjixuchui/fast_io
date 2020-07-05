@@ -111,4 +111,12 @@ constexpr decltype(auto) ocan_takeover(ocrtp<output>& out,Args&& ...args)
 {
 	return ocan_takeover(ocrtp_handle(out),std::forward<Args>(args)...);
 }
+
+template<typename output,typename... Args>
+requires scatter_output_stream<ocrtp_handle_type<output>>
+constexpr decltype(auto) scatter_write(ocrtp<output>& out,Args&& ...args)
+{
+	return scatter_write(ocrtp_handle(out),std::forward<Args>(args)...);
+}
+
 }

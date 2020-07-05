@@ -1,5 +1,5 @@
 #pragma once
-//This jiaendu is created purely by me. FASTEST IN THE WORLD!
+
 namespace fast_io::details
 {
 template<char8_t start=u8'0',std::random_access_iterator Iter>
@@ -19,14 +19,17 @@ inline constexpr void append_nine_digits_dummy(Iter str,std::uint32_t value)
 template<char8_t start=u8'0',std::random_access_iterator Iter>
 inline constexpr void append_nine_digits(Iter str,std::uint32_t value)
 {
-	using char_type = std::iter_value_t<Iter>;
 #ifndef FAST_IO_OPTIMIZE_SIZE
 	if(std::is_constant_evaluated())
 #endif
 		append_nine_digits_dummy<start>(str,value);
 #ifndef FAST_IO_OPTIMIZE_SIZE
+
 	else
 	{
+		using char_type = std::iter_value_t<Iter>;
+#ifdef FAST_IO_OPTIMIZE_TIME
+
 	#if (_WIN64 || __x86_64__ || __ppc64__)
 		std::uint64_t remains0{(static_cast<std::uint64_t>(value) *
 		static_cast<std::uint64_t>(3518437209)) >> 45};
@@ -42,6 +45,19 @@ inline constexpr void append_nine_digits(Iter str,std::uint32_t value)
 		*str = static_cast<char8_t>(v2)+start;
 		my_copy_n(jiaendu::static_tables<char_type,start>::table4[remains1].data(),4,++str);
 		my_copy_n(jiaendu::static_tables<char_type,start>::table4[remains0].data(),4,str += 4);
+#else
+		constexpr auto &table(shared_static_base_table<char_type,10,false,start==0>::table);
+		constexpr std::uint32_t pw(static_cast<std::uint32_t>(table.size()));
+		constexpr std::size_t chars(table.front().size());
+		str+=9;
+		for(std::uint32_t i{};i!=4;++i)
+		{
+			auto const rem(value%pw);
+			value/=pw;
+			my_copy_n(table[rem].data(),chars,str-=chars);
+		}
+		*--str=value+start;
+#endif
 	}
 #endif
 }

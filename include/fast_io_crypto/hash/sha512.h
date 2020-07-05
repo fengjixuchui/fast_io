@@ -81,10 +81,6 @@ inline constexpr uint64_t B2U64(std::byte val, uint8_t sh)
     return (std::to_integer<uint64_t>(val)) << sh;
 }
 
-inline constexpr void process(std::span<std::uint64_t,8> state,std::span<std::byte const,128> blocks)
-{
-
-}
 }
 class sha512_function
 {

@@ -7,25 +7,46 @@ namespace fast_io
 template<typename T>
 inline std::ostream& wrapped_function(std::ostream& out,T v)
 {
-	fast_io::streambuf_io_observer iob{out.rdbuf()};
-	print(iob,v);
+	try
+	{
+		fast_io::streambuf_io_observer iob{out.rdbuf()};
+		print(iob,v);
+	}
+	catch(...)
+	{
+		out.setstate(std::ios_base::failbit);
+	}
 	return out;
 }
 
 template<typename T>
 inline std::istream& wrapped_in_function(std::istream& in,T& v)
 {
-	fast_io::streambuf_io_observer iob{in.rdbuf()};
-	if(!scan<true>(iob,v))[[unlikely]]
-		in.setstate(std::ios_base::eofbit);
+	try
+	{
+		fast_io::streambuf_io_observer iob{in.rdbuf()};
+		if(!scan<true>(iob,v))[[unlikely]]
+			in.setstate(std::ios_base::eofbit);
+	}
+	catch(...)
+	{
+		in.setstate(std::ios_base::failbit);
+	}
 	return in;
 }
 }
 
 extern "C" std::ostream& __wrap__ZSt16__ostream_insertIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_PKS3_x(std::ostream& out,char ch)
 {
-	fast_io::streambuf_io_observer iob{out.rdbuf()};
-	put(iob,ch);
+	try
+	{
+		fast_io::streambuf_io_observer iob{out.rdbuf()};
+		put(iob,ch);
+	}
+	catch(...)
+	{
+		out.setstate(std::ios_base::failbit);
+	}
 	return out;
 }
 
@@ -68,8 +89,6 @@ extern "C" std::ostream& __wrap__ZNSo9_M_insertIeEERSoT_(std::ostream& out,long 
 {
 	return fast_io::wrapped_function(out,v);
 }
-
-
 
 extern "C" std::istream& __wrap__ZNSirsERi(std::istream& in,int& v)
 {

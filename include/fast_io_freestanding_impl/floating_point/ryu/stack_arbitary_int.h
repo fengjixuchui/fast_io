@@ -69,7 +69,7 @@ inline constexpr bool fake_minus_assignment(stack_arbitary_int<buffer_size>& lar
 	for(;small.digits.data()+1<small_end;)
 	{
 		*--large_end-=*--small_end+carry;
-		if(carry=(9<*large_end))
+		if((carry=(9<*large_end)))
 			*large_end+=10;
 	}
 	if(small.size()==large.size())
@@ -84,7 +84,7 @@ inline constexpr bool fake_minus_assignment(stack_arbitary_int<buffer_size>& lar
 	else
 	{
 		*--large_end-=*--small_end+carry;
-		if(carry=(9<*large_end))
+		if((carry=(9<*large_end)))
 			*large_end+=10;
 	}
 	return true;

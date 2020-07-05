@@ -67,7 +67,13 @@ struct bio_io_cookie_functions_t
 			{
 				try
 				{
-					*written=write(*bit_cast<value_type*>(BIO_get_data(bbio)),buf,buf+size)-buf;
+					if constexpr(std::same_as<decltype(write(*bit_cast<value_type*>(BIO_get_data(bbio)),buf,buf+size)),void>)
+					{
+						write(*bit_cast<value_type*>(BIO_get_data(bbio)),buf,buf+size);
+						*written=size;
+					}
+					else
+						*written=write(*bit_cast<value_type*>(BIO_get_data(bbio)),buf,buf+size)-buf;
 					return 0;
 				}
 				catch(...)
@@ -321,19 +327,16 @@ constexpr void print_define(output& out,basic_bio_io_observer<ch_type> bio)
 }
 
 template<output_stream output,std::integral ch_type>
-void print_define(output& out,openssl_error const& err)
+inline void print_define(output& out,openssl_error const& err)
 {
 	bio_file bf(io_cookie,out);
 	ERR_print_errors(bf.native_handle());
 }
 
-inline
-#if __cpp_constexpr >= 201907L
-	constexpr
-#endif
-void openssl_error::report(error_reporter& err) const
+inline void openssl_error::report(error_reporter& err) const
 {
-	print(err,*this);
+	bio_file bf(io_cookie,err);
+	ERR_print_errors(bf.native_handle());
 }
 /*
 inline constexpr char* ibuffer_begin(bio_io_observer cio) noexcept

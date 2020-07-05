@@ -114,6 +114,38 @@ inline constexpr void perrln(Args&&... args)
 	fast_io::println(fast_io::err(),std::forward<Args>(args)...);
 }
 
+template<typename... Args>
+inline constexpr void panic(Args&&... args)
+{
+	if constexpr(sizeof...(Args)!=0)
+	{
+#ifdef __cpp_exceptions
+	try
+	{
+#endif
+		fast_io::print(fast_io::err(),std::forward<Args>(args)...);
+#ifdef __cpp_exceptions
+	}
+	catch(...){}
+#endif
+	}
+	fast_io::fast_terminate();
+}
+
+template<typename... Args>
+inline constexpr void panicln(Args&&... args)
+{
+#ifdef __cpp_exceptions
+	try
+	{
+#endif
+		fast_io::println(fast_io::err(),std::forward<Args>(args)...);
+#ifdef __cpp_exceptions
+	}
+	catch(...){}
+#endif
+	fast_io::fast_terminate();
+}
 
 //Allow debug print
 #ifndef NDEBUG
@@ -149,6 +181,18 @@ template<typename... Args>
 inline constexpr void debug_perrln(Args&&... args)
 {
 	::perrln(std::forward<Args>(args)...);
+}
+
+template<typename... Args>
+inline constexpr void debug_panic(Args&&... args)
+{
+	::panic(std::forward<Args>(args)...);
+}
+
+template<typename... Args>
+inline constexpr void debug_panicln(Args&&... args)
+{
+	::panicln(std::forward<Args>(args)...);
 }
 #endif
 

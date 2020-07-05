@@ -1,7 +1,4 @@
 #pragma once
-#include<streambuf>
-#include<fstream>
-#include<sstream>
 #ifdef __GLIBCXX__
 #include"fp_hack/libstdc++.h"
 #elif defined(_MSVC_STL_UPDATE)
@@ -142,11 +139,18 @@ inline decltype(auto) io_control(basic_filebuf_io_observer<ch_type> h,Args&& ...
 }
 #endif
 
-template<output_stream output,typename T>
-inline constexpr void print_define(output& out,basic_general_streambuf_io_observer<T> iob)
+template<typename T>
+inline constexpr std::size_t print_reserve_size(print_reserve_type_t<basic_general_streambuf_io_observer<T>>)
 {
-	print(out,iob.native_handle());
+	return print_reserve_size(print_reserve_type<void*>);
 }
+
+template<typename T,std::contiguous_iterator caiter,typename U>
+inline constexpr caiter print_reserve_define(print_reserve_type_t<basic_general_streambuf_io_observer<T>>,caiter iter,U&& v)
+{
+	return print_reserve_define(print_reserve_type<void*>,iter,v.rdb);
+}
+
 }
 
 

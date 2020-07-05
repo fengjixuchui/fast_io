@@ -1,8 +1,6 @@
 #pragma once
 #if defined(__GLIBCXX__)
 #include<ext/stdio_filebuf.h>
-#else
-#include<fstream>
 #endif
 #include"streambuf_io_observer.h"
 namespace fast_io

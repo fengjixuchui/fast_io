@@ -50,9 +50,9 @@ inline constexpr std::size_t print_reserve_size(print_reserve_type_t<print_reser
 	return print_reserver<type,char_type>::reserve_size();
 }
 
-template<reserve_printable type,std::integral char_type,std::contiguous_iterator Iter>
+template<reserve_printable type,std::integral char_type,std::contiguous_iterator Iter,typename T>
 requires (std::same_as<char_type,std::iter_value_t<Iter>>||(std::same_as<std::iter_value_t<Iter>,char>&&std::same_as<char_type,char8_t>))
-inline constexpr Iter print_reserve_define(print_reserve_type_t<print_reserver<type,char_type>>,Iter beg,auto& ref)
+inline constexpr Iter print_reserve_define(print_reserve_type_t<print_reserver<type,char_type>>,Iter beg,T&& ref)
 {
 #ifdef __cpp_lib_is_constant_evaluated
 	if(std::is_constant_evaluated())
@@ -73,7 +73,7 @@ class reverse_print_reserver
 public:
 	std::array<char_type,print_reserve_size(print_reserve_type<type>)+1> mutable buffer;
 	std::size_t position;
-	constexpr reverse_print_reserver(type const& t):position(print_reverse_reserve_define(print_reserve_type<type>,buffer.size()-1+buffer.data(),t)-buffer.data()){}
+	constexpr reverse_print_reserver(type const& t):position(reverse_print_reserve_define(print_reserve_type<type>,buffer.size()-1+buffer.data(),t)-buffer.data()){}
 	constexpr std::size_t size() const noexcept
 	{
 		return buffer.size()-1-position;
@@ -104,7 +104,13 @@ public:
 
 
 template<std::integral char_type=char,reserve_printable type>
-inline constexpr std::conditional_t<reverse_reserve_printable<type>,reverse_print_reserver<type,char_type>,print_reserver<type,char_type>> print_reserve(type const& t)
+inline constexpr print_reserver<type,char_type> print_reserve(type const& t)
+{
+	return {t};
+}
+
+template<std::integral char_type=char,reverse_reserve_printable type>
+inline constexpr reverse_print_reserver<type,char_type> reverse_print_reserve(type const& t)
 {
 	return {t};
 }
@@ -116,9 +122,9 @@ inline constexpr std::size_t print_reserve_size(print_reserve_type_t<reverse_pri
 	return reverse_print_reserver<type,char_type>::reserve_size();
 }
 
-template<reserve_printable type,std::integral char_type,std::contiguous_iterator Iter>
+template<reserve_printable type,std::integral char_type,std::contiguous_iterator Iter,typename T>
 requires (std::same_as<char_type,std::iter_value_t<Iter>>||(std::same_as<std::iter_value_t<Iter>,char>&&std::same_as<char_type,char8_t>))
-inline constexpr Iter print_reserve_define(print_reserve_type_t<reverse_print_reserver<type,char_type>>,Iter beg,auto& ref)
+inline constexpr Iter print_reserve_define(print_reserve_type_t<reverse_print_reserver<type,char_type>>,Iter beg,T&& ref)
 {
 #ifdef __cpp_lib_is_constant_evaluated
 	if(std::is_constant_evaluated())

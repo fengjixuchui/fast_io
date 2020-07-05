@@ -6,9 +6,25 @@
 #include<cstddef>
 #include<type_traits>
 #include<memory>
+#include<span>			//for span
+#include<iterator>		//for iterator concepts
 
 namespace fast_io
 {
+//should be binary compatible with POSIX's iovec
+struct io_scatter_t
+{
+	void *base{};
+	std::size_t len{};
+};
+
+template<std::contiguous_iterator Iter>
+requires std::integral<std::iter_value_t<Iter>>
+inline constexpr io_scatter_t io_scatter(Iter begin,Iter end)
+{
+	void const* ptr{std::to_address(begin)};
+	return io_scatter_t{const_cast<void*>(ptr),(end-begin)*sizeof(*begin)};
+}
 
 namespace details
 {
@@ -160,6 +176,19 @@ concept status_stream_impl = requires(T&& stm)
 	typename std::remove_cvref_t<T>::char_type::status_type;
 };
 
+
+template<typename T>
+concept scatter_input_stream_impl = requires(T& in,std::span<io_scatter_t const> sp)
+{
+	{scatter_read(in,sp)}->std::same_as<std::size_t>;
+};
+
+template<typename T>
+concept scatter_output_stream_impl = requires(T& out,std::span<io_scatter_t const> sp)
+{
+	scatter_write(out,sp);
+};
+
 }
 
 
@@ -255,6 +284,12 @@ template<typename T>
 concept memory_map_io_stream = memory_map_input_stream<T>&&memory_map_output_stream<T>;
 
 template<typename T>
+concept scatter_input_stream = input_stream<T>&&details::scatter_input_stream_impl<T>;
+
+template<typename T>
+concept scatter_output_stream = output_stream<T>&&details::scatter_output_stream_impl<T>;
+
+template<typename T>
 concept status_output_stream = output_stream<T>&&details::status_stream_impl<T>&&requires(T out)
 {
 	print_status_define(out);
@@ -285,7 +320,6 @@ concept receiveable=input_stream<input>&&requires(input& in,T&& t)
 	receive_define(in,std::forward<T>(t));
 };
 
-
 template<typename output,typename T>
 concept sendable=output_stream<output>&&requires(output& out,T&& t)
 {
@@ -307,7 +341,6 @@ concept reserve_printable=requires(T&& t,char8_t* ptr)
 	{print_reserve_define(print_reserve_type<std::remove_cvref_t<T>>,ptr,t)}->std::same_as<char8_t*>;
 };
 
-
 template<typename T>
 concept reverse_reserve_printable=reserve_printable<T>&&requires(T&& t,char8_t* ptr)
 {
@@ -324,6 +357,12 @@ template<typename output,typename T>
 concept printable=output_stream<output>&&requires(output& out,T&& t)
 {
 	print_define(out,std::forward<T>(t));
+};
+
+template<typename char_type,typename T>
+concept scatter_printable=requires(char_type ch,T&& t)
+{
+	{print_scatter_define<char_type>(std::forward<T>(t))}->std::convertible_to<io_scatter_t>;
 };
 
 template<typename input,typename T>

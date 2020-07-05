@@ -30,6 +30,14 @@ public:
 	}
 };
 
+template<std::integral ch_type,std::integral ch_type1,std::integral ch_type2>
+inline void set_bio(basic_ssl_io_observer<ch_type> siob,basic_bio_file<ch_type1>&& rbio,basic_bio_file<ch_type2>&& wbio) noexcept
+{
+	SSL_set_bio(siob.s,rbio.bio,wbio.bio);
+	rbio.native_handle()=nullptr;
+	wbio.native_handle()=nullptr;
+}
+
 template<std::integral ch_type>
 inline std::size_t use_count(basic_ssl_io_observer<ch_type> siob)
 {
@@ -97,6 +105,7 @@ public:
 	}
 };
 
+
 template<std::integral ch_type>
 class basic_ssl_file:public basic_ssl_io_handle<ch_type>
 {
@@ -105,6 +114,11 @@ public:
 	using native_handle_type = SSL*;
 	constexpr basic_ssl_file()=default;
 	constexpr basic_ssl_file(native_handle_type s):basic_ssl_io_handle<ch_type>(s){}
+	basic_ssl_file(std::in_place_t,ssl_context_observer ssl_ctx_ob):basic_ssl_io_handle<ch_type>(SSL_new(ssl_ctx_ob.native_handle()))
+	{
+		if(this->native_handle()==nullptr)
+			throw openssl_error();
+	}
 	template<typename... Args>
 	basic_ssl_file(ssl_context_observer ssl_ctx_ob,Args&& ...args):basic_ssl_io_handle<ch_type>(SSL_new(ssl_ctx_ob.native_handle()))
 	{

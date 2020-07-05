@@ -174,7 +174,7 @@ inline constexpr Iter output_exp(T exp,Iter result)
 		unsigned_exp=temp;
 	}
 	return result+len;
-#else
+#elif defined(FAST_IO_OPTIMIZE_TIME)
 	if constexpr(four_digits)
 	{
 	if(1000<=unsigned_exp)[[unlikely]]
@@ -183,6 +183,27 @@ inline constexpr Iter output_exp(T exp,Iter result)
 	if(100<=unsigned_exp)[[unlikely]]
 		return my_copy_n(jiaendu::static_tables<char_type>::table3[unsigned_exp].data(),3,result);
 	return my_copy_n(jiaendu::static_tables<char_type>::table2[unsigned_exp].data(),2,result);
+#else
+	constexpr auto& tb{shared_static_base_table<char_type,10,false>::table};
+	if constexpr(four_digits)
+	{
+	if(1000<=unsigned_exp)[[unlikely]]
+	{
+		auto u{unsigned_exp%100u};
+		auto v{unsigned_exp/100u};
+		my_copy_n(tb[v].data(),2,result);
+		my_copy_n(tb[u].data(),2,result+2);
+		return result+4;
+	}
+	}
+	if(100<=unsigned_exp)[[unlikely]]
+	{
+		auto u{unsigned_exp%100u};
+		*result=static_cast<char8_t>(unsigned_exp/100u)+u8'0';
+		my_copy_n(tb[u].data(),2,result+1);
+		return result+3;
+	}
+	return my_copy_n(tb[unsigned_exp].data(),2,result);
 #endif
 }
 

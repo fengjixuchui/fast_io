@@ -17,14 +17,14 @@ inline constexpr void gf128_mult(std::array<std::uint64_t, 16> const& HL,
 {
     std::uint8_t rem;
 
-    std::uint8_t lo(static_cast<std::uint8_t>(static_cast<std::uint8_t const>(x[15]) & 0x0f));
-    std::uint8_t hi(static_cast<std::uint8_t>(static_cast<std::uint8_t const>(x[15]) >> 4));
+    std::uint8_t lo(static_cast<std::uint8_t>(static_cast<std::uint8_t>(x[15]) & 0x0f));
+    std::uint8_t hi(static_cast<std::uint8_t>(static_cast<std::uint8_t>(x[15]) >> 4));
     std::uint64_t zh(static_cast<std::uint64_t>(HH[lo]));
     std::uint64_t zl(static_cast<std::uint64_t>(HL[lo]));
 
     for (std::size_t i(16); i--;) {
-        lo = static_cast<std::uint8_t>(static_cast<std::uint8_t const>(x[i]) & 0x0f);
-        hi = static_cast<std::uint8_t>(static_cast<std::uint8_t const>(x[i]) >> 4);
+        lo = static_cast<std::uint8_t>(static_cast<std::uint8_t>(x[i]) & 0x0f);
+        hi = static_cast<std::uint8_t>(static_cast<std::uint8_t>(x[i]) >> 4);
 
         if (i != 15) {
             rem = static_cast<std::uint8_t>(zl & 0x0f);
@@ -69,7 +69,7 @@ inline constexpr std::uint64_t GET_UINT32_BE(std::array<std::byte, 16> const& h,
 
 }
 
-template<typename block_cipher = fast_io::crypto::aes::aes_enc_256>
+template<typename block_cipher>
 requires(block_cipher::block_size == 16)
 struct gmac
 {

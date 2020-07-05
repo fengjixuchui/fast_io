@@ -4,6 +4,7 @@
 #include<io.h>
 #else
 #include<unistd.h>
+#include <sys/uio.h>
 #endif
 #include<fcntl.h>
 #ifdef __linux__
@@ -12,7 +13,6 @@
 #ifdef __BSD_VISIBLE
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/uio.h>
 #endif
 
 namespace fast_io
@@ -224,8 +224,14 @@ protected:
 	void close_impl() noexcept
 	{
 		if(this->native_handle()!=-1)
-#if defined(__linux__)&&defined(__x86_64__)
-			system_call<3,int>(this->native_handle());
+#if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
+			system_call<
+#if defined(__x86_64__)
+			3
+#elif defined(__arm64__) || defined(__aarch64__) 
+			57
+#endif
+			,int>(this->native_handle());
 #else
 			close(this->native_handle());
 #endif
@@ -237,8 +243,14 @@ public:
 	constexpr explicit basic_posix_io_handle()=default;
 	constexpr explicit basic_posix_io_handle(int fdd):basic_posix_io_observer<ch_type>{fdd}{}
 	basic_posix_io_handle(basic_posix_io_handle const& dp):basic_posix_io_observer<ch_type>{
-#if defined(__linux__)&&defined(__x86_64__)
-		system_call<32,int>
+#if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
+		system_call<
+#if defined(__x86_64__)
+		32
+#elif defined(__arm64__) || defined(__aarch64__) 
+		23
+#endif
+		,int>
 #else
 		dup
 #endif
@@ -249,8 +261,14 @@ public:
 	basic_posix_io_handle& operator=(basic_posix_io_handle const& dp)
 	{
 		auto newfd(
-#if defined(__linux__)&&defined(__x86_64__)
-		system_call<33,int>
+#if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
+		system_call<
+#if defined(__x86_64__)
+		33
+#elif defined(__arm64__) || defined(__aarch64__) 
+		1041
+#endif
+		,int>
 #else
 		dup2
 #endif
@@ -289,8 +307,14 @@ template<std::integral ch_type,std::contiguous_iterator Iter>
 inline Iter read(basic_posix_io_observer<ch_type> h,Iter begin,Iter end)
 {
 	auto read_bytes(
-#if defined(__linux__)&&defined(__x86_64__)
-		system_call<0,std::ptrdiff_t>
+#if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
+		system_call<
+#if defined(__x86_64__)
+		0
+#elif defined(__arm64__) || defined(__aarch64__)
+		63
+#endif
+		,std::ptrdiff_t>
 #else
 		::read
 #endif
@@ -302,8 +326,14 @@ template<std::integral ch_type,std::contiguous_iterator Iter>
 inline Iter write(basic_posix_io_observer<ch_type> h,Iter begin,Iter end)
 {
 	auto write_bytes(
-#if defined(__linux__)&&defined(__x86_64__)
-		system_call<1,std::ptrdiff_t>
+#if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
+		system_call<
+#if defined(__x86_64__)
+		1
+#elif defined(__arm64__) || defined(__aarch64__)
+		64
+#endif
+		,std::ptrdiff_t>
 #else
 		::write
 #endif
@@ -316,8 +346,14 @@ template<std::integral ch_type,typename T,std::integral R>
 inline std::common_type_t<std::int64_t, std::size_t> seek(basic_posix_io_observer<ch_type> h,seek_type_t<T>,R i=0,seekdir s=seekdir::cur)
 {
 	auto ret(
-#if defined(__linux__)&&defined(__x86_64__)
-		system_call<8,std::ptrdiff_t>
+#if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
+		system_call<
+#if defined(__x86_64__)
+		8
+#elif defined(__arm64__) || defined(__aarch64__)
+		62
+#endif
+		,std::ptrdiff_t>
 #elif defined(__linux__)
 		::lseek64
 #elif defined(__WINNT__) || defined(_MSC_VER)
@@ -381,8 +417,14 @@ requires requires(basic_posix_io_observer<ch_type> h,Args&& ...args)
 }
 inline void io_control(basic_posix_io_observer<ch_type> h,Args&& ...args)
 {
-#if defined(__linux__)&&defined(__x86_64__)
-	system_call_throw_error(system_call<16,int>(h.native_handle(),std::forward<Args>(args)...));
+#if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
+	system_call_throw_error(system_call<
+#if defined(__x86_64__)
+		16
+#elif defined(__arm64__) || defined(__aarch64__)
+		29
+#endif
+	,int>(h.native_handle(),std::forward<Args>(args)...));
 #else
 	if(ioctl(h.native_handle(),std::forward<Args>(args)...)==-1)
 	{
@@ -429,8 +471,14 @@ public:
 #if defined(__WINNT__) || defined(_MSC_VER)
 			::_open(
 #else
-#if defined(__linux__)&&defined(__x86_64__)
-		system_call<257,int>(AT_FDCWD,
+#if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
+		system_call<
+#if defined(__x86_64__)
+		257
+#elif defined(__arm64__) || defined(__aarch64__)
+		56
+#endif
+		,int>(AT_FDCWD,
 #else
 		::openat(AT_FDCWD,
 #endif
@@ -786,11 +834,121 @@ inline constexpr basic_posix_io_observer<char_type> native_stderr()
 {
 	return basic_posix_io_observer<char_type>{posix_stderr_number};
 }
-#endif
-template<output_stream output,std::integral intg>
-inline constexpr void print_define(output& out,basic_posix_io_observer<intg> iob)
+/*
+template<std::integral ch_type>
+inline std::size_t scatter_read(basic_posix_io_observer<ch_type> h,std::span<io_scatter_t> sp)
 {
-	print(out,iob.native_handle());
+	return h.fd;
+}
+template<std::integral ch_type>
+inline std::size_t scatter_write(basic_posix_io_observer<ch_type> h,std::span<io_scatter_t> sp)
+{
+}*/
+
+namespace details
+{
+
+struct __attribute__((__may_alias__)) iovec_may_alias:iovec
+{};
+
+inline std::size_t posix_scatter_read_impl(int fd,std::span<io_scatter_t const> sp)
+{
+
+#if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
+	static_assert(sizeof(unsigned long)==sizeof(std::size_t));
+	auto val{system_call<
+#if defined(__x86_64__)
+		19
+#elif defined(__arm64__) || defined(__aarch64__) 
+		65
+#endif
+,std::ptrdiff_t>(static_cast<unsigned int>(fd),sp.data(),sp.size())};
+	system_call_throw_error(val);
+	return val;
+#else
+
+	std::size_t sz{sp.size()};
+	if(static_cast<std::size_t>(std::numeric_limits<int>::max())<sz)
+		sz=static_cast<std::size_t>(std::numeric_limits<int>::max());
+	auto ptr{reinterpret_cast<iovec_may_alias const*>(sp.data())};
+	std::ptrdiff_t val{::readv(fd,ptr,static_cast<int>(sz))};
+	if(val<0)
+#ifdef __cpp_exceptions
+		throw posix_error();
+#else
+		fast_terminate();
+#endif
+	return val;
+#endif
+}
+
+inline std::size_t posix_scatter_write_impl(int fd,std::span<io_scatter_t const> sp)
+{
+
+#if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
+	static_assert(sizeof(unsigned long)==sizeof(std::size_t));
+	auto val{system_call<
+#if defined(__x86_64__)
+		20
+#else
+		66
+#endif
+,std::ptrdiff_t>(static_cast<unsigned int>(fd),sp.data(),sp.size())};
+	system_call_throw_error(val);
+	return val;
+#else
+	std::size_t sz{sp.size()};
+	if(static_cast<std::size_t>(std::numeric_limits<int>::max())<sz)
+		sz=static_cast<std::size_t>(std::numeric_limits<int>::max());
+	auto ptr{reinterpret_cast<iovec_may_alias const*>(sp.data())};
+	std::ptrdiff_t val{::writev(fd,ptr,static_cast<int>(sz))};
+	if(val<0)
+#ifdef __cpp_exceptions
+		throw posix_error();
+#else
+		fast_terminate();
+#endif
+	return val;
+#endif
+}
+
+}
+
+template<std::integral ch_type,typename... Args>
+inline auto scatter_read(basic_posix_io_observer<ch_type> h,Args&& ...args)
+{
+	return details::posix_scatter_read_impl(h.fd,std::forward<Args>(args)...);
+}
+
+template<std::integral ch_type,typename... Args>
+inline auto scatter_write(basic_posix_io_observer<ch_type> h,Args&& ...args)
+{
+	return details::posix_scatter_write_impl(h.fd,std::forward<Args>(args)...);
+}
+
+template<std::integral ch_type,typename... Args>
+inline auto scatter_read(basic_posix_pipe<ch_type>& h,Args&& ...args)
+{
+	return details::posix_scatter_read_impl(h.in().fd,std::forward<Args>(args)...);
+}
+
+template<std::integral ch_type,typename... Args>
+inline auto scatter_write(basic_posix_pipe<ch_type>& h,Args&& ...args)
+{
+	return details::posix_scatter_write_impl(h.out().fd,std::forward<Args>(args)...);
+}
+
+#endif
+template<std::integral char_type>
+inline constexpr std::size_t print_reserve_size(print_reserve_type_t<basic_posix_io_observer<char_type>>)
+{
+	return print_reserve_size(print_reserve_type<int>);
+}
+
+template<std::integral char_type,std::contiguous_iterator caiter,typename U>
+inline constexpr caiter print_reserve_define(print_reserve_type_t<basic_posix_io_observer<char_type>>,caiter iter,U&& v)
+{
+	return print_reserve_define(print_reserve_type<int>,iter,v.fd);
 }
 
 }

@@ -139,10 +139,6 @@ inline auto system_call(auto p1, auto p2, auto p3, auto p4,auto p5,auto p6)
 template<std::integral I>
 inline void fast_exit(I ret)
 {
-#if defined(__linux__) && defined(__x86_64__)
 	system_call_no_return<60>(ret);
-#else
-	_exit(ret);
-#endif
 }
 }

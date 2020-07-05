@@ -9,7 +9,6 @@ inline constexpr Iter precise(typename floating_traits<floating_type>::mantissa_
 	using mantissa_type = typename floating_trait::mantissa_type;
 	using exponent_type = typename floating_trait::exponent_type;
 	using signed_exponent_type = std::make_signed_t<exponent_type>;
-	using char_type = char8_t;
 	mantissa_type const mantissa(bits & ((static_cast<mantissa_type>(1u) << floating_trait::mantissa_bits) - 1u));
 	exponent_type const exponent(static_cast<exponent_type>(((bits >> floating_trait::mantissa_bits) & floating_trait::exponent_max)));
 	auto const r2(init_rep<floating_type>(mantissa,static_cast<signed_exponent_type>(exponent)));
@@ -18,7 +17,6 @@ inline constexpr Iter precise(typename floating_traits<floating_type>::mantissa_
 
 
 	exponent_type printed_digits(0),available_digits(0);
-	signed_exponent_type exp(0);
 	bool const negative_r2_e(r2e<0);
 	auto result{start};
 	if(-52<=r2e)
@@ -28,7 +26,7 @@ inline constexpr Iter precise(typename floating_traits<floating_type>::mantissa_
 		auto const idx_offset(fixed_pow10<>::offset[idx]);
 		for(std::size_t i(length_for_index(idx));i--;)
 		{
-			exponent_type digits(mul_shift_mod_1e9(r2.m<<8,fixed_pow10<>::split[idx_offset+i],p10bitsmr2e));
+			exponent_type digits(mul_shift_mod_1e9(r2m<<8,fixed_pow10<>::split[idx_offset+i],p10bitsmr2e));
 			if(printed_digits)
 			{
 				append_nine_digits<0>(result,digits);
@@ -57,7 +55,7 @@ inline constexpr Iter precise(typename floating_traits<floating_type>::mantissa_
 			exponent_type const p(of2i+i-mb2_idx);
 			if(idxp1<=p)
 				break;
-			exponent_type digits(mul_shift_mod_1e9(r2.m<<8,fixed_pow10<>::split_2[p],j));
+			exponent_type digits(mul_shift_mod_1e9(r2m<<8,fixed_pow10<>::split_2[p],j));
 			if(printed_digits)
 			{
 				append_nine_digits<0>(result,digits);

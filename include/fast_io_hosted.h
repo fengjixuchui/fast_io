@@ -13,12 +13,7 @@ For hosted implementations the set of standard library headers required by the C
 #include"fast_io_hosted/iomutex.h"
 #include"fast_io_hosted/chrono.h"
 #include"fast_io_hosted/process/native.h"
-#include"fast_io_hosted/global_new.h"
 #include"fast_io_hosted/parallel.h"
-#if __cpp_impl_coroutine >= 201902
-#include<coroutine>
-#include"fast_io_hosted/async_coro.h"
-#endif
 
 //#include<clocale>
 //#include"fast_io_hosted/posix_locale.h"

@@ -3,7 +3,7 @@
 namespace fast_io::details
 {
 
-template<std::integral char_type,std::size_t base,bool upper>
+template<std::integral char_type,std::size_t base,bool upper,bool transparent>
 inline constexpr auto cal_content()
 {
 	constexpr std::size_t chars{2};
@@ -23,6 +23,8 @@ inline constexpr auto cal_content()
 		}
 		++val[j];
 	}
+	if constexpr(!transparent)
+	{
 	for(auto &e : vals)
 		for(auto &e1 : e)
 			if constexpr(10<base)
@@ -39,12 +41,13 @@ inline constexpr auto cal_content()
 			}
 			else
 				e1+=0x30;
+	}
 	return vals;
 }
 
-template<std::integral char_type,std::size_t base,bool upper>
+template<std::integral char_type,std::size_t base,bool upper,bool transparent=false>
 struct shared_static_base_table
 {
-	inline static constexpr auto table=cal_content<char_type,base,upper>();
+	inline static constexpr auto table=cal_content<char_type,base,upper,transparent>();
 };
 }

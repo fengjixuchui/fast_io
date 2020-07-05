@@ -117,12 +117,12 @@ inline constexpr Iter output_shortest(
 								else
 									my_copy_n(u8"e+",2,result);
 								result+=2;
-								my_copy_n(jiaendu::static_tables<char_type>::table2[v2_len-1].data(),2,result);
+								fp_output_two_digits(result,v2_len);
 								result+=2;
 							}
 							else
 							{
-								fp_output_unsigned(result,v2);
+								fp_output_unsigned_with_len(result,v2,v2_len);
 								result+=v2_len;
 							}
 						}
@@ -151,7 +151,7 @@ inline constexpr Iter output_shortest(
 					else
 						my_copy_n(u8"e+",2,result);
 					result+=2;
-					my_copy_n(jiaendu::static_tables<char_type>::table2[v2_len-1].data(),2,result);
+					fp_output_two_digits(result,v2_len-1);
 					result+=2;
 				}
 				return result;
@@ -175,6 +175,7 @@ inline constexpr Iter output_shortest(
 		e10=static_cast<signed_exponent_type>(q);
 		signed_exponent_type const k(floating_trait::pow5_inv_bitcount + pow5bits(q) - 1);
 		signed_exponent_type const i(-r2.e+static_cast<signed_exponent_type>(q)+k);
+#ifdef __SIZEOF_INT128__
 		if constexpr(std::same_as<std::remove_cvref_t<F>,long double>)
 		{
 			auto pow5arr{generic_compute_pow5_inv(q)};
@@ -182,7 +183,9 @@ inline constexpr Iter output_shortest(
 			vp = mul_shift_generic(mv+2, pow5arr, i);
 			vm = mul_shift_generic(mv-1-mm_shift, pow5arr, i);
 		}
-		else if constexpr(std::same_as<floating_type,double>)
+		else
+#endif
+		if constexpr(std::same_as<floating_type,double>)
 			vr=mul_shift_all(r2.m,pow5<F,true>::inv_split[q],i,vp,vm,mm_shift);
 		else if constexpr(std::same_as<floating_type,float>)
 		{
@@ -216,6 +219,7 @@ inline constexpr Iter output_shortest(
 		signed_exponent_type const i(-r2.e-signed_q);
 		signed_exponent_type const k(pow5bits(i)-floating_trait::pow5_bitcount);
 		signed_exponent_type j(signed_q-k);
+#ifdef __SIZEOF_INT128__
 		if constexpr(std::same_as<floating_type,long double>)
 		{
 			auto pow5arr{generic_compute_pow5(i)};
@@ -223,7 +227,9 @@ inline constexpr Iter output_shortest(
 			vp = mul_shift_generic(mv+2, pow5arr, j);
 			vm = mul_shift_generic(mv-1-mm_shift, pow5arr, j);
 		}
-		else if constexpr(std::same_as<floating_type,double>)
+		else
+#endif
+		if constexpr(std::same_as<floating_type,double>)
 			vr=mul_shift_all(r2.m,pow5<F,true>::split[i],j,vp,vm,mm_shift);
 		else if constexpr(std::same_as<floating_type,float>)
 		{

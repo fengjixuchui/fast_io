@@ -27,7 +27,7 @@ public:
 	using char_type = typename indirect_buffer_type::char_type;
 	template<typename... Args>
 	requires std::constructible_from<source_buffer_type,Args...>
-	constexpr basic_indirect_ibuffer_constructor_source_type(Args&& ...args):basic_indirect_ibuffer<src,indire,func>{.source={std::forward<Args>(args)...}}
+	constexpr basic_indirect_ibuffer_constructor_source_type(Args&& ...args):basic_indirect_ibuffer<src,indire,func>{.source={std::forward<Args>(args)...},.indirect={},.function={}}
 	{}
 };
 

@@ -125,12 +125,13 @@ inline void ibuffer_set_curr(c_io_observer_unlocked cio,char* ptr)
 	set_fp_cnt(cio.fp,get_fp_ptr(cio.fp)-ptr+get_fp_cnt(cio.fp));
 	set_fp_ptr(cio.fp,ptr);
 }
-extern "C" int __stdcall __acrt_stdio_refill_and_read_narrow_nolock(FILE*) noexcept;
+//extern "C" int __stdcall __acrt_stdio_refill_and_read_narrow_nolock(FILE*) noexcept;
 
 inline bool underflow(c_io_observer_unlocked cio)
 {
 	using namespace details::ucrt_hack;
-	if(__acrt_stdio_refill_and_read_narrow_nolock(cio.fp)==EOF)[[unlikely]]
+	ibuffer_set_curr(cio,ibuffer_end(cio));
+	if(_fgetc_nolock(cio.fp)==EOF)[[unlikely]]
 		return false;
 	set_fp_cnt(cio.fp,get_fp_cnt(cio.fp)+1);
 	set_fp_ptr(cio.fp,get_fp_ptr(cio.fp)-1);
@@ -163,10 +164,11 @@ inline void obuffer_set_curr(c_io_observer_unlocked cio,char* ptr)
 	set_fp_flags(cio.fp,get_fp_flags(cio.fp)|0x010000);
 }
 
-extern "C" int __stdcall __acrt_stdio_flush_and_write_narrow_nolock(int,FILE*) noexcept;
+//extern "C" int __stdcall __acrt_stdio_flush_and_write_narrow_nolock(int,FILE*) noexcept;
 inline void overflow(c_io_observer_unlocked cio,char ch)
 {
-	if(__acrt_stdio_flush_and_write_narrow_nolock(static_cast<int>(static_cast<unsigned char>(ch)),cio.fp)==EOF)[[unlikely]]
+	obuffer_set_curr(cio,obuffer_end(cio));
+	if(_fputc_nolock(static_cast<int>(static_cast<unsigned char>(ch)),cio.fp)==EOF)[[unlikely]]
 #ifdef __cpp_exceptions
 		throw posix_error();
 #else
@@ -201,7 +203,8 @@ inline void ibuffer_set_curr(wc_io_observer_unlocked cio, [[gnu::may_alias]] wch
 inline bool underflow(wc_io_observer_unlocked cio)
 {
 	using namespace details::ucrt_hack;
-	if(__acrt_stdio_refill_and_read_narrow_nolock(cio.fp)==EOF)[[unlikely]]
+	ibuffer_set_curr(cio,ibuffer_end(cio));
+	if(_fgetwc_nolock(cio.fp)==EOF)[[unlikely]]
 		return false;
 	set_fp_cnt(cio.fp,get_fp_cnt(cio.fp)+1);
 	set_fp_ptr(cio.fp,get_fp_ptr(cio.fp)-1);
@@ -234,13 +237,13 @@ inline void obuffer_set_curr(wc_io_observer_unlocked cio,[[gnu::may_alias]] wcha
 	set_fp_flags(cio.fp,get_fp_flags(cio.fp)|0x010000);
 }
 
-extern "C" wint_t __stdcall __acrt_stdio_flush_and_write_wide_nolock(wint_t,FILE*) noexcept;
+//extern "C" wint_t __stdcall __acrt_stdio_flush_and_write_wide_nolock(wint_t,FILE*) noexcept;
 
 inline void overflow(wc_io_observer_unlocked cio,wchar_t ch)
 {
 	using namespace details::ucrt_hack;
 	obuffer_set_curr(cio,obuffer_end(cio));
-	if(__acrt_stdio_flush_and_write_wide_nolock(static_cast<wint_t>(static_cast<std::make_unsigned_t<wchar_t>>(ch)),cio.fp)==WEOF)[[unlikely]]
+	if(_fputwc_nolock(static_cast<wint_t>(static_cast<std::make_unsigned_t<wchar_t>>(ch)),cio.fp)==WEOF)[[unlikely]]
 #ifdef __cpp_exceptions
 		throw posix_error();
 #else

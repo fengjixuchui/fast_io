@@ -30,14 +30,34 @@ inline constexpr std::size_t fp_output_unsigned(Iter iter,U i)
 	}
 	else
 	{
-
 		namespace algo_decision = 
 #ifdef FAST_IO_OPTIMIZE_SIZE
 			optimize_size;
-#else
+#elif defined(FAST_IO_OPTIMIZE_TIME)
 			jiaendu::fp;
+#else
+			twodigits::fp;
 #endif
 		return algo_decision::output_unsigned(iter,static_cast<std::remove_cvref_t<U>>(i));
+	}
+}
+
+template<std::contiguous_iterator Iter,my_unsigned_integral U>
+inline constexpr void fp_output_unsigned_with_len(Iter iter,U i,std::size_t len)
+{
+	if(std::is_constant_evaluated())
+	{
+		optimize_size::with_length::output_unsigned(iter,static_cast<std::remove_cvref_t<U>>(i),len);
+	}
+	else
+	{
+#ifdef FAST_IO_OPTIMIZE_SIZE
+		optimize_size::with_length::output_unsigned(iter,static_cast<std::remove_cvref_t<U>>(i),len);
+#elif defined(FAST_IO_OPTIMIZE_TIME)
+		jiaendu::fp::output_unsigned(iter,static_cast<std::remove_cvref_t<U>>(i));
+#else
+		return twodigits::with_length::output_unsigned(iter,static_cast<std::remove_cvref_t<U>>(i),len);
+#endif
 	}
 }
 
@@ -62,8 +82,10 @@ inline constexpr std::size_t fp_output_unsigned_point([[maybe_unused]]compile_ti
 			namespace algo_decision = 
 #ifdef FAST_IO_OPTIMIZE_SIZE
 				optimize_size;
-#else
+#elif defined(FAST_IO_OPTIMIZE_TIME)
 				jiaendu::fp;
+#else
+				twodigits::fp;
 #endif
 			std::size_t ret(algo_decision::output_unsigned(std::to_address(str)+1,value));
 			*str=str[1];
@@ -95,7 +117,9 @@ inline constexpr std::size_t output_unsigned(Iter str,U value)
 	{
 		U const temp(value/10);
 		char_type const res(value%10);
-		*str=start;
+		*str=res;
+		value=temp;
+		--str;
 	}
 	return len;
 }
@@ -114,14 +138,29 @@ inline constexpr std::size_t fp_output_unsigned_trans(Iter iter,U i)
 		namespace algo_decision = 
 #ifdef FAST_IO_OPTIMIZE_SIZE
 			transparent;
-#else
+#elif defined(FAST_IO_OPTIMIZE_TIME)
 			jiaendu::fp;
+#else
+			twodigits::fp;
 #endif
 		return algo_decision::output_unsigned<0>(iter,static_cast<std::remove_cvref_t<U>>(i));
 	}
 }
 
-
+template<std::contiguous_iterator Iter,my_unsigned_integral U>
+inline constexpr void fp_output_two_digits(Iter iter,U i)
+{
+#ifdef FAST_IO_OPTIMIZE_SIZE
+	std::uint32_t u(i/10);
+	std::uint32_t v(i%10);
+	*iter=u;
+	iter[1]=v;
+#elif defined(FAST_IO_OPTIMIZE_TIME)
+	my_copy_n(jiaendu::static_tables<std::iter_value_t<Iter>>::table2[i].data(),2,iter);
+#else
+	my_copy_n(shared_static_base_table<std::iter_value_t<Iter>,10,false>::table[i].data(),2,iter);
+#endif
+}
 
 }
 

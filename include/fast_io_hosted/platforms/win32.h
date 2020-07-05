@@ -816,7 +816,18 @@ inline basic_win32_io_observer<char_type> native_stderr()
 template<output_stream output,std::integral intg>
 inline constexpr void print_define(output& out,basic_win32_io_observer<intg> iob)
 {
-	print(out,iob.native_handle());
+	print(out,iob.handle);
 }
 
+template<std::integral char_type>
+inline constexpr std::size_t print_reserve_size(print_reserve_type_t<basic_win32_io_observer<char_type>>)
+{
+	return print_reserve_size(print_reserve_type<void*>);
+}
+
+template<std::integral char_type,std::contiguous_iterator caiter,typename U>
+inline constexpr caiter print_reserve_define(print_reserve_type_t<basic_win32_io_observer<char_type>>,caiter iter,U&& v)
+{
+	return print_reserve_define(print_reserve_type<void*>,iter,v.handle);
+}
 }

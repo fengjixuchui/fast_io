@@ -31,11 +31,12 @@ inline constexpr void output_unsigned_dummy(Iter str,U value)
 	}
 }
 
+namespace with_length
+{
 template<char8_t base=10,bool uppercase=false,std::random_access_iterator Iter,my_unsigned_integral U>
-inline constexpr std::size_t output_unsigned(Iter str,U value)
+inline constexpr void output_unsigned(Iter str,U value,std::size_t const len)
 {
 	using char_type = std::iter_value_t<Iter>;
-	std::size_t const len{chars_len<base>(value)};
 	str+=len;
 	for(std::size_t i{};i!=len;++i)
 	{
@@ -58,6 +59,14 @@ inline constexpr std::size_t output_unsigned(Iter str,U value)
 		}
 		value = temp;
 	}
+}
+}
+
+template<char8_t base=10,bool uppercase=false,std::random_access_iterator Iter,my_unsigned_integral U>
+inline constexpr std::size_t output_unsigned(Iter str,U value)
+{
+	std::size_t const len{chars_len<base>(value)};
+	with_length::output_unsigned(str,value,len);
 	return len;
 }
 

@@ -2,6 +2,10 @@
 
 fast_io is a new C++20 library for extremely fast input/output and aims to replace iostream and cstdio. It is header-only (module only in the future) for easy inclusion in your project. It requires a capable C++20 compiler supporting concepts.
 
+## What does "fast" mean in fast_io?
+
+It does not necessary mean it will be faster than everything else. (Or it would be named as fastest_io. Of course those fmt trolls would claim that.) It means it is significantly faster than stdio.h and iostream for all cases. fast means faster than stdio.h and iostream.
+
 ## Hello World
 
 ```cpp
@@ -150,8 +154,7 @@ Notice: I modified libstdc++'s BUFSIZ 1048576 due to BUFSIZE is too small (512 b
 | Rust itoa library 0.4.6 | > 0.165s | | I ignore the \n part for it to ensure no bias. |
 
 
-RUST I/O IS FUCKING STUPID. ONLY LOSERS USE SUCH A SLOW AND GARBAGE LANGUAGE. 10x slower than fast\_io. + binary bloat
-Rust itoa library is still extremely slow and usable for me. It is still 3x slower than fast\_io.
+Rust language is 10x slower than fast\_io. + binary bloat and itoa library is still extremely slow and usable for me. It is at least 3x slower than fast\_io.
 
 
 Run the same test on MSVC 19.26.28805.
@@ -199,7 +202,7 @@ Run the same test on GCC 11. glibc + libstdc++
 | fast_io::c_file                |      0.092490191s       |   0.104545535s        | Thread Safe. I hacked glibc's FILE* implementation   |
 | fast_io::filebuf_file          |      0.052251608s       |   0.06655806s         | I hacked libstdc++'s streambuf/filebuf implementation|
 
-You can see fast_io can also boost the performance of existing facilities for 10x! Yes, it can even improve FILE* and fstream's performance for 10x depending on platforms since I use concepts to abstract them all. fmtlib actually slows down I/O performance. In general, fmtlib and charconv fucking sucks.
+You can see fast_io can also boost the performance of existing facilities for 10x! Yes, it can even improve FILE* and fstream's performance for 10x depending on platforms since I use concepts to abstract them all. fmtlib actually slows down I/O performance.
 
 2. Output 10M double in round-trip mode with Ryu algorithm
 
@@ -210,7 +213,7 @@ All benchmarks are in benchmarks/0001.10m_double/charconv.
 Run the same test on MSVC 19.26.28805.
 
 
-| Platform                       |       Windows           |  MSVC 19.26.28805     |  Install fmtlib wastes time of my life               |
+| Platform                       |       Windows           |  MSVC 19.26.28805     |                  |
 |--------------------------------|-------------------------|-----------------------|------------------------------------------------------|
 |                                                                                                                                         |
 
@@ -337,3 +340,17 @@ iconv test:
 |--------------------------------|-------------------------|------------------------------------------------------------------------------|
 | iconv command                  |      0.844s             |  GNU iconv. No BOM which sucks                                           |
 | utf8_file_to_utf32_file.cc     |      0.442s             |  I use the SSE algorithms provided by the utf-utils project.                   |
+
+## Credit
+
+This project is made possible by referencing from other open-source projects. (I won't take their code directly. They are reimplemented by myself to fit the purpose of this library or it might have integration issues.)
+
+|Project  | Url                                 |
+|---------|-----------------------------------------|
+|Grisu-Exact| https://github.com/jk-jeon/Grisu-Exact |
+|Ryu| https://github.com/ulfjack/ryu  |
+|SHA-Intrinsics| https://github.com/noloader/SHA-Intrinsics |
+|SHA1| https://github.com/vog/sha1 |
+|UTF-utils| https://github.com/BobSteagall/utf_utils|
+|jenkins-hash-java|https://github.com/vkandy/jenkins-hash-java |
+|md5|https://github.com/JieweiWei/md5 |

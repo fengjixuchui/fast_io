@@ -1,7 +1,7 @@
 #pragma once
 
-#ifdef __SSE4_1__
-//requires -maes -msse4.1 -msse2
+#if defined(__SHA__) && defined(__SSE4_1__)
+//requires -msse4.1 -msha
 #include <immintrin.h>  // for intrinsics for sha1 function
 #endif
 
@@ -9,7 +9,7 @@
 namespace fast_io
 {
 
-
+#if !(defined(__SHA__) && defined(__SSE4_1__))
 namespace details::sha1
 {
 namespace
@@ -160,7 +160,7 @@ inline constexpr void transform(std::span<std::uint32_t,5> digest, std::array<st
 
 }
 }
-
+#endif
 
 class sha1_function
 {
@@ -168,9 +168,9 @@ public:
 	using digest_type = std::array<std::uint32_t,5>;
 	static inline constexpr digest_type digest_initial_value{0x67452301,0xefcdab89,0x98badcfe,0x10325476,0xc3d2e1f0};
 	static inline constexpr std::size_t block_size{64};
-	void operator()(std::span<std::uint32_t,5> state,std::span<std::byte const,64> blocks)
+	void operator()(std::span<std::uint32_t,5> state,std::span<std::byte const,64> block)
 	{
-#ifdef __SSE4_1__
+#if defined(__SHA__) && defined(__SSE4_1__)
 //https://stackoverflow.com/questions/21107350/how-can-i-access-sha-intrinsic
 		__m128i ABCD, ABCD_SAVE, E0, E0_SAVE, E1;
 		__m128i MASK, MSG0, MSG1, MSG2, MSG3;
@@ -188,14 +188,14 @@ public:
 		E0_SAVE = E0;
 
 		// Rounds 0-3
-		MSG0 = _mm_loadu_si128((__m128i*) blocks.data());
+		MSG0 = _mm_loadu_si128((__m128i*) block.data());
 		MSG0 = _mm_shuffle_epi8(MSG0, MASK);
 		E0 = _mm_add_epi32(E0, MSG0);
 		E1 = ABCD;
 		ABCD = _mm_sha1rnds4_epu32(ABCD, E0, 0);
 
 		// Rounds 4-7
-		MSG1 = _mm_loadu_si128((__m128i*) (blocks.data()+16));
+		MSG1 = _mm_loadu_si128((__m128i*) (block.data()+16));
 		MSG1 = _mm_shuffle_epi8(MSG1, MASK);
 		E1 = _mm_sha1nexte_epu32(E1, MSG1);
 		E0 = ABCD;
@@ -203,7 +203,7 @@ public:
 		MSG0 = _mm_sha1msg1_epu32(MSG0, MSG1);
 
 		// Rounds 8-11
-		MSG2 = _mm_loadu_si128((__m128i*) (blocks.data()+32));
+		MSG2 = _mm_loadu_si128((__m128i*) (block.data()+32));
 		MSG2 = _mm_shuffle_epi8(MSG2, MASK);
 		E0 = _mm_sha1nexte_epu32(E0, MSG2);
 		E1 = ABCD;
@@ -212,7 +212,7 @@ public:
 		MSG0 = _mm_xor_si128(MSG0, MSG2);
 
 		// Rounds 12-15
-		MSG3 = _mm_loadu_si128((__m128i*) (blocks.data()+48));
+		MSG3 = _mm_loadu_si128((__m128i*) (block.data()+48));
 		MSG3 = _mm_shuffle_epi8(MSG3, MASK);
 		E1 = _mm_sha1nexte_epu32(E1, MSG3);
 		E0 = ABCD;
@@ -351,18 +351,184 @@ public:
 		ABCD = _mm_shuffle_epi32(ABCD, 0x1B);
 		_mm_storeu_si128((__m128i*) state.data(), ABCD);
 		state[4] = _mm_extract_epi32(E0, 3);
+
+#elif defined(FAST_IO_ARM_SHA) && ( defined(__arm__) || defined(__aarch32__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM) )
+
+		uint32x4_t ABCD, ABCD_SAVED;
+		uint32x4_t TMP0, TMP1;
+		uint32x4_t MSG0, MSG1, MSG2, MSG3;
+		uint32_t   E0, E0_SAVED, E1;
+
+		ABCD = vld1q_u32(state.data());
+
+		ABCD_SAVED = ABCD;
+		E0_SAVED = E0;
+
+		/* Load message */
+		MSG0 = vld1q_u32(reinterpret_cast<std::uint32_t const *>(block.data() +  0));
+		MSG1 = vld1q_u32(reinterpret_cast<std::uint32_t const *>(block.data() + 16));
+		MSG2 = vld1q_u32(reinterpret_cast<std::uint32_t const *>(block.data() + 32));
+		MSG3 = vld1q_u32(reinterpret_cast<std::uint32_t const *>(block.data() + 48));
+
+		/* Reverse for little endian */
+		MSG0 = vreinterpretq_u32_u8(vrev32q_u8(vreinterpretq_u8_u32(MSG0)));
+		MSG1 = vreinterpretq_u32_u8(vrev32q_u8(vreinterpretq_u8_u32(MSG1)));
+		MSG2 = vreinterpretq_u32_u8(vrev32q_u8(vreinterpretq_u8_u32(MSG2)));
+		MSG3 = vreinterpretq_u32_u8(vrev32q_u8(vreinterpretq_u8_u32(MSG3)));
+
+		TMP0 = vaddq_u32(MSG0, vdupq_n_u32(0x5A827999));
+		TMP1 = vaddq_u32(MSG1, vdupq_n_u32(0x5A827999));
+
+		/* Rounds 0-3 */
+		E1 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+		ABCD = vsha1cq_u32(ABCD, E0, TMP0);
+		TMP0 = vaddq_u32(MSG2, vdupq_n_u32(0x5A827999));
+		MSG0 = vsha1su0q_u32(MSG0, MSG1, MSG2);
+
+		/* Rounds 4-7 */
+		E0 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+		ABCD = vsha1cq_u32(ABCD, E1, TMP1);
+		TMP1 = vaddq_u32(MSG3, vdupq_n_u32(0x5A827999));
+		MSG0 = vsha1su1q_u32(MSG0, MSG3);
+		MSG1 = vsha1su0q_u32(MSG1, MSG2, MSG3);
+
+		/* Rounds 8-11 */
+		E1 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+		ABCD = vsha1cq_u32(ABCD, E0, TMP0);
+		TMP0 = vaddq_u32(MSG0, vdupq_n_u32(0x5A827999));
+		MSG1 = vsha1su1q_u32(MSG1, MSG0);
+		MSG2 = vsha1su0q_u32(MSG2, MSG3, MSG0);
+
+		/* Rounds 12-15 */
+		E0 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+		ABCD = vsha1cq_u32(ABCD, E1, TMP1);
+		TMP1 = vaddq_u32(MSG1, vdupq_n_u32(0x6ED9EBA1));
+		MSG2 = vsha1su1q_u32(MSG2, MSG1);
+		MSG3 = vsha1su0q_u32(MSG3, MSG0, MSG1);
+
+		/* Rounds 16-19 */
+		E1 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+		ABCD = vsha1cq_u32(ABCD, E0, TMP0);
+		TMP0 = vaddq_u32(MSG2, vdupq_n_u32(0x6ED9EBA1));
+		MSG3 = vsha1su1q_u32(MSG3, MSG2);
+		MSG0 = vsha1su0q_u32(MSG0, MSG1, MSG2);
+
+		/* Rounds 20-23 */
+		E0 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+		ABCD = vsha1pq_u32(ABCD, E1, TMP1);
+		TMP1 = vaddq_u32(MSG3, vdupq_n_u32(0x6ED9EBA1));
+		MSG0 = vsha1su1q_u32(MSG0, MSG3);
+		MSG1 = vsha1su0q_u32(MSG1, MSG2, MSG3);
+
+		/* Rounds 24-27 */
+		E1 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+		ABCD = vsha1pq_u32(ABCD, E0, TMP0);
+		TMP0 = vaddq_u32(MSG0, vdupq_n_u32(0x6ED9EBA1));
+		MSG1 = vsha1su1q_u32(MSG1, MSG0);
+		MSG2 = vsha1su0q_u32(MSG2, MSG3, MSG0);
+
+		/* Rounds 28-31 */
+		E0 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+		ABCD = vsha1pq_u32(ABCD, E1, TMP1);
+		TMP1 = vaddq_u32(MSG1, vdupq_n_u32(0x6ED9EBA1));
+		MSG2 = vsha1su1q_u32(MSG2, MSG1);
+		MSG3 = vsha1su0q_u32(MSG3, MSG0, MSG1);
+
+		/* Rounds 32-35 */
+		E1 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+		ABCD = vsha1pq_u32(ABCD, E0, TMP0);
+		TMP0 = vaddq_u32(MSG2, vdupq_n_u32(0x8F1BBCDC));
+		MSG3 = vsha1su1q_u32(MSG3, MSG2);
+		MSG0 = vsha1su0q_u32(MSG0, MSG1, MSG2);
+
+		/* Rounds 36-39 */
+		E0 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+		ABCD = vsha1pq_u32(ABCD, E1, TMP1);
+		TMP1 = vaddq_u32(MSG3, vdupq_n_u32(0x8F1BBCDC));
+		MSG0 = vsha1su1q_u32(MSG0, MSG3);
+		MSG1 = vsha1su0q_u32(MSG1, MSG2, MSG3);
+
+		/* Rounds 40-43 */
+		E1 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+		ABCD = vsha1mq_u32(ABCD, E0, TMP0);
+		TMP0 = vaddq_u32(MSG0, vdupq_n_u32(0x8F1BBCDC));
+		MSG1 = vsha1su1q_u32(MSG1, MSG0);
+		MSG2 = vsha1su0q_u32(MSG2, MSG3, MSG0);
+
+		/* Rounds 44-47 */
+		E0 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+		ABCD = vsha1mq_u32(ABCD, E1, TMP1);
+		TMP1 = vaddq_u32(MSG1, vdupq_n_u32(0x8F1BBCDC));
+		MSG2 = vsha1su1q_u32(MSG2, MSG1);
+		MSG3 = vsha1su0q_u32(MSG3, MSG0, MSG1);
+
+		/* Rounds 48-51 */
+		E1 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+		ABCD = vsha1mq_u32(ABCD, E0, TMP0);
+		TMP0 = vaddq_u32(MSG2, vdupq_n_u32(0x8F1BBCDC));
+		MSG3 = vsha1su1q_u32(MSG3, MSG2);
+		MSG0 = vsha1su0q_u32(MSG0, MSG1, MSG2);
+
+		/* Rounds 52-55 */
+		E0 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+		ABCD = vsha1mq_u32(ABCD, E1, TMP1);
+		TMP1 = vaddq_u32(MSG3, vdupq_n_u32(0xCA62C1D6));
+		MSG0 = vsha1su1q_u32(MSG0, MSG3);
+		MSG1 = vsha1su0q_u32(MSG1, MSG2, MSG3);
+
+		/* Rounds 56-59 */
+		E1 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+		ABCD = vsha1mq_u32(ABCD, E0, TMP0);
+		TMP0 = vaddq_u32(MSG0, vdupq_n_u32(0xCA62C1D6));
+		MSG1 = vsha1su1q_u32(MSG1, MSG0);
+		MSG2 = vsha1su0q_u32(MSG2, MSG3, MSG0);
+
+		/* Rounds 60-63 */
+		E0 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+		ABCD = vsha1pq_u32(ABCD, E1, TMP1);
+		TMP1 = vaddq_u32(MSG1, vdupq_n_u32(0xCA62C1D6));
+		MSG2 = vsha1su1q_u32(MSG2, MSG1);
+		MSG3 = vsha1su0q_u32(MSG3, MSG0, MSG1);
+
+		/* Rounds 64-67 */
+		E1 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+		ABCD = vsha1pq_u32(ABCD, E0, TMP0);
+		TMP0 = vaddq_u32(MSG2, vdupq_n_u32(0xCA62C1D6));
+		MSG3 = vsha1su1q_u32(MSG3, MSG2);
+		MSG0 = vsha1su0q_u32(MSG0, MSG1, MSG2);
+
+		/* Rounds 68-71 */
+		E0 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+		ABCD = vsha1pq_u32(ABCD, E1, TMP1);
+		TMP1 = vaddq_u32(MSG3, vdupq_n_u32(0xCA62C1D6));
+		MSG0 = vsha1su1q_u32(MSG0, MSG3);
+
+		/* Rounds 72-75 */
+		E1 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+		ABCD = vsha1pq_u32(ABCD, E0, TMP0);
+
+		/* Rounds 76-79 */
+		E0 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+		ABCD = vsha1pq_u32(ABCD, E1, TMP1);
+
+		/* Combine state */
+		E0 += E0_SAVED;
+		ABCD = vaddq_u32(ABCD_SAVED, ABCD);
+
+		vst1q_u32(state.data(), ABCD);
+		state[4] = E0;
 #else
-		std::array<std::uint32_t,16> tblocks;
-		memcpy(tblocks.data(),blocks.data(),block_size);
-		for(auto& e : tblocks)
+		std::array<std::uint32_t,16> tblock;
+		memcpy(tblock.data(),block.data(),block_size);
+		for(auto& e : tblock)
 			e=details::byte_swap(e);
-		details::sha1::transform(state,tblocks);
+		details::sha1::transform(state,tblock);
 #endif
 	}
 
 	void operator()(std::span<std::uint32_t,5> state,std::span<std::byte const> blocks)
 	{
-#ifdef __SSE4_1__
+#if defined(__SHA__) && defined(__SSE4_1__)
 //https://stackoverflow.com/questions/21107350/how-can-i-access-sha-intrinsic
 		__m128i ABCD, ABCD_SAVE, E0, E0_SAVE, E1;
 		__m128i MASK, MSG0, MSG1, MSG2, MSG3;
@@ -544,6 +710,174 @@ public:
 		ABCD = _mm_shuffle_epi32(ABCD, 0x1B);
 		_mm_storeu_si128((__m128i*) state.data(), ABCD);
 		state[4] = _mm_extract_epi32(E0, 3);
+#elif defined(FAST_IO_ARM_SHA) && ( defined(__arm__) || defined(__aarch32__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM) )
+
+
+		uint32x4_t ABCD, ABCD_SAVED;
+		uint32x4_t TMP0, TMP1;
+		uint32x4_t MSG0, MSG1, MSG2, MSG3;
+		uint32_t   E0, E0_SAVED, E1;
+
+		ABCD = vld1q_u32(state.data());
+
+		for(auto data(blocks.data()),ed(blocks.data()+blocks.size());data!=ed;data+=block_size)
+		{
+			ABCD_SAVED = ABCD;
+			E0_SAVED = E0;
+
+			/* Load message */
+			MSG0 = vld1q_u32(reinterpret_cast<std::uint32_t const *>(data +  0));
+			MSG1 = vld1q_u32(reinterpret_cast<std::uint32_t const *>(data + 16));
+			MSG2 = vld1q_u32(reinterpret_cast<std::uint32_t const *>(data + 32));
+			MSG3 = vld1q_u32(reinterpret_cast<std::uint32_t const *>(data + 48));
+
+			/* Reverse for little endian */
+			MSG0 = vreinterpretq_u32_u8(vrev32q_u8(vreinterpretq_u8_u32(MSG0)));
+			MSG1 = vreinterpretq_u32_u8(vrev32q_u8(vreinterpretq_u8_u32(MSG1)));
+			MSG2 = vreinterpretq_u32_u8(vrev32q_u8(vreinterpretq_u8_u32(MSG2)));
+			MSG3 = vreinterpretq_u32_u8(vrev32q_u8(vreinterpretq_u8_u32(MSG3)));
+
+			TMP0 = vaddq_u32(MSG0, vdupq_n_u32(0x5A827999));
+			TMP1 = vaddq_u32(MSG1, vdupq_n_u32(0x5A827999));
+
+			/* Rounds 0-3 */
+			E1 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+			ABCD = vsha1cq_u32(ABCD, E0, TMP0);
+			TMP0 = vaddq_u32(MSG2, vdupq_n_u32(0x5A827999));
+			MSG0 = vsha1su0q_u32(MSG0, MSG1, MSG2);
+
+			/* Rounds 4-7 */
+			E0 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+			ABCD = vsha1cq_u32(ABCD, E1, TMP1);
+			TMP1 = vaddq_u32(MSG3, vdupq_n_u32(0x5A827999));
+			MSG0 = vsha1su1q_u32(MSG0, MSG3);
+			MSG1 = vsha1su0q_u32(MSG1, MSG2, MSG3);
+
+			/* Rounds 8-11 */
+			E1 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+			ABCD = vsha1cq_u32(ABCD, E0, TMP0);
+			TMP0 = vaddq_u32(MSG0, vdupq_n_u32(0x5A827999));
+			MSG1 = vsha1su1q_u32(MSG1, MSG0);
+			MSG2 = vsha1su0q_u32(MSG2, MSG3, MSG0);
+
+			/* Rounds 12-15 */
+			E0 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+			ABCD = vsha1cq_u32(ABCD, E1, TMP1);
+			TMP1 = vaddq_u32(MSG1, vdupq_n_u32(0x6ED9EBA1));
+			MSG2 = vsha1su1q_u32(MSG2, MSG1);
+			MSG3 = vsha1su0q_u32(MSG3, MSG0, MSG1);
+
+			/* Rounds 16-19 */
+			E1 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+			ABCD = vsha1cq_u32(ABCD, E0, TMP0);
+			TMP0 = vaddq_u32(MSG2, vdupq_n_u32(0x6ED9EBA1));
+			MSG3 = vsha1su1q_u32(MSG3, MSG2);
+			MSG0 = vsha1su0q_u32(MSG0, MSG1, MSG2);
+
+			/* Rounds 20-23 */
+			E0 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+			ABCD = vsha1pq_u32(ABCD, E1, TMP1);
+			TMP1 = vaddq_u32(MSG3, vdupq_n_u32(0x6ED9EBA1));
+			MSG0 = vsha1su1q_u32(MSG0, MSG3);
+			MSG1 = vsha1su0q_u32(MSG1, MSG2, MSG3);
+
+			/* Rounds 24-27 */
+			E1 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+			ABCD = vsha1pq_u32(ABCD, E0, TMP0);
+			TMP0 = vaddq_u32(MSG0, vdupq_n_u32(0x6ED9EBA1));
+			MSG1 = vsha1su1q_u32(MSG1, MSG0);
+			MSG2 = vsha1su0q_u32(MSG2, MSG3, MSG0);
+
+			/* Rounds 28-31 */
+			E0 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+			ABCD = vsha1pq_u32(ABCD, E1, TMP1);
+			TMP1 = vaddq_u32(MSG1, vdupq_n_u32(0x6ED9EBA1));
+			MSG2 = vsha1su1q_u32(MSG2, MSG1);
+			MSG3 = vsha1su0q_u32(MSG3, MSG0, MSG1);
+
+			/* Rounds 32-35 */
+			E1 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+			ABCD = vsha1pq_u32(ABCD, E0, TMP0);
+			TMP0 = vaddq_u32(MSG2, vdupq_n_u32(0x8F1BBCDC));
+			MSG3 = vsha1su1q_u32(MSG3, MSG2);
+			MSG0 = vsha1su0q_u32(MSG0, MSG1, MSG2);
+
+			/* Rounds 36-39 */
+			E0 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+			ABCD = vsha1pq_u32(ABCD, E1, TMP1);
+			TMP1 = vaddq_u32(MSG3, vdupq_n_u32(0x8F1BBCDC));
+			MSG0 = vsha1su1q_u32(MSG0, MSG3);
+			MSG1 = vsha1su0q_u32(MSG1, MSG2, MSG3);
+
+			/* Rounds 40-43 */
+			E1 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+			ABCD = vsha1mq_u32(ABCD, E0, TMP0);
+			TMP0 = vaddq_u32(MSG0, vdupq_n_u32(0x8F1BBCDC));
+			MSG1 = vsha1su1q_u32(MSG1, MSG0);
+			MSG2 = vsha1su0q_u32(MSG2, MSG3, MSG0);
+
+			/* Rounds 44-47 */
+			E0 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+			ABCD = vsha1mq_u32(ABCD, E1, TMP1);
+			TMP1 = vaddq_u32(MSG1, vdupq_n_u32(0x8F1BBCDC));
+			MSG2 = vsha1su1q_u32(MSG2, MSG1);
+			MSG3 = vsha1su0q_u32(MSG3, MSG0, MSG1);
+
+			/* Rounds 48-51 */
+			E1 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+			ABCD = vsha1mq_u32(ABCD, E0, TMP0);
+			TMP0 = vaddq_u32(MSG2, vdupq_n_u32(0x8F1BBCDC));
+			MSG3 = vsha1su1q_u32(MSG3, MSG2);
+			MSG0 = vsha1su0q_u32(MSG0, MSG1, MSG2);
+
+			/* Rounds 52-55 */
+			E0 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+			ABCD = vsha1mq_u32(ABCD, E1, TMP1);
+			TMP1 = vaddq_u32(MSG3, vdupq_n_u32(0xCA62C1D6));
+			MSG0 = vsha1su1q_u32(MSG0, MSG3);
+			MSG1 = vsha1su0q_u32(MSG1, MSG2, MSG3);
+
+			/* Rounds 56-59 */
+			E1 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+			ABCD = vsha1mq_u32(ABCD, E0, TMP0);
+			TMP0 = vaddq_u32(MSG0, vdupq_n_u32(0xCA62C1D6));
+			MSG1 = vsha1su1q_u32(MSG1, MSG0);
+			MSG2 = vsha1su0q_u32(MSG2, MSG3, MSG0);
+
+			/* Rounds 60-63 */
+			E0 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+			ABCD = vsha1pq_u32(ABCD, E1, TMP1);
+			TMP1 = vaddq_u32(MSG1, vdupq_n_u32(0xCA62C1D6));
+			MSG2 = vsha1su1q_u32(MSG2, MSG1);
+			MSG3 = vsha1su0q_u32(MSG3, MSG0, MSG1);
+
+			/* Rounds 64-67 */
+			E1 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+			ABCD = vsha1pq_u32(ABCD, E0, TMP0);
+			TMP0 = vaddq_u32(MSG2, vdupq_n_u32(0xCA62C1D6));
+			MSG3 = vsha1su1q_u32(MSG3, MSG2);
+			MSG0 = vsha1su0q_u32(MSG0, MSG1, MSG2);
+
+			/* Rounds 68-71 */
+			E0 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+			ABCD = vsha1pq_u32(ABCD, E1, TMP1);
+			TMP1 = vaddq_u32(MSG3, vdupq_n_u32(0xCA62C1D6));
+			MSG0 = vsha1su1q_u32(MSG0, MSG3);
+
+			/* Rounds 72-75 */
+			E1 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+			ABCD = vsha1pq_u32(ABCD, E0, TMP0);
+
+			/* Rounds 76-79 */
+			E0 = vsha1h_u32(vgetq_lane_u32(ABCD, 0));
+			ABCD = vsha1pq_u32(ABCD, E1, TMP1);
+
+			/* Combine state */
+			E0 += E0_SAVED;
+			ABCD = vaddq_u32(ABCD_SAVED, ABCD);
+		}
+		vst1q_u32(state.data(), ABCD);
+		state[4] = E0;
 #else
 		for(auto block(blocks.data()),ed(blocks.data()+blocks.size());block!=ed;block+=block_size)
 		{

@@ -91,5 +91,10 @@ constexpr decltype(auto) memory_map_in_handle(icrtp<input>& in)
 {
 	return memory_map_in_handle(icrtp_handle(in));
 }
-
+template<typename input,typename... Args>
+requires scatter_input_stream<icrtp_handle_type<input>>
+constexpr decltype(auto) scatter_read(icrtp<input>& in,Args&& ...args)
+{
+	return scatter_read(icrtp_handle(in),std::forward<Args>(args)...);
+}
 }

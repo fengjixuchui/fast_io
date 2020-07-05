@@ -1,25 +1,16 @@
 #pragma once
 
 //fast_io_legacy.h deals with legacy C <stdio.h> and C++ <iostream>/<fstream>/<sstream> interface
+
+#include<streambuf>
+#include<fstream>
+#include<sstream>
+#include<istream>
+#include<ostream>
+
 #include"fast_io_hosted.h"
 #include"fast_io.h"
 #include"fast_io_legacy_impl/c/impl.h"
 #include"fast_io_legacy_impl/cpp/streambuf_io_observer.h"
 #include"fast_io_legacy_impl/cpp/filebuf_file.h"
 #include"fast_io_legacy_impl/fast_io_streambuf.h"
-
-/*
-#include<iostream>
-#ifdef __GLIBCXX__
-#include<ext/stdio_filebuf.h>
-#endif
-#include"fast_io_legacy_impl/stream_view.h"
-#include"fast_io_legacy_impl/streambuf_view.h"
-#include"fast_io_legacy_impl/streambuf_handle.h"
-#include"fast_io_legacy_impl/fast_io_streambuf.h"
-#include"fast_io_legacy_impl/fast_io_iostream.h"
-#include"fast_io_legacy_impl/filebuf_handle.h"
-#if defined (__GLIBCXX__) || defined (_MSC_VER)
-#include"fast_io_legacy_impl/stream_file.h"
-#endif
-*/

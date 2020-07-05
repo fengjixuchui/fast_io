@@ -3,18 +3,6 @@
 namespace fast_io
 {
 
-template<character_output_stream output,std::integral T>
-requires std::same_as<T,bool>
-inline constexpr void print_define(output& out, T const& b)
-{
-	put(out,b+0x30);
-}
-
-template<output_stream output>
-inline constexpr void print_define(output& out,std::basic_string_view<typename output::char_type> str)
-{
-	write(out,str.data(),str.data()+str.size());
-}
 
 namespace details
 {
@@ -271,27 +259,181 @@ inline constexpr auto scan(input &&in,Args&& ...args)
 
 namespace details
 {
+
+
+template<std::integral char_type,typename T>
+inline constexpr void scatter_print_recursive(io_scatter_t* arr,T&& t)
+{
+	*arr=print_scatter_define<char_type>(std::forward<T>(t));
+}
+
+template<std::integral char_type,typename T,typename... Args>
+inline constexpr void scatter_print_recursive(io_scatter_t* arr,T&& t, Args&& ...args)
+{
+	*arr=print_scatter_define<char_type>(std::forward<T>(t));
+	scatter_print_recursive<char_type>(arr+1,std::forward<Args>(args)...);
+}
+
+template<std::integral char_type,typename T>
+inline constexpr void scatter_print_with_buffer_recursive_unit(internal_temporary_buffer<char_type>& b,
+		io_scatter_t* arr,T&& t)
+{
+	if constexpr(scatter_printable<char_type,T>)
+	{
+		*arr=print_scatter_define<char_type>(std::forward<T>(t));
+	}
+	else
+	{
+		auto start_ptr{b.end_ptr};
+		print_control(b,std::forward<T>(t));
+		*arr={start_ptr,(b.end_ptr-start_ptr)*sizeof(*start_ptr)};
+	}
+}
+
+template<std::integral char_type,typename T>
+inline constexpr void scatter_print_with_buffer_recursive(internal_temporary_buffer<char_type>& b,
+		io_scatter_t* arr,T&& t)
+{
+	scatter_print_with_buffer_recursive_unit(b,arr,std::forward<T>(t));
+}
+
+template<std::integral char_type,typename T,typename... Args>
+inline constexpr void scatter_print_with_buffer_recursive(internal_temporary_buffer<char_type>& b,
+	io_scatter_t* arr,T&& t, Args&& ...args)
+{
+	scatter_print_with_buffer_recursive_unit(b,arr,std::forward<T>(t));
+	scatter_print_with_buffer_recursive(b,arr+1,std::forward<Args>(args)...);
+}
+
+
+template<typename T>
+inline constexpr std::size_t calculate_scatter_reserve_size_unit()
+{
+	using real_type = std::remove_cvref_t<T>;
+	if constexpr(reserve_printable<real_type>)
+	{
+		constexpr std::size_t sz{print_reserve_size(print_reserve_type<real_type>)};
+		return sz;
+	}
+	else
+		return 0;
+}
+
+template<typename T>
+inline constexpr std::size_t calculate_scatter_reserve_size()
+{
+	return calculate_scatter_reserve_size_unit<T>();
+}
+
+template<typename T,typename... Args>
+requires (sizeof...(Args)!=0)
+inline constexpr std::size_t calculate_scatter_reserve_size()
+{
+	return calculate_scatter_reserve_size_unit<T>()+
+		calculate_scatter_reserve_size<Args...>();
+}
+
+template<std::integral char_type,typename T>
+inline constexpr void scatter_print_with_reserve_recursive_unit(char_type*& start_ptr,
+		io_scatter_t* arr,T&& t)
+{
+	if constexpr(scatter_printable<char_type,T>)
+	{
+		*arr=print_scatter_define<char_type>(std::forward<T>(t));
+	}
+	else
+	{
+		using real_type = std::remove_cvref_t<T>;
+		auto end_ptr = print_reserve_define(print_reserve_type<real_type>,start_ptr,std::forward<T>(t));
+		*arr={start_ptr,(end_ptr-start_ptr)*sizeof(*start_ptr)};
+		start_ptr=end_ptr;
+	}
+}
+
+
+
+template<std::integral char_type,typename T>
+inline constexpr void scatter_print_with_reserve_recursive(char_type* ptr,
+		io_scatter_t* arr,T&& t)
+{
+	scatter_print_with_reserve_recursive_unit(ptr,arr,std::forward<T>(t));
+}
+
+template<std::integral char_type,typename T,typename... Args>
+inline constexpr void scatter_print_with_reserve_recursive(char_type* ptr,
+	io_scatter_t* arr,T&& t, Args&& ...args)
+{
+	scatter_print_with_reserve_recursive_unit(ptr,arr,std::forward<T>(t));
+	scatter_print_with_reserve_recursive(ptr,arr+1,std::forward<Args>(args)...);
+}
+
 template<bool line,output_stream output,typename ...Args>
 inline constexpr void print_fallback(output &out,Args&& ...args)
 {
-	internal_temporary_buffer<typename output::char_type> buffer;
-	if constexpr(line)
+	if constexpr(scatter_output_stream<output>&&(line||(scatter_printable<typename output::char_type,Args>||...)||
+		(reserve_printable<Args>||...)))
 	{
-		if constexpr((sizeof...(Args)==1)&&(reserve_printable<Args>&&...))
+		std::array<io_scatter_t,(sizeof...(Args))+static_cast<std::size_t>(line)> scatters;
+		if constexpr((scatter_printable<typename output::char_type,Args>&&...))
 		{
-			((details::print_control_line(buffer,std::forward<Args>(args))),...);
+			scatter_print_recursive<typename output::char_type>(scatters.data(),std::forward<Args>(args)...);
+			if constexpr(line)
+			{
+				typename output::char_type ch(u8'\n');
+				scatters.back()={std::addressof(ch),sizeof(ch)};
+				scatter_write(out,scatters);
+			}
+			else
+				scatter_write(out,scatters);
+		}
+		else if constexpr((((scatter_printable<typename output::char_type,Args>||reserve_printable<Args>)&&...)))
+		{
+			std::array<typename output::char_type,calculate_scatter_reserve_size<Args...>()+static_cast<std::size_t>(line)> array;
+			scatter_print_with_reserve_recursive(array.data(),scatters.data(),std::forward<Args>(args)...);
+			if constexpr(line)
+			{
+				typename output::char_type ch(u8'\n');
+				scatters.back()={std::addressof(ch),sizeof(ch)};
+				scatter_write(out,scatters);
+			}
+			else
+				scatter_write(out,scatters);
 		}
 		else
 		{
-			((details::print_control(buffer,std::forward<Args>(args))),...);
-			put(buffer,u8'\n');
+			internal_temporary_buffer<typename output::char_type> buffer;
+			scatter_print_with_buffer_recursive(buffer,scatters.data(),std::forward<Args>(args)...);
+			if constexpr(line)
+			{
+				typename output::char_type ch(u8'\n');
+				scatters.back()={std::addressof(ch),sizeof(ch)};
+				scatter_write(out,scatters);
+			}
+			else
+				scatter_write(out,scatters);
 		}
 	}
 	else
 	{
-		(details::print_control(buffer,std::forward<Args>(args)),...);
+		internal_temporary_buffer<typename output::char_type> buffer;
+		if constexpr(line)
+		{
+			if constexpr((sizeof...(Args)==1)&&(reserve_printable<Args>&&...))
+			{
+				((details::print_control_line(buffer,std::forward<Args>(args))),...);
+			}
+			else
+			{
+				((details::print_control(buffer,std::forward<Args>(args))),...);
+				put(buffer,u8'\n');
+			}
+		}
+		else
+		{
+			(details::print_control(buffer,std::forward<Args>(args)),...);
+		}
+		write(out,buffer.beg_ptr,buffer.end_ptr);
 	}
-	write(out,buffer.beg_ptr,buffer.end_ptr);
 }
 }
 

@@ -135,6 +135,12 @@ inline auto recv(SOCKET sock,mem_address* add,Args&& ...args)
 }
 
 template<typename ...Args>
+inline auto wsasend(Args&& ...args)
+{
+	return call_win32_ws2_32<decltype(::WSASend)*>("WSASend",std::forward<Args>(args)...);
+}
+
+template<typename ...Args>
 inline auto closesocket(Args&& ...args)
 {
 	return call_win32_ws2_32<decltype(::closesocket)*>("closesocket",std::forward<Args>(args)...);

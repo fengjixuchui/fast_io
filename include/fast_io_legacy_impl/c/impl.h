@@ -796,16 +796,28 @@ inline decltype(auto) zero_copy_out_handle(basic_c_io_observer_unlocked<ch_type>
 	return zero_copy_out_handle(static_cast<basic_posix_io_observer<ch_type>>(h));
 }
 
-template<output_stream output,std::integral intg>
-inline constexpr void print_define(output& out,basic_c_io_observer_unlocked<intg> iob)
+template<std::integral char_type>
+inline constexpr std::size_t print_reserve_size(print_reserve_type_t<basic_c_io_observer_unlocked<char_type>>)
 {
-	print(out,fast_io::unsigned_view(iob.native_handle()));
+	return print_reserve_size(print_reserve_type<void*>);
 }
 
-template<output_stream output,std::integral intg>
-inline constexpr void print_define(output& out,basic_c_io_observer<intg> iob)
+template<std::integral char_type,std::contiguous_iterator caiter,typename U>
+inline constexpr caiter print_reserve_define(print_reserve_type_t<basic_c_io_observer_unlocked<char_type>>,caiter iter,U&& v)
 {
-	print(out,fast_io::unsigned_view(iob.native_handle()));
+	return print_reserve_define(print_reserve_type<void*>,iter,v.fp);
+}
+
+template<std::integral char_type>
+inline constexpr std::size_t print_reserve_size(print_reserve_type_t<basic_c_io_observer<char_type>>)
+{
+	return print_reserve_size(print_reserve_type<void*>);
+}
+
+template<std::integral char_type,std::contiguous_iterator caiter,typename U>
+inline constexpr caiter print_reserve_define(print_reserve_type_t<basic_c_io_observer<char_type>>,caiter iter,U&& v)
+{
+	return print_reserve_define(print_reserve_type<void*>,iter,v.fp);
 }
 
 }
@@ -819,8 +831,7 @@ inline constexpr void print_define(output& out,basic_c_io_observer<intg> iob)
 #include"musl.h"
 #elif defined(__BSD_VISIBLE)
 #include"bsd.h"
-#else
-#include"general.h"
 #endif
 
+#include"general.h"
 #include"done.h"

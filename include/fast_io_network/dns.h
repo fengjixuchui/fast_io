@@ -137,13 +137,13 @@ inline constexpr auto begin(basic_dns<fam> & d)
 }
 
 template<fast_io::sock::family fam>
-inline constexpr std::default_sentinel_t end(basic_dns<fam> const& d)
+inline constexpr std::default_sentinel_t end(basic_dns<fam> const&)
 {
 	return {};
 }
 
 template<fast_io::sock::family fam>
-inline constexpr std::default_sentinel_t cend(basic_dns<fam> const& d)
+inline constexpr std::default_sentinel_t cend(basic_dns<fam> const&)
 {
 	return {};
 }

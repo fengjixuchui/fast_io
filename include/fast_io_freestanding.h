@@ -27,10 +27,6 @@
 #include"fast_io_freestanding_impl/indirect_obuffer.h"
 #include"fast_io_freestanding_impl/ovector.h"
 //#include"fast_io_freestanding_impl/ucs.h"
-#if __cpp_coroutines >= 201902
-#include<coroutine>		//coroutine is freestanding
-#include"fast_io_freestanding_impl/generator.h"
-#endif
 
 namespace fast_io
 {

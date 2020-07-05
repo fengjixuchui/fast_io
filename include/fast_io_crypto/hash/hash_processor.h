@@ -2,6 +2,14 @@
 
 namespace fast_io
 {
+
+namespace details
+{
+
+class compress_current_position
+{};
+}
+
 template<std::integral ch_type,typename Func>
 class basic_hash_processor
 {
@@ -10,8 +18,8 @@ public:
 	using function_type = Func;
 	function_type& function;
 	inline static constexpr std::size_t block_size = function_type::block_size;
-	std::array<std::byte,block_size> temporary_buffer{};
-	std::size_t current_position{};
+	[[no_unique_address]] std::array<std::byte,block_size> temporary_buffer{};
+	[[no_unique_address]] std::conditional_t<block_size==0,details::compress_current_position,std::size_t> current_position{};
 	constexpr basic_hash_processor(function_type& func):function(func)
 	{
 		if constexpr(requires(Func& func)
@@ -22,7 +30,10 @@ public:
 	}
 	constexpr void do_final()
 	{
-		function.digest(std::as_bytes(std::span<std::byte const>{temporary_buffer.data(),current_position}));
+		if constexpr(block_size!=0)
+			function.digest(std::as_bytes(std::span<std::byte const>{temporary_buffer.data(),current_position}));
+		else
+			function.digest();
 	}
 };
 
@@ -58,6 +69,12 @@ inline void write(basic_hash_processor<ch_type,Func>& out,Iter begin,Iter end)
 {
 	if(std::same_as<std::iter_value_t<Iter>,char>)
 	{
+		if constexpr(Func::block_size==0)
+		{
+			out.function(std::as_bytes(std::span{std::to_address(begin),std::to_address(end)}));
+		}
+		else
+		{
 		std::size_t const bytes(end-begin);
 		std::size_t to_copy{Func::block_size-out.current_position};
 		if(bytes<to_copy)
@@ -68,6 +85,7 @@ inline void write(basic_hash_processor<ch_type,Func>& out,Iter begin,Iter end)
 			return;
 		}
 		details::hash_processor::write_cold_path(out,begin,end);
+		}
 	}
 	else
 		write(out,reinterpret_cast<char const*>(std::to_address(begin)),reinterpret_cast<char const*>(std::to_address(end)));

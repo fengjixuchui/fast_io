@@ -381,7 +381,7 @@ template<output_stream Ohandler,bool forcecopy,typename Buf>
 }
 
 template<output_stream Ohandler,bool forcecopy,typename Buf>
-[[nodiscard]] inline constexpr auto& obuffer_curr(basic_obuf<Ohandler,forcecopy,Buf>& ob)
+[[nodiscard]] inline constexpr auto obuffer_curr(basic_obuf<Ohandler,forcecopy,Buf>& ob)
 {
 	return ob.obuffer.curr;
 }
@@ -408,7 +408,7 @@ constexpr void obuf_write_force_copy(basic_obuf<Ohandler,forcecopy,Buf>& ob,Iter
 		auto it{write(ob.oh,cbegin,cend)};
 		if(it!=cend)
 		{
-			if(Buf::size<=cend-it)
+			if(Buf::size<=static_cast<std::size_t>(cend-it))
 #ifdef __cpp_exceptions
 				throw posix_error(EIO);
 #else

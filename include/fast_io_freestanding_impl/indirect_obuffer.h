@@ -29,7 +29,7 @@ public:
 	using function_type = func;
 	template<typename... Args>
 	requires std::constructible_from<destination_type,Args...>
-	constexpr basic_indirect_obuffer_constructor_source_type(Args&&...args):basic_indirect_obuffer<ch_type,dest,func>{.destination={std::forward<Args>(args)...}}{}
+	constexpr basic_indirect_obuffer_constructor_source_type(Args&&...args):basic_indirect_obuffer<ch_type,dest,func>{.destination={std::forward<Args>(args)...},.function={}}{}
 };
 
 

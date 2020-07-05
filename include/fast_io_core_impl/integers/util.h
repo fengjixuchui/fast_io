@@ -44,14 +44,12 @@ template<std::uint32_t base,bool ryu_mode=false,my_unsigned_integral U>
 inline constexpr std::uint32_t chars_len(U value) noexcept
 {
 /*
-#ifdef FAST_IO_FMT_BENCHMARK
 	if constexpr(base==10&&sizeof(U)<=8)
 	{
 		std::uint32_t t{static_cast<std::uint32_t>(std::bit_width(static_cast<std::remove_cvref_t<U>>(value|1)))*1233 >> 12};
 		return t-(value<power10table<std::remove_cvref_t<U>>[t]) + 1;
 	}
 	else
-#endif
 */
 	if constexpr(base==10&&sizeof(U)<=16)
 	{
