@@ -32,7 +32,7 @@ println("vec.begin():",vec.begin()," vec.end()",vec.end());
 */
 
 template<typename Iter>
-requires (std::contiguous_iterator<Iter>||std::same_as<std::remove_cvref_t<Iter>,void*>)
+requires (std::contiguous_iterator<Iter>||std::is_pointer_v<std::remove_cvref_t<Iter>>||std::same_as<std::remove_cvref_t<Iter>,void*>)
 inline constexpr std::size_t print_reserve_size(print_reserve_type_t<Iter>)
 {
 	constexpr std::size_t sz{sizeof(std::uintptr_t)*2+4};
@@ -40,13 +40,16 @@ inline constexpr std::size_t print_reserve_size(print_reserve_type_t<Iter>)
 }
 
 template<typename Iter,std::contiguous_iterator caiter,typename U>
-requires (std::contiguous_iterator<Iter>||std::same_as<std::remove_cvref_t<Iter>,void*>)
+requires (std::contiguous_iterator<Iter>||std::is_pointer_v<std::remove_cvref_t<Iter>>||std::same_as<std::remove_cvref_t<Iter>,void*>)
 inline caiter print_reserve_define(print_reserve_type_t<Iter>,caiter iter,U&& v)
 {
 	constexpr std::size_t uisz{sizeof(std::uintptr_t)*2+2};
 	constexpr std::size_t uisz1{uisz+2};
 	details::my_copy_n(u8"0x",2,iter);
-	details::optimize_size::output_unsigned_dummy<uisz,16>(iter+2,bit_cast<std::uintptr_t>(std::to_address(v)));
+	if constexpr(std::is_pointer_v<std::remove_cvref_t<Iter>>)
+		details::optimize_size::output_unsigned_dummy<uisz,16>(iter+2,bit_cast<std::uintptr_t>(v));	
+	else
+		details::optimize_size::output_unsigned_dummy<uisz,16>(iter+2,bit_cast<std::uintptr_t>(std::to_address(v)));
 	return iter+uisz1;
 }
 

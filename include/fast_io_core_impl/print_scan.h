@@ -370,8 +370,7 @@ inline constexpr void scatter_print_with_reserve_recursive(char_type* ptr,
 template<bool line,output_stream output,typename ...Args>
 inline constexpr void print_fallback(output &out,Args&& ...args)
 {
-	if constexpr(scatter_output_stream<output>&&(line||(scatter_printable<typename output::char_type,Args>||...)||
-		(reserve_printable<Args>||...)))
+	if constexpr(scatter_output_stream<output>&&((scatter_printable<typename output::char_type,Args>||reserve_printable<Args>)&&...))
 	{
 		std::array<io_scatter_t,(sizeof...(Args))+static_cast<std::size_t>(line)> scatters;
 		if constexpr((scatter_printable<typename output::char_type,Args>&&...))
@@ -386,23 +385,10 @@ inline constexpr void print_fallback(output &out,Args&& ...args)
 			else
 				scatter_write(out,scatters);
 		}
-		else if constexpr((((scatter_printable<typename output::char_type,Args>||reserve_printable<Args>)&&...)))
+		else
 		{
 			std::array<typename output::char_type,calculate_scatter_reserve_size<Args...>()+static_cast<std::size_t>(line)> array;
 			scatter_print_with_reserve_recursive(array.data(),scatters.data(),std::forward<Args>(args)...);
-			if constexpr(line)
-			{
-				typename output::char_type ch(u8'\n');
-				scatters.back()={std::addressof(ch),sizeof(ch)};
-				scatter_write(out,scatters);
-			}
-			else
-				scatter_write(out,scatters);
-		}
-		else
-		{
-			internal_temporary_buffer<typename output::char_type> buffer;
-			scatter_print_with_buffer_recursive(buffer,scatters.data(),std::forward<Args>(args)...);
 			if constexpr(line)
 			{
 				typename output::char_type ch(u8'\n');
