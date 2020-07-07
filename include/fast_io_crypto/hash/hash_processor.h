@@ -90,6 +90,14 @@ inline void write(basic_hash_processor<ch_type,Func>& out,Iter begin,Iter end)
 	else
 		write(out,reinterpret_cast<char const*>(std::to_address(begin)),reinterpret_cast<char const*>(std::to_address(end)));
 }
+
+template<std::integral ch_type,typename Func>
+inline void scatter_write(basic_hash_processor<ch_type,Func>& out,std::span<io_scatter_t const> sp)
+{
+	for(auto const& e : sp)
+		write(out,reinterpret_cast<char const*>(e.base),reinterpret_cast<char const*>(e.base)+e.len);
+}
+
 template<typename Func>
 class hash_processor:public basic_hash_processor<char,Func>
 {

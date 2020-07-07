@@ -1,6 +1,6 @@
 #pragma once
 
-namespace fast_io::crypto::details::ed25519_donna::curve25519_donna
+namespace fast_io::details::ed25519
 {
 
 union packedelem8

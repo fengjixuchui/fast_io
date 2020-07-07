@@ -410,17 +410,17 @@ public:
 #else
 		uint32_t a, b, c, d, e, f, g, h, s0, s1, T1, T2;
 		uint32_t X[16];
-		a = state[0];
-		b = state[1];
-		c = state[2];
-		d = state[3];
-		e = state[4];
-		f = state[5];
-		g = state[6];
-		h = state[7];
 		using namespace fast_io::details::sha256;
 		for(auto data(blocks.data()),ed(blocks.data()+blocks.size());data!=ed;)
 		{
+			a = state[0];
+			b = state[1];
+			c = state[2];
+			d = state[3];
+			e = state[4];
+			f = state[5];
+			g = state[6];
+			h = state[7];
 			uint32_t i = 0;
 			for (; i < 16; ++i)
 			{

@@ -1,6 +1,6 @@
 #pragma once
 
-namespace fast_io::crypto::details::ed25519_donna::curve25519_donna
+namespace fast_io::details::ed25519
 {
 
 inline void curve25519_pow_two5mtwo0_two250mtwo0(bignum25519 b)

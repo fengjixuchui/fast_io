@@ -2,6 +2,13 @@
 
 fast_io is a new C++20 library for extremely fast input/output and aims to replace iostream and cstdio. It is header-only (module only in the future) for easy inclusion in your project. It requires a capable C++20 compiler supporting concepts.
 
+## Discord URL.
+
+You can directly ask me questions in Discord.
+
+https://discord.gg/wYfh8kk
+
+
 ## What does "fast" mean in fast_io?
 
 It does not necessary mean it will be faster than everything else. (Or it would be named as fastest_io. Of course those fmt trolls would claim that.) It means it is significantly faster than stdio.h and iostream for all cases. fast means faster than stdio.h and iostream.
