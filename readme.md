@@ -36,6 +36,7 @@ For Linux, you can watch this video to help you install the latest GCC easily. h
 - Windows
 - Linux
 - BSD platforms (Including FreeBSD, NetBSD, OpenBSD and Mac)
+- Barebone (No any operating system.)
 - Todo: Webassembly
 
 ## Supported libc FILE* hacks platforms
@@ -44,7 +45,9 @@ For Linux, you can watch this video to help you install the latest GCC easily. h
 - Universal CRT
 - BSD libc
 - MUSL libc
-- To do: Bionic
+- To do (before we supported them, they will be emulated with POSIX apis):
+- Newlib
+- Bionic
 
 ## Supported C++ standard library std::streambuf/std::filebuf hacks platforms
 - GCC libstdc++
