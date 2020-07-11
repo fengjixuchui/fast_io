@@ -123,9 +123,28 @@ public:
 
 template<typename stm>
 inline constexpr c_io_cookie_functions_t<stm> c_io_cookie_functions{};
-#elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__)) || defined(__BIONIC__)
+#elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__)) || defined(__BIONIC__) || defined(__NEWLIB__)
 namespace details
 {
+#ifdef __NEWLIB__
+# ifdef __LARGE64_FILES
+extern "C" FILE	*funopen (const void *__cookie,
+		int (*__readfn)(void *__c, char *__buf,
+				_READ_WRITE_BUFSIZE_TYPE __n),
+		int (*__writefn)(void *__c, const char *__buf,
+				 _READ_WRITE_BUFSIZE_TYPE __n),
+		_fpos64_t (*__seekfn)(void *__c, _fpos64_t __off, int __whence),
+		int (*__closefn)(void *__c));
+#else
+extern "C" FILE	*funopen (const void *__cookie,
+		int (*__readfn)(void *__c, char *__buf,
+				_READ_WRITE_BUFSIZE_TYPE __n),
+		int (*__writefn)(void *__c, const char *__buf,
+				 _READ_WRITE_BUFSIZE_TYPE __n),
+		fpos_t  (*__seekfn)(void *__c, fpos_t  __off, int __whence),
+		int (*__closefn)(void *__c));
+#endif
+#endif
 //funopen
 template<typename stm>
 requires stream<std::remove_cvref_t<stm>>
@@ -216,7 +235,9 @@ inline std::FILE* funopen_wrapper(void* cookie)
 #endif
 		};
 	}
-	auto fp{::funopen(cookie,readfn,writefn,seekfn,closefn)};
+	auto fp{
+funopen(
+cookie,readfn,writefn,seekfn,closefn)};
 	if(fp==nullptr)
 #ifdef __cpp_exceptions
 		throw posix_error();
@@ -254,6 +275,8 @@ public:
 		auto fd(
 #if defined(__WINNT__) || defined(_MSC_VER)
 	_fileno(fp)
+#elif defined(__NEWLIB__)
+	fp->_file
 #else
 	::fileno_unlocked(fp)
 #endif
@@ -416,6 +439,8 @@ public:
 		auto fd(
 #if defined(__WINNT__) || defined(_MSC_VER)
 	_fileno(fp)
+#elif defined(__NEWLIB__)
+	fp->_file
 #else
 	::fileno(fp)
 #endif
@@ -459,6 +484,10 @@ public:
 	{
 #if defined(__WINNT__) || defined(_MSC_VER)
 		_lock_file(fp);
+#elif defined(__NEWLIB__)
+#ifndef __SINGLE_THREAD__
+//		flockfile(fp);	//TO FIX
+#endif
 #else
 		flockfile(fp);
 #endif
@@ -469,6 +498,10 @@ public:
 	{
 #if defined(__WINNT__) || defined(_MSC_VER)
 		_unlock_file(fp);
+#elif defined(__NEWLIB__)
+#ifndef __SINGLE_THREAD__
+//		_funlockfile(fp); //TO FIX
+#endif
 #else
 		funlockfile(fp);
 #endif
@@ -601,14 +634,16 @@ public:
 			seek(*this,0,seekdir::end);
 	}*/
 //fdopen interface
-
-	basic_c_file_impl(basic_posix_io_handle<typename T::char_type>&& posix_handle,std::string_view mode):T(
+	basic_c_file_impl(native_interface_t,basic_posix_io_handle<typename T::char_type>&& posix_handle,char const* mode):T(
 #if defined(__WINNT__) || defined(_MSC_VER)
-			::_fdopen
+			::_fdopen(
+#elif defined(__NEWLIB__)
+			::_fdopen_r(_REENT,
 #else
-			::fdopen
+			::fdopen(
 #endif
-(posix_handle.native_handle(),mode.data()))
+		posix_handle.fd,mode)
+			)
 	{
 		if(native_handle()==nullptr)
 #ifdef __cpp_exceptions
@@ -637,11 +672,12 @@ public:
 	}
 
 	basic_c_file_impl(basic_posix_io_handle<char_type>&& posix_handle,open_mode om):
-		basic_c_file_impl(std::move(posix_handle),to_c_mode(om)){}
+		basic_c_file_impl(native_interface,std::move(posix_handle),to_c_mode(om).data()){}
 	template<open_mode om>
 	basic_c_file_impl(basic_posix_io_handle<char_type>&& posix_handle,open_interface_t<om>):
-		basic_c_file_impl(std::move(posix_handle),details::c_open_mode<om>::value){}
-
+		basic_c_file_impl(native_interface,std::move(posix_handle),details::c_open_mode<om>::value.data()){}
+	basic_c_file_impl(basic_posix_io_handle<char_type>&& posix_handle,std::string_view mode):
+		basic_c_file_impl(native_interface,std::move(posix_handle),to_c_mode(from_c_mode(mode)).data()){}
 #if defined(__WINNT__) || defined(_MSC_VER)
 //windows specific. open posix file from win32 io handle
 	basic_c_file_impl(basic_win32_io_handle<char_type>&& win32_handle,std::string_view mode):
@@ -686,7 +722,7 @@ public:
 			fast_terminate();
 #endif
 		up.release();
-#elif defined(__BSD_VISIBLE) || defined(__BIONIC__)
+#elif defined(__BSD_VISIBLE) || defined(__BIONIC__) || defined(__NEWLIB__)
 		std::unique_ptr<stm> up{std::make_unique<std::remove_cvref_t<stm>>(std::forward<Args>(args)...)};
 		this->native_handle()=details::funopen_wrapper<std::remove_cvref_t<stm>>(up.get());
 		up.release();
@@ -709,7 +745,7 @@ public:
 #else
 			fast_terminate();
 #endif
-#elif defined(__BSD_VISIBLE) || defined(__BIONIC__)
+#elif defined(__BSD_VISIBLE) || defined(__BIONIC__) || defined(__NEWLIB__)
 		this->native_handle()=details::funopen_wrapper<stm&>(std::addressof(reff));
 #else
 #ifdef __cpp_exceptions
@@ -830,7 +866,13 @@ inline constexpr caiter print_reserve_define(print_reserve_type_t<basic_c_io_obs
 #elif defined(__MUSL__)
 #include"musl.h"
 #elif defined(__BSD_VISIBLE)
+#if defined(__NEWLIB__)
+#ifndef (__CUSTOM_FILE_IO__)
+#include"newlib.h"
+#endif
+#else
 #include"bsd.h"
+#endif
 #endif
 
 #include"general.h"

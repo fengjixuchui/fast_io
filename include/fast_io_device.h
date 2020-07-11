@@ -25,9 +25,9 @@ using basic_iobuf_file = basic_iobuf<basic_ionative_file<char_type>>;
 using inative_file = input_file_wrapper<native_file>;
 using onative_file = output_file_wrapper<native_file>;
 using ionative_file = io_file_wrapper<native_file>;
-
+#if !defined(__NEWLIB__)
 using omap_file = basic_omap<basic_file_wrapper<native_file,open_mode::trunc|open_mode::out|open_mode::binary>,native_file_map>;
-
+#endif
 template<output_stream output>
 using basic_obuf_text = basic_obuf<basic_indirect_obuffer_constructor_source_type<typename output::char_type,output,transforms::binary_to_text<>>,true>;
 
@@ -40,11 +40,11 @@ using iobuf_file = basic_iobuf<ionative_file>;
 
 using ibuf_text_file = basic_ibuf_text<inative_file>;
 using obuf_text_file = basic_obuf_text<onative_file>;
-
+#if !defined(__NEWLIB__)||defined(_GLIBCXX_HAS_GTHREADS)
 using ibuf_file_mutex = basic_iomutex<ibuf_file>;
 using obuf_file_mutex = basic_iomutex<obuf_file>;
 using iobuf_file_mutex = basic_iomutex<iobuf_file>;
-
+#endif
 // utf-8
 using u8pipe = io_wrapper<u8native_pipe>;
 
@@ -56,11 +56,11 @@ using u8ionative_file = io_file_wrapper<u8native_file>;
 using u8ibuf_file = basic_ibuf<u8inative_file>;
 using u8obuf_file = basic_obuf<u8onative_file>;
 using u8iobuf_file = basic_iobuf<u8ionative_file>;
-
+#if !defined(__NEWLIB__)||defined(_GLIBCXX_HAS_GTHREADS)
 using u8ibuf_file_mutex = basic_iomutex<u8ibuf_file>;
 using u8obuf_file_mutex = basic_iomutex<u8obuf_file>;
 using u8iobuf_file_mutex = basic_iomutex<u8iobuf_file>;
-
+#endif
 using wpipe = io_wrapper<wnative_pipe>;
 
 using winative_file = input_file_wrapper<wnative_file>;
@@ -70,11 +70,11 @@ using wionative_file = io_file_wrapper<wnative_file>;
 using wibuf_file = basic_ibuf<winative_file>;
 using wobuf_file = basic_obuf<wonative_file>;
 using wiobuf_file = basic_iobuf<wionative_file>;
-
+#if !defined(__NEWLIB__)||defined(_GLIBCXX_HAS_GTHREADS)
 using wibuf_file_mutex = basic_iomutex<wibuf_file>;
 using wobuf_file_mutex = basic_iomutex<wobuf_file>;
 using wiobuf_file_mutex = basic_iomutex<wiobuf_file>;
-
+#endif
 
 template<std::integral new_code_type,output_stream output>
 using basic_obuf_utf = basic_obuf<basic_indirect_obuffer_constructor_source_type<new_code_type,output,transforms::utf>,true>;

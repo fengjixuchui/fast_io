@@ -5,6 +5,43 @@ namespace fast_io
 
 namespace details
 {
+template<std::integral char_type,bool iobuf=false>
+inline constexpr std::size_t cal_buffer_size()
+{
+	if constexpr(iobuf)
+	{
+		return 
+#ifdef FAST_IO_BUFFER_SIZE
+		FAST_IO_BUFFER_SIZE
+#else
+#if defined(__WINNT__) || defined(_MSC_VER)
+	1048576
+#else
+	65536
+#endif
+#endif
+		/sizeof(char_type);
+	}
+	else
+	{
+	return 
+#ifdef FAST_IO_BUFFER_SIZE
+	FAST_IO_BUFFER_SIZE	//avoid BUFSIZ macro since it is a cancer and often set incorrectly
+#else
+#ifdef FAST_IO_TRANSMIT_ON_STACK
+	4096
+#else
+#if defined(__WINNT__) || defined(_MSC_VER)
+	1048576
+#else
+	65536
+#endif
+#endif
+#endif
+	/sizeof(char_type);
+	}
+}
+
 template<output_stream output,input_stream input>
 inline constexpr std::uintmax_t bufferred_transmit_impl(output& outp,input& inp)
 {
@@ -27,11 +64,16 @@ inline constexpr std::uintmax_t bufferred_transmit_impl(output& outp,input& inp)
 	}
 	else
 	{
-		for(
-#ifndef _MSC_VER
-alignas(65536)
+		using char_type = typename std::remove_cvref_t<input>::char_type;
+		constexpr std::size_t buffer_size{cal_buffer_size<char_type>()};
+#ifdef FAST_IO_TRANSMIT_ON_STACK
+		std::array<char_type,buffer_size> array;
+#else
+		temp_unique_arr_ptr<char_type> ptr(buffer_size);
+// we need to allocate it on the heap to avoid potential stack overflows
+		std::span<char_type,buffer_size> array(ptr.data(),ptr.data()+buffer_size);
 #endif
-std::array<unsigned char,65536> array;;)
+		for(;;)
 		{
 			auto p(read(inp,array.data(),array.data()+array.size()));
 			if(p==array.data())
@@ -76,11 +118,16 @@ inline constexpr std::uintmax_t bufferred_transmit_impl(output& outp,input& inp,
 	}
 	else
 	{
-		for(
-#ifndef _MSC_VER
-alignas(65536)
+		using char_type = typename std::remove_cvref_t<input>::char_type;
+		constexpr std::size_t buffer_size{cal_buffer_size<char_type>()};
+#ifdef FAST_IO_TRANSMIT_ON_STACK
+		std::array<char_type,buffer_size> array;
+#else
+		temp_unique_arr_ptr<char_type> ptr(buffer_size);
+// we need to allocate it on the heap to avoid potential stack overflows
+		std::span<char_type,buffer_size> array(ptr.data(),ptr.data()+buffer_size);
 #endif
-std::array<unsigned char,65536> array;bytes;)
+		for(;bytes;)
 		{
 			std::size_t b(array.size());
 			if(bytes<b)

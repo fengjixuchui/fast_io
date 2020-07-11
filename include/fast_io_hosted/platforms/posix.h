@@ -4,15 +4,18 @@
 #include<io.h>
 #else
 #include<unistd.h>
-#include <sys/uio.h>
 #endif
 #include<fcntl.h>
 #ifdef __linux__
+#include<sys/uio.h>
 #include<sys/sendfile.h>
 #endif
 #ifdef __BSD_VISIBLE
+#ifndef __NEWLIB__
+#include <sys/uio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#endif
 #endif
 
 namespace fast_io
@@ -137,7 +140,7 @@ inline constexpr int calculate_posix_open_mode(open_mode value)
 		mode |= _O_TEMPORARY;
 #endif
 #ifdef _O_SEQUENTIAL
-	if((value&open_mode::sequential_scan)!=open_mode::none)
+	if((value&open_mode::random_access)!=open_mode::none)
 		mode |= _O_SEQUENTIAL;
 	else
 		mode |= _O_RANDOM;
@@ -179,12 +182,20 @@ struct posix_file_openmode
 	static int constexpr mode = calculate_posix_open_mode(om);
 };
 }
+
+#ifdef __linux__
+class io_uring_observer;
+#endif
+
 template<std::integral ch_type>
 class basic_posix_io_observer
 {
 public:
 	using char_type = ch_type;
 	using native_handle_type = int;
+#ifdef __linux__
+	using async_scheduler_type = io_uring_observer;
+#endif
 	native_handle_type fd=-1;
 	constexpr auto& native_handle() noexcept
 	{
@@ -454,6 +465,9 @@ public:
 	using char_type = ch_type;
 	using native_handle_type = typename basic_posix_io_handle<char_type>::native_handle_type;
 	using basic_posix_io_handle<ch_type>::native_handle;
+#ifdef __linux__
+	using async_scheduler_type = io_uring_observer;
+#endif
 	constexpr basic_posix_file() noexcept = default;
 	constexpr basic_posix_file(int fd) noexcept: basic_posix_io_handle<ch_type>(fd){}
 	template<typename ...Args>
@@ -462,6 +476,8 @@ public:
 		{
 #if defined(__WINNT__) || defined(_MSC_VER)
 			::_open(
+#elif defined(__NEWLIB__)
+			::open(
 #else
 			::openat(AT_FDCWD,
 #endif
@@ -470,6 +486,8 @@ public:
 	basic_posix_file(native_interface_t,Args&& ...args):basic_posix_io_handle<ch_type>(
 #if defined(__WINNT__) || defined(_MSC_VER)
 			::_open(
+#elif defined(__NEWLIB__)
+			::open(
 #else
 #if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
 		system_call<
@@ -563,7 +581,7 @@ public:
 		this->close_impl();
 	}
 };
-
+#if !defined(__NEWLIB__)
 template<std::integral ch_type>
 inline void truncate(basic_posix_io_observer<ch_type> h,std::size_t size)
 {
@@ -584,6 +602,7 @@ inline void truncate(basic_posix_io_observer<ch_type> h,std::size_t size)
 #endif
 #endif
 }
+#endif
 
 template<std::integral ch_type>
 class basic_posix_pipe
@@ -591,6 +610,9 @@ class basic_posix_pipe
 public:
 	using char_type = ch_type;
 	using native_handle_type = std::array<basic_posix_file<ch_type>,2>;
+#ifdef __linux__
+	using async_scheduler_type = io_uring_observer;
+#endif
 private:
 	native_handle_type pipes;
 public:
@@ -691,7 +713,7 @@ using wposix_pipe=basic_posix_pipe<wchar_t>;
 inline int constexpr posix_stdin_number = 0;
 inline int constexpr posix_stdout_number = 1;
 inline int constexpr posix_stderr_number = 2;
-#if defined(__linux__)||defined(__BSD_VISIBLE)
+#if defined(__linux__)||(defined(__BSD_VISIBLE)&&!defined(__NEWLIB__))
 
 //zero copy IO for linux
 
@@ -845,9 +867,9 @@ inline std::size_t scatter_write(basic_posix_io_observer<ch_type> h,std::span<io
 {
 }*/
 
+#ifndef __NEWLIB__
 namespace details
 {
-
 struct __attribute__((__may_alias__)) iovec_may_alias:iovec
 {};
 
@@ -937,7 +959,7 @@ inline auto scatter_write(basic_posix_pipe<ch_type>& h,Args&& ...args)
 {
 	return details::posix_scatter_write_impl(h.out().fd,std::forward<Args>(args)...);
 }
-
+#endif
 #endif
 template<std::integral char_type>
 inline constexpr std::size_t print_reserve_size(print_reserve_type_t<basic_posix_io_observer<char_type>>)

@@ -4,93 +4,84 @@
 namespace fast_io
 {
 
-template<typename T>
-class basic_ospan
+template<std::integral ch_type,std::size_t extent=std::dynamic_extent>
+class ospan
 {
-	T s;
 public:
-	typename T::pointer internal_pointer;
-	using value_type = T;
-	using char_type = typename T::value_type;
-	template<typename ...Args>
-	requires std::constructible_from<T,Args...>
-	constexpr basic_ospan(Args&& ...args):s(std::forward<Args>(args)...),internal_pointer(s.data()){}
-	constexpr auto& span()
+	using char_type = ch_type;
+	using span_type = std::span<char_type,extent>;
+	span_type span;
+	using pointer = span_type::pointer;
+	pointer current;
+	template<typename... Args>
+	requires std::constructible_from<span_type,Args...>
+	constexpr ospan(Args&& ...args):span(std::forward<Args>(args)...),current(span.data()){}
+	constexpr auto data() const noexcept
 	{
-		return s;
+		return span.data();
 	}
-	constexpr void clear(){internal_pointer=s.data();}
+	constexpr auto data() noexcept
+	{
+		return span.data();
+	}
+	constexpr std::size_t size() const noexcept
+	{
+		return current-span.data();
+	}
+	constexpr void clear() noexcept {current=span.data();}
 };
 
-template<typename T>
-[[nodiscard]] inline constexpr std::size_t osize(basic_ospan<T>& ob)
+template<std::integral char_type,std::size_t extent>
+inline constexpr auto obuffer_begin(ospan<char_type,extent>& sp) noexcept
 {
-	return ob.internal_pointer-ob.span().data();
+	return sp.data();
 }
 
-template<typename T>
-[[nodiscard]] inline constexpr auto oreserve(basic_ospan<T>& ob,std::size_t) noexcept
+template<std::integral char_type,std::size_t extent>
+inline constexpr auto obuffer_curr(ospan<char_type,extent>& sp) noexcept
 {
-	return ob.internal_pointer;
+	return sp.current;
 }
 
-template<typename T>
-inline constexpr void orelease(basic_ospan<T>& ob,typename T::pointer ptr)
+template<std::integral char_type,std::size_t extent>
+inline constexpr auto obuffer_end(ospan<char_type,extent>& sp) noexcept
 {
-	ob.internal_pointer=ptr;
+	return std::to_address(sp.span.end());
 }
 
-template<typename T,std::contiguous_iterator Iter>
-inline constexpr void write(basic_ospan<T>& ob,Iter cbegin,Iter cend)
+template<std::integral char_type,std::size_t extent>
+inline constexpr auto obuffer_set_curr(ospan<char_type,extent>& sp,char_type* ptr) noexcept
 {
-	using char_type = typename T::value_type;
-	ob.internal_pointer=std::copy(static_cast<char_type const*>(static_cast<void const*>(std::to_address(cbegin))),
-		static_cast<char_type const*>(static_cast<void const*>(std::to_address(cend))),ob.internal_pointer);
+	sp.current=ptr;
 }
-template<typename T>
-inline constexpr void put(basic_ospan<T>& ob,typename T::value_type ch)
+
+template<std::integral char_type,std::size_t extent>
+inline constexpr auto overflow(ospan<char_type,extent>&,char_type) noexcept
 {
-	*ob.internal_pointer=ch;
-	++ob.internal_pointer;
+	fast_terminate();
 }
 
-template<typename T>
-inline constexpr void flush(basic_ospan<T>&){}
-
-template<typename T>
-inline constexpr void fill_nc(basic_ospan<T>& os,std::size_t count,typename T::value_type const& ch)
+template<std::integral char_type,std::size_t extent,std::contiguous_iterator Iter>
+requires (std::same_as<char_type,std::iter_value_t<Iter>>||std::same_as<char,char_type>)
+inline constexpr void write(ospan<char_type,extent>& ob,Iter cbegin,Iter cend) noexcept	//contract : cend-begin + curr <= span's size
 {
-	os.internal_pointer=std::fill_n(os.internal_pointer,count,ch);
+	if constexpr(std::same_as<char_type,std::iter_value_t<Iter>>)
+	{
+		std::size_t const sz(cend-cbegin);
+		if(ob.span.size()<ob.size()+sz)[[unlikely]]
+			fast_terminate();
+		details::non_overlapped_copy_n(cbegin,sz,ob.current);
+		ob.current+=sz;
+	}
+	else
+	{
+		write(ob,reinterpret_cast<char const*>(std::to_address(cbegin)),
+			reinterpret_cast<char const*>(std::to_address(cend)));
+	}
 }
 
-template<output_stream output,typename T>
-inline constexpr void print_define(output& out,basic_ospan<T> s)
-{
-	write(out,s.span().data(),s.internal_pointer);
-}
-
-template<typename T>
-[[nodiscard]] inline constexpr basic_istring_view<std::basic_string_view<typename T::value_type>> to_istring_view(basic_ospan<T> s)
-{
-	return {s.span().data(),static_cast<std::size_t>(s.internal_pointer-s.span().data())};
-}
-
-template<typename T>
-[[nodiscard]] inline constexpr std::basic_string_view<typename T::value_type> to_string_view(basic_ospan<T> s)
-{
-	return {s.span().data(),static_cast<std::size_t>(s.internal_pointer-s.span().data())};
-}
+template<typename... Args>
+ospan(Args&& ...args) -> ospan<typename std::remove_cvref_t<decltype(std::span(std::forward<Args>(args)...))>::value_type,
+		std::remove_cvref_t<decltype(std::span(std::forward<Args>(args)...))>::extent>;
 
 }
-
-#ifdef __cpp_lib_span
-
-#include<span>
-
-namespace fast_io
-{
-using ospan = basic_ospan<std::span<char>>;
-using u8ospan = basic_ospan<std::span<char8_t>>;
-}
-
-#endif
