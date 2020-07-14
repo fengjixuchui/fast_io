@@ -8,6 +8,9 @@ namespace details
 template<std::integral char_type,bool iobuf=false>
 inline constexpr std::size_t cal_buffer_size()
 {
+#ifdef FAST_IO_BUFFER_SIZE
+	static_assert(sizeof(char_type)<=FAST_IO_BUFFER_SIZE);
+#endif
 	if constexpr(iobuf)
 	{
 		return 
@@ -51,7 +54,7 @@ inline constexpr std::uintmax_t bufferred_transmit_impl(output& outp,input& inp)
 		do
 		{
 			auto b{ibuffer_curr(inp)};
-			auto e{std::to_address(ibuffer_end(inp))};
+			auto e{ibuffer_end(inp)};
 			if(b!=e)[[likely]]
 			{
 				std::size_t transmitted_this_round(static_cast<std::size_t>(e-b));
@@ -73,6 +76,7 @@ inline constexpr std::uintmax_t bufferred_transmit_impl(output& outp,input& inp)
 // we need to allocate it on the heap to avoid potential stack overflows
 		std::span<char_type,buffer_size> array(ptr.data(),ptr.data()+buffer_size);
 #endif
+		conditional_secure_clear_guard<char_type,secure_clear_requirement_stream<std::remove_cvref_t<input>>> guard(array.data(),buffer_size);
 		for(;;)
 		{
 			auto p(read(inp,array.data(),array.data()+array.size()));
@@ -95,8 +99,8 @@ inline constexpr std::uintmax_t bufferred_transmit_impl(output& outp,input& inp,
 	{
 		do
 		{
-			auto b(begin(inp));
-			auto e(end(inp));
+			auto b(ibuffer_begin(inp));
+			auto e(ibuffer_end(inp));
 			if(b!=e)[[likely]]
 			{
 				std::size_t transmitted_this_round((e-b)*sizeof(*b));
@@ -127,6 +131,7 @@ inline constexpr std::uintmax_t bufferred_transmit_impl(output& outp,input& inp,
 // we need to allocate it on the heap to avoid potential stack overflows
 		std::span<char_type,buffer_size> array(ptr.data(),ptr.data()+buffer_size);
 #endif
+		conditional_secure_clear_guard<char_type,secure_clear_requirement_stream<std::remove_cvref_t<input>>> guard(array.data(),buffer_size);
 		for(;bytes;)
 		{
 			std::size_t b(array.size());
