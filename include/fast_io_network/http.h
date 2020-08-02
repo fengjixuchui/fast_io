@@ -1,5 +1,5 @@
 #pragma once
-#include<unordered_map>
+//#include<unordered_map>
 
 namespace fast_io
 {
@@ -97,7 +97,7 @@ inline void print_define(output& out,basic_http_request_status<typename output::
 	print(out,s.method,u8" ",s.path,u8" ",s.version);
 }
 
-#ifdef __cpp_coroutines
+#if __cpp_lib_coroutine >= 201707L
 
 template<input_stream input>
 requires (buffer_input_stream<input>||mutex_input_stream<input>)
@@ -118,9 +118,13 @@ inline generator<http_header_line<typename input::char_type>> scan_http_header(i
 				co_return;
 			auto sz{str.find(u8':')};
 			if(sz==std::string::npos)
+#ifdef __cpp_exceptions
 				throw fast_io_text_error("unknown http header line");
+#else
+				fast_terminate();
+#endif
 			std::size_t i{sz+1};
-			for(;i!=str.size()&&i==u8' ';++i);
+			for(;i!=str.size()&&str[i]==u8' ';++i);
 			co_yield http_header_line<typename input::char_type>{
 			std::basic_string_view<typename input::char_type>(str.data(),sz),
 			std::basic_string_view<typename input::char_type>(str.cbegin()+i,str.cend())};
