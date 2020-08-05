@@ -14,12 +14,12 @@ inline constexpr bool scan_with_space_temporary_buffer_impl(output& buffer,input
 		return false;
 	if constexpr(space)
 	{
-		space_scan_reserve_define(io_reserve_type<no_cvref,true>,obuffer_begin(buffer),obuffer_curr(buffer),std::forward<T>(t));
+		space_scan_reserve_define(io_reserve_type<no_cvref>,obuffer_begin(buffer),obuffer_curr(buffer),std::forward<T>(t));
 		return true;
 	}
 	else
 	{
-		scan_reserve_define(io_reserve_type<no_cvref,true>,obuffer_begin(buffer),obuffer_curr(buffer),std::forward<T>(t));
+		scan_reserve_define(io_reserve_type<no_cvref>,obuffer_begin(buffer),obuffer_curr(buffer),std::forward<T>(t));
 		return true;
 	}
 }
@@ -27,8 +27,18 @@ inline constexpr bool scan_with_space_temporary_buffer_impl(output& buffer,input
 template<bool space=true,character_input_stream input,typename T>
 inline constexpr bool scan_with_space_temporary_buffer(input& in,T&& t)
 {
+	using no_cvref_input = std::remove_cvref_t<input>;
 	using no_cvref = std::remove_cvref_t<T>;
-	if constexpr(reserve_size_scanable<no_cvref>)
+	if constexpr(space&&space_scanable<no_cvref_input,T>)
+	{
+		space_scan_define(in,std::forward<T>(t));
+		return true;
+	}
+	else if constexpr(!space&&!scanable<no_cvref_input,T>)
+	{
+		return scan_define(in,std::forward<T>(t));
+	}
+	else if constexpr(reserve_size_scanable<no_cvref>)
 	{
 		std::array<typename std::remove_cvref_t<input>::char_type,scan_reserve_size(io_reserve_type<std::remove_cvref_t<T>>)> array;
 		ospan osp(array);
@@ -39,6 +49,7 @@ inline constexpr bool scan_with_space_temporary_buffer(input& in,T&& t)
 		internal_temporary_buffer<typename std::remove_cvref_t<input>::char_type> buffer;
 		return scan_with_space_temporary_buffer_impl<space>(buffer,in,std::forward<T>(t));
 	}
+
 }
 
 template<character_input_stream input,typename T>
@@ -46,6 +57,7 @@ requires (general_scanable<input,T>||general_reserve_scanable<T,internal_tempora
 inline constexpr auto scan_with_space(input &in,T&& t)
 {
 	using no_cvref = std::remove_cvref_t<T>;
+	using no_cvref_input = std::remove_cvref_t<input>;
 	constexpr bool not_contiguous{!contiguous_buffer_input_stream<input>};
 	if constexpr(space_scanable<input,T>||reserve_space_scanable<T,internal_temporary_buffer<typename std::remove_cvref_t<input>::char_type>,input>)
 	{
@@ -55,15 +67,20 @@ inline constexpr auto scan_with_space(input &in,T&& t)
 		{
 			if constexpr(buffer_input_stream<input>)
 			{
-				auto curr{ibuffer_curr(in)};
-				auto ed{ibuffer_end(in)};
-				auto res{space_scan_reserve_define(io_reserve_type<no_cvref,not_contiguous>,curr,ed,std::forward<T>(t))};
-				if constexpr(not_contiguous)
+				if constexpr(reserve_scan_avoidance<input>&&space_scanable<input,T>)
+					space_scan_define(in,std::forward<T>(t));
+				else
 				{
-					if(res==ed)[[unlikely]]
-						return scan_with_space_temporary_buffer(in,std::forward<T>(t));
+					auto curr{ibuffer_curr(in)};
+					auto ed{ibuffer_end(in)};
+					auto res{space_scan_reserve_define(io_reserve_type<no_cvref,not_contiguous>,curr,ed,std::forward<T>(t))};
+					if constexpr(not_contiguous)
+					{
+						if(res==ed)[[unlikely]]
+							return scan_with_space_temporary_buffer(in,std::forward<T>(t));
+					}
+					ibuffer_set_curr(in,res);
 				}
-				ibuffer_set_curr(in,res);
 			}
 			else
 				return scan_with_space_temporary_buffer(in,std::forward<T>(t));
@@ -81,18 +98,23 @@ inline constexpr auto scan_with_space(input &in,T&& t)
 			using no_cvref = std::remove_cvref_t<T>;
 			if constexpr(buffer_input_stream<input>)
 			{
-				auto curr{ibuffer_curr(in)};
-				auto ed{ibuffer_end(in)};
-				auto res{scan_reserve_define(io_reserve_type<no_cvref,!not_contiguous>,curr,ed,std::forward<T>(t))};
-				if(!res.first)
-					return false;
-				if constexpr(not_contiguous)
+				if constexpr(reserve_scan_avoidance<input>&&scanable<input,T>)
+					space_scan_define(in,std::forward<T>(t));
+				else
 				{
-					if(res==ed)[[unlikely]]
-						return scan_with_space_temporary_buffer<false>(in,std::forward<T>(t));
+					auto curr{ibuffer_curr(in)};
+					auto ed{ibuffer_end(in)};
+					auto res{scan_reserve_define(io_reserve_type<no_cvref,!not_contiguous>,curr,ed,std::forward<T>(t))};
+					if(!res.first)
+						return false;
+					if constexpr(not_contiguous)
+					{
+						if(res==ed)[[unlikely]]
+							return scan_with_space_temporary_buffer<false>(in,std::forward<T>(t));
+					}
+					ibuffer_set_curr(in,res);
+					return true;
 				}
-				ibuffer_set_curr(in,res);
-				return true;
 			}
 			else
 				return scan_with_space_temporary_buffer<false>(in,std::forward<T>(t));
@@ -138,6 +160,8 @@ inline constexpr void print_control(output& out,T&& t)
 {
 	using char_type = typename output::char_type;
 	using no_cvref = std::remove_cvref_t<T>;
+//	static_assert(printable<std::remove_cvref_t<output>,no_cvref>);
+
 	if constexpr(reserve_printable<T>)
 	{
 		constexpr std::size_t size{print_reserve_size(io_reserve_type<no_cvref>)};
@@ -165,7 +189,7 @@ inline constexpr void print_control(output& out,T&& t)
 			write(out,array.data(),print_reserve_define(io_reserve_type<no_cvref>,array.data(),std::forward<T>(t)));
 		}
 	}
-	else if constexpr(printable<output,T>)
+	else if constexpr(printable<output,no_cvref>)
 	{
 		print_define(out,std::forward<T>(t));
 	}
@@ -300,16 +324,18 @@ inline constexpr auto scan(input &&in,Args&& ...args)
 	}
 	else if constexpr(status_input_stream<input>)
 		return scan_status_define<report_eof>(in,std::forward<Args>(args)...);
+	else if constexpr(!character_input_stream<input>)
+	{
+		single_character_input_buffer<std::remove_cvref_t<input>> scib{in};
+		return scan<report_eof>(scib,std::forward<Args>(args)...);
+	}
 	else if constexpr(!requires()
 	{
 		details::normal_scan<report_eof>(in,std::forward<Args>(args)...);
 	})
 	{
-		if constexpr(character_input_stream<input>)
-			static_assert(!character_input_stream<input>,
-			"\n\n\tThe type is not defined for scanning. Please consider defining as with scan_define or space_scan_define.\n");
-		else
-			static_assert(character_input_stream<input>);
+		static_assert(!character_input_stream<input>,
+		"\n\n\tThe type is not defined for scanning. Please consider defining as with scan_define or space_scan_define.\n");
 	}
 	else
 		return details::normal_scan<report_eof>(in,std::forward<Args>(args)...);
@@ -526,16 +552,22 @@ inline constexpr void print(output &&out,Args&& ...args)
 	else if constexpr(((printable<output,Args>||reserve_printable<Args>)&&...)&&(sizeof...(Args)==1||buffer_output_stream<output>))
 	{
 		if constexpr(sizeof...(Args)==1||(!maybe_buffer_output_stream<output>))
+		{
 			(details::print_control(out,std::forward<Args>(args)),...);
+		}
 		else
 		{
-			if(!obuffer_is_active(out))[[unlikely]]
+			if constexpr(sizeof...(Args)!=1)
 			{
-				details::print_fallback<false>(out,std::forward<Args>(args)...);
-				return;
+				if(!obuffer_is_active(out))[[unlikely]]
+				{
+					details::print_fallback<false>(out,std::forward<Args>(args)...);
+					return;
+				}
 			}
 			(details::print_control(out,std::forward<Args>(args)),...);
 		}
+
 	}
 	else
 		details::print_fallback<false>(out,std::forward<Args>(args)...);

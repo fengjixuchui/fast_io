@@ -16,14 +16,14 @@ concept scanable=input_stream<input>&&requires(input& in,T&& t)
 };
 
 template<typename T,typename output,typename input>
-concept reserve_scanable=details::scan_reserve_transmit_impl<T,output,input>&&requires(T t,char8_t const* ptr,input in)
+concept reserve_scanable=(details::scan_reserve_transmit_impl<T,output,input>||scanable<T,input>)&&requires(T t,char8_t const* ptr,input in)
 {
 	scan_reserve_skip(io_reserve_type<std::remove_cvref_t<T>>,in);
 	{scan_reserve_define(io_reserve_type<std::remove_cvref_t<T>,true>,ptr,ptr,t)}->std::convertible_to<char8_t const*>;
 };
 
 template<typename T,typename output,typename input>
-concept reserve_space_scanable=details::scan_reserve_transmit_impl<T,output,input>&&
+concept reserve_space_scanable=(details::scan_reserve_transmit_impl<T,output,input>||space_scanable<T,input>)&&
 	requires(T t,char8_t const* ptr)
 {
 	{space_scan_reserve_define(io_reserve_type<std::remove_cvref_t<T>,true>,ptr,ptr,t)}->std::convertible_to<char8_t const*>;
@@ -38,6 +38,11 @@ concept reserve_size_scanable=requires()
 	{scan_reserve_size(io_reserve_type<std::remove_cvref_t<T>>)}->std::convertible_to<std::size_t>;
 };
 
+template<typename input>
+concept reserve_scan_avoidance = requires(input in)
+{
+	avoid_scan_reserve(in);
+};
 
 template<typename T>
 concept reserve_printable=requires(T&& t,char8_t* ptr)
