@@ -421,8 +421,16 @@ inline void async_read_callback(basic_win32_io_observer<char>,basic_win32_io_obs
 	if constexpr(4<sizeof(std::size_t))
 		if(static_cast<std::size_t>(UINT32_MAX)<to_read)
 			to_read=static_cast<std::size_t>(UINT32_MAX);
-	callback.native_handle()->Offset=static_cast<std::size_t>(offset)&std::numeric_limits<std::uint32_t>::max();
-	callback.native_handle()->OffsetHigh=static_cast<std::size_t>(offset)>>32;
+	if constexpr(4<sizeof(std::size_t))
+	{
+		callback.native_handle()->Offset=static_cast<std::size_t>(offset)&std::numeric_limits<std::uint32_t>::max();
+		callback.native_handle()->OffsetHigh=static_cast<std::size_t>(offset)>>static_cast<std::size_t>(32);
+	}
+	else
+	{
+		callback.native_handle()->Offset=static_cast<std::uint32_t>(offset);
+		callback.native_handle()->OffsetHigh=0;
+	}
 	if(!win32::ReadFile(h.native_handle(),std::to_address(cbegin),static_cast<std::uint32_t>(to_read),nullptr,callback.native_handle()))[[likely]]
 	{
 		auto err(win32::GetLastError());
@@ -452,8 +460,16 @@ inline void async_write_callback(basic_win32_io_observer<char> over,basic_win32_
 	if constexpr(4<sizeof(std::size_t))
 		if(static_cast<std::size_t>(UINT32_MAX)<to_write)
 			to_write=static_cast<std::size_t>(UINT32_MAX);
-	callback.native_handle()->Offset=static_cast<std::size_t>(offset)&std::numeric_limits<std::uint32_t>::max();
-	callback.native_handle()->OffsetHigh=static_cast<std::size_t>(offset)>>32;
+	if constexpr(4<sizeof(std::size_t))
+	{
+		callback.native_handle()->Offset=static_cast<std::size_t>(offset)&std::numeric_limits<std::uint32_t>::max();
+		callback.native_handle()->OffsetHigh=static_cast<std::size_t>(offset)>>static_cast<std::size_t>(32);
+	}
+	else
+	{
+		callback.native_handle()->Offset=static_cast<std::uint32_t>(offset);
+		callback.native_handle()->OffsetHigh=0;
+	}
 	if(!win32::WriteFile(h.native_handle(),std::to_address(cbegin),static_cast<std::uint32_t>(to_write),nullptr,callback.native_handle()))[[likely]]
 	{
 		auto err(win32::GetLastError());
@@ -606,12 +622,6 @@ public:
 	constexpr basic_win32_file& operator=(basic_win32_file const&)=default;
 	constexpr basic_win32_file(basic_win32_file&&) noexcept=default;
 	constexpr basic_win32_file& operator=(basic_win32_file&&) noexcept=default;
-	constexpr native_handle_type release() noexcept
-	{
-		auto temp{this->native_handle()};
-		this->native_handle()==nullptr;
-		return temp;
-	}
 };
 
 template<std::integral ch_type>
@@ -634,9 +644,7 @@ class basic_win32_pipe
 public:
 	using char_type = ch_type;
 	using native_handle_type = std::array<basic_win32_file<ch_type>,2>;
-private:
 	native_handle_type pipes;
-public:
 	template<typename ...Args>
 /*	requires requires(Args&& ...args)
 	{

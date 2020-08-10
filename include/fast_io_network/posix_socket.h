@@ -73,6 +73,18 @@ inline auto recv(Args&& ...args)
 	return call_posix(::recv,std::forward<Args>(args)...);
 }
 
+
+template<typename ...Args>
+inline auto sendmsg(Args&& ...args)
+{
+	return call_posix(::sendmsg,std::forward<Args>(args)...);
+}
+template<typename ...Args>
+inline auto recvmsg(Args&& ...args)
+{
+	return call_posix(::recvmsg,std::forward<Args>(args)...);
+}
+
 template<typename ...Args>
 inline auto closesocket(Args&& ...args)
 {
@@ -108,7 +120,7 @@ inline void getaddrinfo(Args&& ...args)
 {
 	int ec(::getaddrinfo(std::forward<Args>(args)...));
 	if(ec)
-		fast_io::details::throw_gai_error(ec);
+		fast_io::throw_gai_error(ec);
 }
 
 template<typename ...Args>

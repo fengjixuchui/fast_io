@@ -49,14 +49,25 @@ template<std::integral CharT,bool need_secure_clear=false,std::size_t buffer_siz
 requires (buffer_size!=0)
 class basic_buf_handler
 {
-	Allocator alloc;
 public:
 	using char_type = CharT;
 	using allocator_type = Allocator;
 	char_type *beg{},*curr{},*end{};
+	[[no_unique_address]] Allocator alloc;
+private:
+	constexpr inline void cleanse()
+	{
+		if(beg)
+		{
+			if constexpr(need_secure_clear)
+				secure_clear(beg,buffer_size*sizeof(char_type));
+			std::allocator_traits<allocator_type>::deallocate(alloc,beg,buffer_size);
+		}
+	}
+public:
 	constexpr basic_buf_handler()=default;
+	constexpr basic_buf_handler(basic_buf_handler const& other)=delete;
 	constexpr basic_buf_handler& operator=(basic_buf_handler const&)=delete;
-	constexpr basic_buf_handler(basic_buf_handler const&)=delete;
 	static constexpr std::size_t size = buffer_size;
 	constexpr basic_buf_handler(basic_buf_handler&& m) noexcept:beg(m.beg),curr(m.curr),end(m.end)
 	{
@@ -64,33 +75,22 @@ public:
 	}
 	constexpr basic_buf_handler& operator=(basic_buf_handler&& m) noexcept
 	{
-		if(std::addressof(m)!=this)[[likely]]
-		{
-			if(m.beg)
-			{
-				if constexpr(need_secure_clear)
-					secure_clear(beg,buffer_size*sizeof(char_type));
-				std::allocator_traits<allocator_type>::deallocate(alloc,beg,buffer_size);
-			}
-			beg=m.beg;
-			curr=m.curr;
-			end=m.end;
-			m.end=m.curr=m.beg=nullptr;
-		}
+		if(std::addressof(m)==this)[[unlikely]]
+			return *this;
+		cleanse();
+		beg=m.beg;
+		curr=m.curr;
+		end=m.end;
+		m.end=m.curr=m.beg=nullptr;
 		return *this;
 	}
 	constexpr inline void init_space()
 	{
 		end=curr=beg=std::allocator_traits<allocator_type>::allocate(alloc,buffer_size);
 	}
-	constexpr inline void release()
+	constexpr inline void release() const noexcept
 	{
-		if(beg)[[likely]]
-		{
-			if constexpr(need_secure_clear)
-				secure_clear(beg,buffer_size*sizeof(char_type));
-			std::allocator_traits<allocator_type>::deallocate(alloc,beg,buffer_size);
-		}
+		cleanse();
 		end=curr=beg=nullptr;
 	}
 #if __cpp_lib_is_constant_evaluated >= 201811L && __cpp_constexpr_dynamic_alloc >= 201907L
@@ -105,7 +105,7 @@ public:
 			std::allocator_traits<allocator_type>::deallocate(alloc,beg,buffer_size);
 		}
 	}
-	Allocator get_allocator() const{ return alloc;}
+	constexpr Allocator get_allocator() const noexcept { return alloc;}
 };
 
 
@@ -113,8 +113,8 @@ template<input_stream Ihandler,typename Buf=basic_buf_handler<typename Ihandler:
 class basic_ibuf:public ocrtp<basic_ibuf<Ihandler,Buf>>
 {
 public:
-	Ihandler ih;
 	Buf ibuffer;
+	Ihandler ih;
 	constexpr auto& ocrtp_handle() requires output_stream<Ihandler>
 	{
 		return ih;
@@ -129,6 +129,23 @@ public:
 	{
 		return ih;
 	}
+#if __cpp_lib_is_constant_evaluated >= 201811L && __cpp_constexpr_dynamic_alloc >= 201907L
+	constexpr
+#endif
+	~basic_ibuf()=default;
+	constexpr basic_ibuf(basic_ibuf const& other) requires(std::copyable<Ihandler>):ih(other.ih){}
+	constexpr basic_ibuf(basic_ibuf const& other) = delete;
+	constexpr basic_ibuf& operator=(basic_ibuf const& other) requires(std::copyable<Ihandler>)
+	{
+		if(std::addressof(other)==this)
+			return *this;
+		ih=other.ih;
+		ibuffer.end=ibuffer.curr=ibuffer.beg;
+		return *this;
+	}
+	constexpr basic_ibuf& operator=(basic_ibuf const& other) =delete;
+	constexpr basic_ibuf(basic_ibuf&&) noexcept=default;
+	constexpr basic_ibuf& operator=(basic_ibuf&&) noexcept=default;
 };
 template<input_stream Ihandler,typename Buf>
 inline constexpr bool underflow(basic_ibuf<Ihandler,Buf>& ib)
@@ -190,7 +207,7 @@ concept write_read_punned_constraints = (std::contiguous_iterator<Iter>&&sizeof(
 
 namespace details
 {
-template<std::size_t buffer_size,bool punning=false,typename T,typename Iter>
+template<std::size_t buffer_size,typename T,std::contiguous_iterator Iter>
 requires std::same_as<std::iter_value_t<Iter>,typename std::remove_cvref_t<T>::char_type>
 inline constexpr Iter ibuf_read_cold(T& ib,Iter begin,Iter end)
 {
@@ -199,27 +216,15 @@ inline constexpr Iter ibuf_read_cold(T& ib,Iter begin,Iter end)
 	if(ib.ibuffer.end==nullptr)
 	{
 		if(buffer_size<=n)
-		{
 			return read(ib.native_handle(),begin,end);
-		}
 		ib.ibuffer.init_space();
 		ib.ibuffer.curr=ib.ibuffer.end=ib.ibuffer.beg;
 	}
-	if constexpr(punning)
-	{
-		std::memcpy(begin,ib.ibuffer.curr,buffer_remain*sizeof(std::iter_value_t<Iter>));
-		begin+=buffer_remain;
-	}
-	else
-		begin=std::copy_n(ib.ibuffer.curr,buffer_remain,begin);
+	details::non_overlapped_copy_n(ib.ibuffer.curr,buffer_remain,begin);
+	begin+=buffer_remain;
 	if(begin+buffer_size<end)
 	{
-//			if constexpr(std::contiguous_iterator<Iter>)
-			begin=read(ib.native_handle(),begin,end);
-/*			else
-		{
-			
-		}*/
+		begin=read(ib.native_handle(),begin,end);
 		if(begin!=end)
 		{
 			ib.ibuffer.end=ib.ibuffer.curr=ib.ibuffer.beg;
@@ -232,53 +237,32 @@ inline constexpr Iter ibuf_read_cold(T& ib,Iter begin,Iter end)
 	std::size_t const sz(ib.ibuffer.end-ib.ibuffer.beg);
 	if(sz<n)
 		n=sz;
-	if constexpr(punning)
-	{
-		std::memcpy(begin,ib.ibuffer.curr,n*sizeof(std::iter_value_t<Iter>));
-		begin+=n;
-	}
-	else
-		begin=std::copy_n(ib.ibuffer.curr,n,begin);
+	details::non_overlapped_copy_n(ib.ibuffer.curr,n,begin);
+	begin+=n;
 	ib.ibuffer.curr+=n;
 	return begin;
 }
 
-template<std::size_t buffer_size,bool punning=false,typename T,typename Iter>
-requires std::same_as<std::iter_value_t<Iter>,typename std::remove_cvref_t<T>::char_type>
-inline constexpr Iter ibuf_read(T& ib,Iter begin,Iter end)
-{
-	std::size_t n(end-begin);
-	if(ib.ibuffer.curr+n<ib.ibuffer.end)[[unlikely]]			//cache miss
-		return ibuf_read_cold<buffer_size,punning>(ib,begin,end);
-	if constexpr(punning)
-	{
-		std::memcpy(begin,ib.ibuffer.curr,n*sizeof(std::iter_value_t<Iter>));
-		begin+=n;
-	}
-	else
-		begin=std::copy_n(ib.ibuffer.curr,n,begin);
-	ib.ibuffer.curr+=n;
-	return begin;
-
-}
 }
 
 template<input_stream Ihandler,typename Buf,std::contiguous_iterator Iter>
-requires (write_read_punned_constraints<basic_ibuf<Ihandler,Buf>,Iter>)
+requires (std::same_as<std::iter_value_t<Iter>,typename Ihandler::char_type>||std::same_as<typename Ihandler::char_type,char>)
 inline constexpr Iter read(basic_ibuf<Ihandler,Buf>& ib,Iter begin,Iter end)
 {
 	using char_type = typename basic_ibuf<Ihandler,Buf>::char_type;
-	if constexpr(std::same_as<char_type,typename std::iterator_traits<Iter>::value_type>)
+	if constexpr(std::same_as<char_type,std::iter_value_t<Iter>>)
 	{
-		if(std::is_constant_evaluated())
-			return details::ibuf_read<Buf::size>(ib,std::to_address(begin),std::to_address(end));
-		else
-			return details::ibuf_read<Buf::size,true>(ib,std::to_address(begin),std::to_address(end));
+		std::size_t n(end-begin);
+		if(ib.ibuffer.end<ib.ibuffer.curr+n)[[unlikely]]			//cache miss
+			return details::ibuf_read_cold<Buf::size>(ib,begin,end);
+		details::non_overlapped_copy_n(ib.ibuffer.curr,n,begin);
+		ib.ibuffer.curr+=n;
+		return begin;
 	}
 	else
 	{
-		auto b(reinterpret_cast<char const*>(std::to_address(begin)));
-		return begin+(details::ibuf_read<Buf::size,true>(ib,b,reinterpret_cast<char const*>(std::to_address(end)))-b)/sizeof(*begin);
+		auto b(reinterpret_cast<char*>(std::to_address(begin)));
+		return begin+(read(ib,b,reinterpret_cast<char*>(std::to_address(end)))-b)/sizeof(*begin);
 	}
 }
 
@@ -316,6 +300,24 @@ inline constexpr decltype(auto) memory_map_in_handle(basic_ibuf<Ihandler,Buf>& h
 	return memory_map_in_handle(handle.native_handle());
 }
 
+template<connection_stream Ihandler,typename Buf>
+inline constexpr decltype(auto) connect(basic_ibuf<Ihandler,Buf>& ob)
+{
+	return connect(ob.native_handle());
+}
+
+template<listener_stream Ihandler,typename Buf>
+inline constexpr decltype(auto) listen(basic_ibuf<Ihandler,Buf>& ob)
+{
+	return listen(ob.native_handle());
+}
+
+template<acceptance_stream Ihandler,typename Buf>
+inline constexpr decltype(auto) accept(basic_ibuf<Ihandler,Buf>& ob)
+{
+	return accept(ob.native_handle());
+}
+
 template<output_stream Ohandler,bool forcecopy=false,typename Buf=basic_buf_handler<typename Ohandler::char_type,secure_clear_requirement_stream<Ohandler>>>
 class basic_obuf:public icrtp<basic_obuf<Ohandler,forcecopy,Buf>>
 {
@@ -346,23 +348,37 @@ public:
 	template<typename... Args>
 	requires std::constructible_from<Ohandler,Args...>
 	constexpr basic_obuf(Args&&... args):oh(std::forward<Args>(args)...){}
+#if __cpp_lib_is_constant_evaluated >= 201811L && __cpp_constexpr_dynamic_alloc >= 201907L
+	constexpr
+#endif
 	~basic_obuf()
 	{
 		close_impl();
 	}
-	basic_obuf& operator=(basic_obuf const&)=delete;
-	basic_obuf(basic_obuf const&)=delete;
-	constexpr basic_obuf(basic_obuf&& bmv) noexcept:oh(std::move(bmv.oh)),obuffer(std::move(bmv.obuffer)){}
-	constexpr basic_obuf& operator=(basic_obuf&& b) noexcept
+	constexpr basic_obuf(basic_obuf const& other) requires(std::copyable<Ohandler>):oh(other.oh){}
+	constexpr basic_obuf(basic_obuf const&)=delete;
+	constexpr basic_obuf& operator=(basic_obuf const& other) requires(std::copyable<Ohandler>)
 	{
-		if(std::addressof(b)!=this)
-		{
-			close_impl();
-			oh=std::move(b.oh);
-			obuffer=std::move(b.obuffer);
-		}
+		if(std::addressof(other)==this)
+			return *this;
+		close_impl();
+		oh.obuffer.curr=oh.obuffer.beg;
+		oh=other.oh;
 		return *this;
 	}
+	constexpr basic_obuf& operator=(basic_obuf const&)=delete; 
+	constexpr basic_obuf(basic_obuf&& bmv) noexcept requires(std::movable<Ohandler>):oh(std::move(bmv.oh)),obuffer(std::move(bmv.obuffer)){}
+	constexpr basic_obuf& operator=(basic_obuf&& b) noexcept requires(std::movable<Ohandler>)
+	{
+		if(std::addressof(b)==this)[[unlikely]]
+			return *this;
+		close_impl();
+		oh=std::move(b.oh);
+		obuffer=std::move(b.obuffer);
+		return *this;
+	}
+	constexpr basic_obuf& operator=(basic_obuf&&) noexcept =delete;
+	constexpr basic_obuf(basic_obuf&&) noexcept=delete;
 	inline constexpr auto& native_handle()
 	{
 		return oh;
@@ -400,24 +416,27 @@ inline constexpr void require_secure_clear(basic_obuf<Ohandler,forcecopy,Buf>&){
 
 namespace details
 {
-template<bool init,bool punning=false,output_stream Ohandler,bool forcecopy,typename Buf,std::contiguous_iterator Iter>
+template<bool init,bool overlapped,output_stream Ohandler,bool forcecopy,typename Buf,std::contiguous_iterator Iter>
 constexpr void obuf_write_force_copy(basic_obuf<Ohandler,forcecopy,Buf>& ob,Iter cbegin,Iter cend)
 {
 	if constexpr(forcecopy&&!std::same_as<decltype(write(ob.oh,cbegin,cend)),void>)
 	{
 		auto it{write(ob.oh,cbegin,cend)};
-		if(it!=cend)
+		if(it==cend)
+			ob.obuffer.curr=ob.obuffer.beg;
+		else
 		{
 			if(Buf::size<=static_cast<std::size_t>(cend-it))
 				throw_posix_error(EIO);
 			if constexpr(init)
 			{
 				ob.obuffer.init_space();
-				ob.obuffer.end=(ob.obuffer.curr=ob.obuffer.beg)+Buf::size;
+				ob.obuffer.end=ob.obuffer.beg+Buf::size;
 			}
+			if constexpr(overlapped)
+				my_copy_n(it,cend-it,ob.obuffer.beg);//might overlapped. need to worry about this
 			else
-				ob.obuffer.curr=ob.obuffer.beg;
-			memcpy(ob.obuffer.beg,std::to_address(it),(cend-it)*sizeof(*cbegin));
+				non_overlapped_copy_n(it,cend-it,ob.obuffer.beg);
 			ob.obuffer.curr=ob.obuffer.beg+(cend-it);
 		}
 	}
@@ -435,7 +454,7 @@ inline constexpr void overflow(basic_obuf<Ohandler,forcecopy,Buf>& ob,typename O
 {
 	if(ob.obuffer.beg)
 	{
-		details::obuf_write_force_copy<false>(ob,ob.obuffer.beg,ob.obuffer.end);
+		details::obuf_write_force_copy<false,true>(ob,ob.obuffer.beg,ob.obuffer.end);
 	}
 	else	//cold buffer
 	{
@@ -468,7 +487,7 @@ inline constexpr void iobuf_fill_nc_define_code_path(basic_obuf<Ohandler,forceco
 		std::size_t mn(ob.obuffer.end-ob.obuffer.beg);
 		if(n<mn)
 			mn=n;
-		obuf_write_force_copy<false>(ob,ob.obuffer.beg,ob.obuffer.curr+mn);
+		obuf_write_force_copy<false,true>(ob,ob.obuffer.beg,ob.obuffer.curr+mn);
 		last=ob.obuffer.curr;
 		n-=mn;
 	}
@@ -492,7 +511,7 @@ inline constexpr void fill_nc_define(basic_obuf<Ohandler,forcecopy,Buf>& ob,std:
 namespace details
 {
 
-template<bool punning=false,output_stream Ohandler,bool forcecopy,typename Buf,std::contiguous_iterator Iter>
+template<output_stream Ohandler,bool forcecopy,typename Buf,std::contiguous_iterator Iter>
 constexpr void obuf_write_cold(basic_obuf<Ohandler,forcecopy,Buf>& ob,Iter cbegin,Iter cend,std::size_t diff)
 {
 	using T = basic_obuf<Ohandler,forcecopy,Buf>;
@@ -502,41 +521,34 @@ constexpr void obuf_write_cold(basic_obuf<Ohandler,forcecopy,Buf>& ob,Iter cbegi
 			return;
 		if(T::buffer_type::size<=diff)
 		{
-			obuf_write_force_copy<true,punning>(ob,cbegin,cend);
+			obuf_write_force_copy<true,false>(ob,cbegin,cend);
 			return;
 		}
 		ob.obuffer.init_space();
 		ob.obuffer.end=(ob.obuffer.curr=ob.obuffer.beg)+T::buffer_type::size;
-		if constexpr(punning)
-			memcpy(ob.obuffer.curr,cbegin,diff*sizeof(std::iter_value_t<Iter>));
-		else
-			std::copy_n(cbegin,diff,ob.obuffer.curr);
+		non_overlapped_copy_n(cbegin,diff,ob.obuffer.curr);
 		ob.obuffer.curr+=diff;
 		return;
 	}
-
 	if constexpr(forcecopy&&!std::same_as<decltype(write(ob.oh,cbegin,cend)),void>)
 	{
 		while(ob.obuffer.end-ob.obuffer.curr<cend-cbegin)
 		{
 			std::size_t const need_to_copy(ob.obuffer.end-ob.obuffer.curr);
-			memcpy(ob.obuffer.curr,std::to_address(cbegin),need_to_copy*sizeof(*cbegin));
-			obuf_write_force_copy<false,punning>(ob,ob.obuffer.curr,ob.obuffer.end);			
+			non_overlapped_copy_n(cbegin,need_to_copy,ob.obuffer.curr);
+			obuf_write_force_copy<false,true>(ob,ob.obuffer.beg,ob.obuffer.end);
 			cbegin+=need_to_copy;
 		}
 		std::size_t const need_to_copy(cend-cbegin);
-		memcpy(ob.obuffer.curr,std::to_address(cbegin),need_to_copy*sizeof(*cbegin));
+		details::non_overlapped_copy_n(cbegin,need_to_copy,ob.obuffer.curr);
 		ob.obuffer.curr+=need_to_copy;
 	}
 	else
 	{
 		std::size_t n(ob.obuffer.end-ob.obuffer.curr);
-		if constexpr(punning)
-			memcpy(ob.obuffer.curr,cbegin,n*sizeof(std::iter_value_t<Iter>));
-		else
-			std::copy_n(cbegin,n,ob.obuffer.curr);	
+		details::non_overlapped_copy_n(cbegin,n,ob.obuffer.curr);
 		cbegin+=n;
-		write(ob.native_handle(),ob.obuffer.beg,ob.obuffer.end);
+		write(ob.oh,ob.obuffer.beg,ob.obuffer.end);
 		if(cbegin+(T::buffer_type::size)<cend)
 		{
 			write(ob.oh,cbegin,cend);
@@ -545,51 +557,34 @@ constexpr void obuf_write_cold(basic_obuf<Ohandler,forcecopy,Buf>& ob,Iter cbegi
 		else
 		{
 			std::size_t const df(cend-cbegin);
-			if constexpr(punning)
-				memcpy(ob.obuffer.beg,cbegin,df*sizeof(std::iter_value_t<Iter>));
-			else
-				std::copy_n(cbegin,df,ob.obuffer.beg);
+			details::non_overlapped_copy_n(cbegin,df,ob.obuffer.beg);
 			ob.obuffer.curr=ob.obuffer.beg+df;
 		}
 	}
 }
 
-template<bool punning=false,output_stream Ohandler,bool forcecopy,typename Buf,std::contiguous_iterator Iter>
-requires std::same_as<std::iter_value_t<Iter>,typename Ohandler::char_type>
-inline constexpr void obuf_write(basic_obuf<Ohandler,forcecopy,Buf>& ob,Iter cbegin,Iter cend)
-{
-	std::size_t const diff(cend-cbegin);
-	auto curr{ob.obuffer.curr};
-	auto e{curr+diff};
-	if(e<ob.obuffer.end)[[likely]]
-	{
-		if constexpr(punning)
-			memcpy(curr,cbegin,diff*sizeof(std::iter_value_t<Iter>));
-		else
-			std::copy_n(cbegin,diff,ob.obuffer.curr);
-		ob.obuffer.curr=e;
-		return;
-	}
-	obuf_write_cold<punning>(ob,cbegin,cend,diff);
-}
-
 }
 
 template<output_stream Ohandler,bool forcecopy,typename Buf,std::contiguous_iterator Iter>
-requires (write_read_punned_constraints<basic_obuf<Ohandler,forcecopy,Buf>,Iter>)
-inline constexpr void write(basic_obuf<Ohandler,forcecopy,Buf>& ob,Iter cbegini,Iter cendi)
+requires (std::same_as<std::iter_value_t<Iter>,typename Ohandler::char_type>||std::same_as<typename Ohandler::char_type,char>)
+inline constexpr void write(basic_obuf<Ohandler,forcecopy,Buf>& ob,Iter cbegin,Iter cend)
 {
 	using char_type = typename basic_obuf<Ohandler,forcecopy,Buf>::char_type;
-	if constexpr(std::same_as<char_type,typename std::iterator_traits<Iter>::value_type>)
+	if constexpr(std::same_as<char_type,std::iter_value_t<Iter>>)
 	{
-		if(std::is_constant_evaluated())
-			details::obuf_write<false>(ob,std::to_address(cbegini),std::to_address(cendi));
-		else
-			details::obuf_write<true>(ob,std::to_address(cbegini),std::to_address(cendi));
+		std::size_t const diff(cend-cbegin);
+		auto curr{ob.obuffer.curr};
+		auto e{curr+diff};
+		if(e<ob.obuffer.end)[[likely]]
+		{
+			details::non_overlapped_copy_n(cbegin,diff,curr);
+			ob.obuffer.curr=e;
+			return;
+		}
+		details::obuf_write_cold(ob,cbegin,cend,diff);
 	}
 	else
-		details::obuf_write<true>(ob,reinterpret_cast<char const*>(std::to_address(cbegini)),
-					reinterpret_cast<char const*>(std::to_address(cendi)));
+		write(ob,reinterpret_cast<char const*>(std::to_address(cbegin)),reinterpret_cast<char const*>(std::to_address(cend)));
 }
 
 template<output_stream Ohandler,bool forcecopy,typename Buf>
@@ -597,7 +592,7 @@ inline constexpr void flush(basic_obuf<Ohandler,forcecopy,Buf>& ob)
 {
 	if(ob.obuffer.beg==ob.obuffer.curr)
 		return;
-	write(ob.native_handle(),ob.obuffer.beg,ob.obuffer.curr);
+	write(ob.oh,ob.obuffer.beg,ob.obuffer.curr);
 	ob.obuffer.curr=ob.obuffer.beg;
 //	flush(oh.native_handle());
 }
@@ -608,10 +603,28 @@ inline constexpr decltype(auto) seek(basic_obuf<Ohandler,forcecopy,Buf>& ob,Args
 {
 	if(ob.obuffer.beg!=ob.obuffer.curr)
 	{
-		write(ob.native_handle(),ob.obuffer.beg,ob.obuffer.curr);
+		write(ob.oh,ob.obuffer.beg,ob.obuffer.curr);
 		ob.obuffer.curr=ob.obuffer.beg;
 	}
-	return seek(ob.native_handle(),std::forward<Args>(args)...);
+	return seek(ob.oh,std::forward<Args>(args)...);
+}
+
+template<connection_stream Ohandler,bool forcecopy,typename Buf>
+inline constexpr decltype(auto) connect(basic_obuf<Ohandler,forcecopy,Buf>& ob)
+{
+	return connect(ob.native_handle());
+}
+
+template<connection_stream Ohandler,bool forcecopy,typename Buf>
+inline constexpr decltype(auto) listen(basic_obuf<Ohandler,forcecopy,Buf>& ob)
+{
+	return listen(ob.native_handle());
+}
+
+template<acceptance_stream Ohandler,bool forcecopy,typename Buf>
+inline constexpr decltype(auto) accept(basic_obuf<Ohandler,forcecopy,Buf>& ob)
+{
+	return accept(ob.native_handle());
 }
 
 template<io_stream ioh,bool forcecopy=false,typename bf=basic_buf_handler<typename ioh::char_type>>
