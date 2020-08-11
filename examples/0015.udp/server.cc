@@ -5,18 +5,12 @@
 int main()
 try
 {
-//	debug_println(__LINE__);
-	fast_io::server hd(2000,fast_io::sock::type::datagrams,fast_io::sock::protocal::udp);
+	fast_io::udp_server server(2001);
 	for(;;)
-	try
 	{
-		fast_io::ibuf_socket_acceptor accept(hd);
-		println(fast_io::out(),u8"a client connect to this server");
-		print_flush(accept,u8"hello world\n");
-	}
-	catch(std::exception const & e)
-	{
-		perrln(e);
+		fast_io::ip_endpoint client;
+		std::array<char,100> buffer;
+		write(fast_io::out(),buffer.begin(),read(fast_io::packet(server,client),buffer.begin(),buffer.end()));
 	}
 }
 catch(std::exception const & e)
