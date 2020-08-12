@@ -198,7 +198,7 @@ concept async_scatter_output_stream_impl = requires(T out,std::span<io_scatter_t
 	requires requires(typename std::remove_cvref_t<decltype(async_scheduler_type(out))>::type sch,
 	typename std::remove_cvref_t<decltype(async_overlapped_type(out))>::type overlapped,std::ptrdiff_t offset)
 	{
-		async_write_callback(sch,out,sp,overlapped,offset);
+		async_scatter_write_callback(sch,out,sp,overlapped,offset);
 	};
 };
 

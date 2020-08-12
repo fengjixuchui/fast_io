@@ -15,167 +15,168 @@ constexpr void return_void() {}
 };
 };
 
+namespace details
+{
 
-template<async_input_stream stm,std::input_or_output_iterator Iter1,std::input_or_output_iterator Iter2>
-class async_read
+template<typename stm,std::input_iterator Iter,bool write>
+requires ((write&&async_output_stream<stm>)||(!write&&async_input_stream<stm>))
+class async_io_coroutine
 {
 public:
-	typename io_async_scheduler_t<stm>::type& sch;
-	stm& sm;
-	Iter1 beg;
-	Iter2 end;
+	typename io_async_scheduler_t<stm>::type& scheduler;
+	stm& stream;
+	Iter first,last;
+	std::ptrdiff_t offset{write?-1:0};
+	std::size_t transferred_bytes{};
+	int err{};
+	typename io_async_overlapped_t<stm>::type overlapped;
+	constexpr bool await_ready() const { return false; }
+	constexpr Iter await_resume() const
+	{
+		if(err)
+			throw_posix_error(err);
+		return first+transferred_bytes/sizeof(*first);
+	}
+	void await_suspend(std::coroutine_handle<> handle)
+	{
+		overlapped=typename io_async_overlapped_t<stm>::type(std::in_place,[handle,this](std::size_t calb,int errn)
+		{
+			this->transferred_bytes=calb;
+			this->err=errn;
+			handle.resume();
+		});
+		if constexpr(write)
+			async_read_callback(scheduler,stream,first,last,overlapped,offset);
+		else
+			async_write_callback(scheduler,stream,first,last,overlapped,offset);
+	}
+};
+
+
+
+
+
+template<typename stm,bool write>
+requires ((write&&async_scatter_output_stream<stm>)||(!write&&async_scatter_input_stream<stm>))
+class async_scatter_io_coroutine
+{
+public:
+	typename io_async_scheduler_t<stm>::type& scheduler;
+	stm& stream;
+	std::span<io_scatter_t> scatters;
+	std::ptrdiff_t offset{write?-1:0};
+	typename io_async_overlapped_t<stm>::type overlapped;
+	std::size_t transferred_bytes{};
+	int err{};
+	constexpr bool await_ready() const { return false; }
+	constexpr std::size_t await_resume() const
+	{
+		if(err)
+			throw_posix_error(err);
+		return transferred_bytes;
+	}
+	void await_suspend(std::coroutine_handle<> handle)
+	{
+		overlapped=typename io_async_overlapped_t<stm>::type(std::in_place,[handle,this](std::size_t calb,int errn)
+		{
+			this->transferred_bytes=calb;
+			this->err=errn;
+			handle.resume();
+		});
+		if constexpr(write)
+			async_scatter_read_callback(scheduler,stream,scatters,overlapped,offset);
+		else
+			async_scatter_write_callback(scheduler,stream,scatters,overlapped,offset);
+	}
+};
+
+
+template<async_output_stream stm,bool line>
+class async_print_coroutine
+{
+public:
+	typename io_async_scheduler_t<stm>::type& scheduler;
+	stm& stream;
 	std::ptrdiff_t offset{};
-	std::size_t transferred_size{};
 	typename io_async_overlapped_t<stm>::type overlapped;
-	constexpr bool await_ready() const { return false; }
-	constexpr Iter1 await_resume() const { return beg+transferred_size; }
-	void await_suspend(std::coroutine_handle<> handle)
-	{
-		overlapped=typename io_async_overlapped_t<stm>::type(std::in_place,[handle,this](std::size_t calb)
-		{
-			this->transferred_size=calb/sizeof(*beg);
-			handle.resume();
-		});
-		async_read_callback(sch,sm,beg,end,overlapped,offset*sizeof(*beg));
-	}
-};
-
-template<async_input_stream stm,std::input_or_output_iterator Iter1,
-	std::input_or_output_iterator Iter2> async_read(typename io_async_scheduler_t<stm>::type&,stm&,Iter1,Iter2,std::ptrdiff_t)
-		-> async_read<stm, Iter1, Iter2>;
-template<async_input_stream stm,std::input_or_output_iterator Iter1,
-	std::input_or_output_iterator Iter2> async_read(typename io_async_scheduler_t<stm>::typee&,stm&,Iter1,Iter2)
-		-> async_read<stm, Iter1, Iter2>;
-
-
-
-
-template<async_output_stream stm,std::input_or_output_iterator Iter1,std::input_or_output_iterator Iter2>
-class async_write
-{
-public:
-	typename io_async_scheduler_t<stm>::type& sch;
-	stm& sm;
-	Iter1 beg;
-	Iter2 end;
-	std::ptrdiff_t offset{-1};
-	std::size_t transferred_size{};
-	typename io_async_overlapped_t<stm>::type overlapped;
-	constexpr bool await_ready() const { return false; }
-	constexpr Iter1 await_resume() const { return beg+transferred_size; }
-	void await_suspend(std::coroutine_handle<> handle)
-	{
-		overlapped=typename io_async_overlapped_t<stm>::type(std::in_place,[handle,this](std::size_t calb)
-		{
-			this->transferred_size=calb/sizeof(*beg);
-			handle.resume();
-		});
-		async_write_callback(sch,sm,beg,end,overlapped,offset*sizeof(*beg));
-	}
-};
-
-template<async_output_stream stm,std::input_or_output_iterator Iter1,
-	std::input_or_output_iterator Iter2> async_write(typename io_async_scheduler_t<stm>::type&,stm&,Iter1,Iter2,std::ptrdiff_t) ->
-		async_write<stm, Iter1, Iter2>;
-template<async_output_stream stm,std::input_or_output_iterator Iter1,
-	std::input_or_output_iterator Iter2> async_write(typename io_async_scheduler_t<stm>::type&,stm&,Iter1,Iter2) -> async_write<stm, Iter1, Iter2>;
-
-template<async_output_stream stm>
-class async_print
-{
-public:
-	typename stm::async_scheduler_type& sch;
-	stm& sm;
-	std::ptrdiff_t offset{-1};
+	std::size_t transferred_bytes{};
+	int err{};
 	internal_temporary_buffer<typename stm::char_type> buffer;
-	std::size_t transferred_size{};
-	typename io_async_overlapped_t<stm>::type overlapped;
 	template<typename ...Args>
-	async_print(typename stm::async_scheduler_type& sh,stm& s,Args&& ...args):sch(sh),sm(s)
+	async_print_coroutine(typename io_async_scheduler_t<stm>::type& sh,std::ptrdiff_t off,stm& s,Args&& ...args):scheduler(sh),stream(s)
 	{
-		print(buffer,std::forward<Args>(args)...);
-	}
-	template<typename ...Args>
-	async_print(typename stm::async_scheduler_type& sh,std::ptrdiff_t off,stm& s,Args&& ...args):sch(sh),sm(s),offset(off)
-	{
-		print(buffer,std::forward<Args>(args)...);
+		if constexpr(line)
+			println(buffer,std::forward<Args>(args)...);
+		else
+			print(buffer,std::forward<Args>(args)...);
 	}
 	constexpr bool await_ready() const { return false; }
-	constexpr std::size_t await_resume() const { return transferred_size; }
+	constexpr std::size_t await_resume() const
+	{
+		if(err)
+			throw_posix_error(err);
+		return transferred_bytes;
+	}
 	void await_suspend(std::coroutine_handle<> handle)
 	{
-		overlapped=typename io_async_overlapped_t<stm>::type(std::in_place,[handle,this](std::size_t calb)
+		overlapped=typename io_async_overlapped_t<stm>::type(std::in_place,[handle,this](std::size_t calb,int errn)
 		{
-			this->transferred_size=calb/sizeof(typename stm::char_type);
+			this->transferred_bytes=calb;
+			this->err=errn;
 			handle.resume();
 		});
-		async_write_callback(sch,sm,buffer.beg_ptr,buffer.end_ptr,overlapped,offset*sizeof(typename stm::char_type));
+		async_write_callback(scheduler,stream,buffer.beg_ptr,buffer.end_ptr,overlapped,offset);
 	}
 };
+}
 
-template<async_output_stream stm,typename ...Args> async_print(typename io_async_scheduler_t<stm>::type&,stm&,Args&& ...) -> async_print<stm>;
-template<async_output_stream stm,typename ...Args> async_print(typename io_async_scheduler_t<stm>::type&,std::ptrdiff_t,stm&,Args&& ...) -> async_print<stm>;
-
-template<async_output_stream stm>
-class async_println
+template<async_input_stream stm,std::input_iterator Iter>
+constexpr inline details::async_io_coroutine<stm,Iter,false> async_read(typename io_async_scheduler_t<stm>::type& scheduler,stm& sm,Iter begin,Iter end,std::ptrdiff_t offset=0)
 {
-public:
-	typename stm::async_scheduler_type& sch;
-	stm& sm;
-	std::ptrdiff_t offset{-1};
-	internal_temporary_buffer<typename stm::char_type> buffer;
-	std::size_t transferred_size{};
-	typename io_async_overlapped_t<stm>::type overlapped;
-	template<typename ...Args>
-	async_println(typename stm::async_scheduler_type& sh,stm& s,Args&& ...args):sch(sh),sm(s)
-	{
-		println(buffer,std::forward<Args>(args)...);
-	}
-	template<typename ...Args>
-	async_println(typename stm::async_scheduler_type& sh,std::ptrdiff_t off,stm& s,Args&& ...args):sch(sh),sm(s),offset(off)
-	{
-		println(buffer,std::forward<Args>(args)...);
-	}
-	constexpr bool await_ready() const { return false; }
-	constexpr std::size_t await_resume() const { return transferred_size; }
-	void await_suspend(std::coroutine_handle<> handle)
-	{
-		overlapped=typename io_async_overlapped_t<stm>::type(std::in_place,[handle,this](std::size_t calb)
-		{
-			this->transferred_size=calb/sizeof(typename stm::char_type);
-			handle.resume();
-		});
-		async_write_callback(sch,sm,buffer.beg_ptr,buffer.end_ptr,overlapped,offset*sizeof(typename stm::char_type));
-	}
-};
+	return {scheduler,sm,begin,end,offset};
+}
 
-template<async_output_stream stm,typename ...Args> async_println(typename io_async_scheduler_t<stm>::type&,stm&,Args&& ...) -> async_println<stm>;
-template<async_output_stream stm,typename ...Args> async_println(typename io_async_scheduler_t<stm>::type&,std::ptrdiff_t,stm&,Args&& ...) -> async_println<stm>;
-
-template<typename stm>
-class async_scatter_write
+template<async_output_stream stm,std::input_iterator Iter>
+constexpr inline details::async_io_coroutine<stm,Iter,true> async_write(typename io_async_scheduler_t<stm>::type& scheduler,stm& sm,Iter begin,Iter end,std::ptrdiff_t offset=-1)
 {
-public:
-	typename stm::async_scheduler_type& sch;
-	stm& sm;
-	std::span<io_scatter_t const> span;
-	std::ptrdiff_t offset{};
-	std::size_t transferred_size{};
-	typename io_async_overlapped_t<stm>::type overlapped;
-	constexpr bool await_ready() const { return false; }
-	constexpr std::size_t await_resume() const { return transferred_size; }
-	void await_suspend(std::coroutine_handle<> handle)
-	{
-		overlapped=typename io_async_overlapped_t<stm>::type(std::in_place,[handle,this](std::size_t calb)
-		{
-			this->transferred_size=calb;
-			handle.resume();
-		});
-		async_scatter_write_callback(sch,sm,span,overlapped,offset);
-	}
-};
+	return {scheduler,sm,begin,end,offset};
+}
 
-template<async_output_stream stm> async_scatter_write(typename io_async_scheduler_t<stm>::type&,stm&,std::span<io_scatter_t const>,std::ptrdiff_t) -> async_scatter_write<stm>;
-template<async_output_stream stm> async_scatter_write(typename io_async_scheduler_t<stm>::type&,stm&,std::span<io_scatter_t const>) -> async_scatter_write<stm>;
+template<async_scatter_input_stream stm>
+constexpr inline details::async_scatter_io_coroutine<stm,false> async_scatter_read(typename io_async_scheduler_t<stm>::type& scheduler,stm& sm,std::span<io_scatter_t> sc,std::ptrdiff_t offset=0)
+{
+	return {scheduler,sm,sc,offset};
+}
+
+template<async_scatter_output_stream stm>
+constexpr inline details::async_scatter_io_coroutine<stm,true> async_scatter_write(typename io_async_scheduler_t<stm>::type& scheduler,stm& sm,std::span<io_scatter_t> sc,std::ptrdiff_t offset=-1)
+{
+	return {scheduler,sm,sc,offset};
+}
+
+
+template<async_output_stream stm,typename... Args>
+constexpr inline details::async_print_coroutine<stm,false> async_print(typename io_async_scheduler_t<stm>::type& scheduler,stm& sm,Args&& ...args)
+{
+	return details::async_print_coroutine<stm,false>(scheduler,-1,sm,std::forward<Args>(args)...);
+}
+template<async_output_stream stm,typename... Args>
+constexpr inline details::async_print_coroutine<stm,true> async_println(typename io_async_scheduler_t<stm>::type& scheduler,stm& sm,Args&& ...args)
+{
+	return details::async_print_coroutine<stm,true>(scheduler,-1,sm,std::forward<Args>(args)...);
+}
+
+template<async_output_stream stm,typename... Args>
+constexpr inline details::async_print_coroutine<stm,false> async_print(typename io_async_scheduler_t<stm>::type& scheduler,std::ptrdiff_t offset,stm& sm,Args&& ...args)
+{
+	return details::async_print_coroutine<stm,false>(scheduler,offset,sm,std::forward<Args>(args)...);
+}
+template<async_output_stream stm,typename... Args>
+constexpr inline details::async_print_coroutine<stm,true> async_println(typename io_async_scheduler_t<stm>::type& scheduler,std::ptrdiff_t offset,stm& sm,Args&& ...args)
+{
+	return details::async_print_coroutine<stm,true>(scheduler,offset,sm,std::forward<Args>(args)...);
+}
+
+
 
 }
