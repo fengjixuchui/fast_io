@@ -139,17 +139,9 @@ public:
 	{
 		return io_ptr;
 	}
-	inline constexpr void reset() noexcept
+	inline constexpr void reset(native_handle_type newptr=nullptr) noexcept
 	{
-		io_ptr=nullptr;
-	}
-	inline constexpr void reset(native_handle_type newhandle) noexcept
-	{
-		io_ptr=newhandle;
-	}
-	inline constexpr void swap(basic_io_io_observer& other) noexcept
-	{
-		std::swap(io_ptr, other.io_ptr);
+		io_ptr=newptr;
 	}
 };
 #ifdef __cpp_rtti

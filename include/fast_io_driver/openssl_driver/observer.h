@@ -21,6 +21,16 @@ public:
 	{
 		return handle;
 	}
+	constexpr void reset(native_handle_type newhandle=nullptr) noexcept
+	{
+		handle=newhandle;
+	}
+	constexpr native_handle_type release() noexcept
+	{
+		auto temp{handle};
+		handle=nullptr;
+		return temp;
+	}
 };
 
 }

@@ -33,14 +33,6 @@ public:
 		cd = -1;
 		return temp;
 	}
-	inline constexpr void reset() noexcept
-	{
-		cd=-1;
-	}
-	inline constexpr void reset(native_handle_type newcd) noexcept
-	{
-		cd=newcd;
-	}
 	inline constexpr void swap(posix_iconv_observer& other) noexcept
 	{
 		std::swap(cd, other.cd);
@@ -68,14 +60,22 @@ public:
 	{
 		if(std::addressof(bmv)==this)
 			return *this;
-		iconv_close(this->get());
+		if(this->native_handle()!=-1)[[likely]]
+			iconv_close(this->get());
 		this->native_handle()=bmv.native_handle();
 		bmv.native_handle()=-1;
 		return *this;
 	}
 	~posix_iconv()
 	{
-		iconv_close(this->get());
+		if(this->native_handle()!=-1)[[likely]]
+			iconv_close(this->get());
+	}
+	inline void reset(native_handle_type newcd=-1) noexcept
+	{
+		if(this->native_handle()!=-1)[[likely]]
+			iconv_close(this->get());
+		this->native_handle()=newcd;
 	}
 };
 

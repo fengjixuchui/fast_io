@@ -32,17 +32,9 @@ public:
 		phandle=nullptr;
 		return temp;
 	}
-	inline constexpr void reset() noexcept
-	{
-		phandle=nullptr;
-	}
-	inline constexpr void reset(native_handle_type newhandle) noexcept
+	inline constexpr void reset(native_handle_type newhandle=nullptr) noexcept
 	{
 		phandle=newhandle;
-	}
-	inline constexpr void swap(basic_mfc_io_observer& other) noexcept
-	{
-		std::swap(phandle, other.phandle);
 	}
 };
 

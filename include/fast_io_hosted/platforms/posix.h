@@ -195,6 +195,10 @@ public:
 		ring=nullptr;
 		return temp;
 	}
+	constexpr void reset(native_handle_type newring=nullptr)
+	{
+		ring=newring;
+	}
 };
 using io_async_observer=io_uring_observer;
 #endif
@@ -205,9 +209,6 @@ class basic_posix_io_observer
 public:
 	using char_type = ch_type;
 	using native_handle_type = int;
-#if defined (__linux__) || defined(__WINNT__) || defined(_MSC_VER)
-	using async_scheduler_type = io_async_observer;
-#endif
 	native_handle_type fd=-1;
 	constexpr auto& native_handle() noexcept
 	{
@@ -237,17 +238,9 @@ public:
 		fd=-1;
 		return temp;
 	}
-	inline constexpr void reset() noexcept
-	{
-		fd=-1;
-	}
-	inline constexpr void reset(native_handle_type newfd) noexcept
+	inline constexpr void reset(native_handle_type newfd=-1) noexcept
 	{
 		fd=newfd;
-	}
-	inline constexpr void swap(basic_posix_io_observer& other) noexcept
-	{
-		std::swap(fd, other.fd);
 	}
 };
 
@@ -257,9 +250,6 @@ class basic_posix_io_handle:public basic_posix_io_observer<ch_type>
 public:
 	using char_type = ch_type;
 	using native_handle_type = int;
-#if defined (__linux__) || defined(__WINNT__) || defined(_MSC_VER)
-	using async_scheduler_type = io_async_observer;
-#endif
 	constexpr explicit basic_posix_io_handle()=default;
 	constexpr explicit basic_posix_io_handle(int fdd):basic_posix_io_observer<ch_type>{fdd}{}
 	basic_posix_io_handle(basic_posix_io_handle const& dp):basic_posix_io_observer<ch_type>{details::sys_dup(dp.native_handle())}
@@ -285,18 +275,21 @@ public:
 		}
 		return *this;
 	}
+	inline constexpr void reset(native_handle_type newfd=-1) noexcept
+	{
+		if(this->native_handle()!=-1)[[likely]]
+			details::sys_close(this->native_handle());
+		this->native_handle()=newfd;
+	}
 	void close()
 	{
-		details::sys_close_throw_error(this->naitve_handle());
-		this->native_handle()=-1;
+		if(*this)[[likely]]
+		{
+			details::sys_close_throw_error(this->native_handle());
+			this->native_handle()=-1;
+		}
 	}
 };
-
-template<std::integral ch_type>
-inline bool valid(basic_posix_io_observer<ch_type> h)
-{
-	return h.native_handle()!=-1;
-}
 
 template<std::integral ch_type,std::contiguous_iterator Iter>
 inline Iter read(basic_posix_io_observer<ch_type> h,Iter begin,Iter end)
@@ -447,11 +440,10 @@ public:
 	using char_type = ch_type;
 	using native_handle_type = typename basic_posix_io_handle<char_type>::native_handle_type;
 	using basic_posix_io_handle<ch_type>::native_handle;
-#if defined (__linux__) || defined(__WINNT__) || defined(_MSC_VER)
-	using async_scheduler_type = io_async_observer;
-#endif
 	constexpr basic_posix_file() noexcept = default;
-	constexpr basic_posix_file(int fd) noexcept: basic_posix_io_handle<ch_type>(fd){}
+	template<typename native_hd>
+	requires std::same_as<native_handle_type,std::remove_cvref_t<native_hd>>
+	constexpr basic_posix_file(native_hd fd) noexcept: basic_posix_io_handle<ch_type>(fd){}
 	template<typename ...Args>
 	requires requires(Args&& ...args)
 	{
@@ -598,9 +590,6 @@ class basic_posix_pipe
 public:
 	using char_type = ch_type;
 	using native_handle_type = std::array<basic_posix_file<ch_type>,2>;
-#if defined (__linux__) || defined(__WINNT__) || defined(_MSC_VER)
-	using async_scheduler_type = io_async_observer;
-#endif
 	native_handle_type pipes;
 	basic_posix_pipe()
 	{

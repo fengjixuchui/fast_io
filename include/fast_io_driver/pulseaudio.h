@@ -47,17 +47,9 @@ public:
 		s={};
 		return temp;
 	}
-	inline constexpr void reset() noexcept
-	{
-		s=nullptr;
-	}
-	inline constexpr void reset(native_handle_type newhandle) noexcept
+	inline constexpr void reset(native_handle_type newhandle=nullptr) noexcept
 	{
 		s=newhandle;
-	}
-	inline constexpr void swap(basic_pulseaudio_simple_io_observer& other) noexcept
-	{
-		std::swap(s, other.s);
 	}
 };
 
@@ -100,6 +92,12 @@ public:
 		this->native_handle()=hd.native_handle();
 		hd.native_handle()=nullptr;
 		return *this;
+	}
+	inline void reset(native_handle_type newhandle=nullptr) noexcept
+	{
+		if(this->native_handle())[[likely]]
+			pa_simple_free(this->native_handle());
+		this->native_handle()=newhandle;
 	}
 	~basic_pulseaudio_simple_file()
 	{

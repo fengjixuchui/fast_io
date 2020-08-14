@@ -118,6 +118,11 @@ concept async_scatter_output_stream = async_stream<T>&&details::async_scatter_ou
 template<typename T>
 concept async_scatter_io_stream = async_input_stream<T>&&async_scatter_output_stream<T>;
 
+template<typename T>
+concept closable_stream = stream<T>&&requires(T t)
+{
+	{t.close()}->std::same_as<void>;
+};
 
 template<typename T>
 concept secure_clear_requirement_stream = stream<T>&&requires(T stm)
@@ -128,6 +133,11 @@ concept secure_clear_requirement_stream = stream<T>&&requires(T stm)
 template<typename T>
 concept redirect_stream = stream<T>&&details::redirect_stream_impl<T>;
 
+template<typename T>
+concept capacity_available_buffer_input_stream = buffer_input_stream<T>&&requires(T stm)
+{
+	{ibuffer_cap(stm)}->std::convertible_to<typename std::remove_cvref_t<T>::char_type*>;
+};
 
 /*
 status streams deal with special stream types like streams which need locale

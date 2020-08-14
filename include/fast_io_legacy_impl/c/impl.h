@@ -253,9 +253,6 @@ public:
 	using char_type = ch_type;
 	using native_handle_type = std::FILE*;
 	native_handle_type fp{};
-#if defined (__linux__) || defined(__WINNT__) || defined(_MSC_VER)
-	using async_scheduler_type = io_async_observer;
-#endif
 	constexpr auto& native_handle() noexcept
 	{
 		return fp;
@@ -292,17 +289,9 @@ public:
 		fp=nullptr;
 		return temp;
 	}
-	inline constexpr void reset() noexcept
-	{
-		fp=nullptr;
-	}
-	inline constexpr void reset(native_handle_type newfp) noexcept
+	inline constexpr void reset(native_handle_type newfp=nullptr) noexcept
 	{
 		fp=newfp;
-	}
-	inline constexpr void swap(basic_c_io_observer_unlocked& other) noexcept
-	{
-		std::swap(fp, other.fp);
 	}
 };
 
@@ -410,9 +399,6 @@ public:
 	using char_type = ch_type;
 	using native_handle_type = std::FILE*;
 	native_handle_type fp{};
-#if defined (__linux__) || defined(__WINNT__) || defined(_MSC_VER)
-	using async_scheduler_type = io_async_observer;
-#endif
 	constexpr auto& native_handle() const noexcept
 	{
 		return fp;
@@ -456,17 +442,9 @@ public:
 		fp=nullptr;
 		return temp;
 	}
-	inline constexpr void reset() noexcept
-	{
-		fp=nullptr;
-	}
-	inline constexpr void reset(native_handle_type newfp) noexcept
+	inline constexpr void reset(native_handle_type newfp=nullptr) noexcept
 	{
 		fp=newfp;
-	}
-	inline constexpr void swap(basic_c_io_observer& other) noexcept
-	{
-		std::swap(fp, other.fp);
 	}
 };
 
@@ -563,9 +541,6 @@ class basic_c_io_handle_impl:public T
 public:
 	using char_type = typename T::char_type;
 	using native_handle_type = std::FILE*;
-#if defined (__linux__) || defined(__WINNT__) || defined(_MSC_VER)
-	using async_scheduler_type = io_async_observer;
-#endif
 	constexpr basic_c_io_handle_impl()=default;
 	constexpr basic_c_io_handle_impl(native_handle_type fp2) noexcept:T{fp2}{}
 	basic_c_io_handle_impl(basic_c_io_handle_impl const&)=delete;
@@ -585,9 +560,18 @@ public:
 	}
 	void close()
 	{
+		if(this->native_handle())[[likely]]
+		{
+			if(std::fclose(this->native_handle())==EOF)
+				throw_posix_error();
+			this->native_handle()=nullptr;
+		}
+	}
+	inline constexpr void reset(native_handle_type newfp=nullptr) noexcept
+	{
 		if(std::fclose(this->native_handle())==EOF)
 			throw_posix_error();
-		this->native_handle()=nullptr;
+		this->native_handle()=newfp;
 	}
 };
 
@@ -599,11 +583,10 @@ public:
 	using T::native_handle;
 	using char_type=typename T::char_type;
 	using native_handle_type=typename T::native_handle_type;
-#if defined (__linux__) || defined(__WINNT__) || defined(_MSC_VER)
-	using async_scheduler_type = io_async_observer;
-#endif
 	basic_c_file_impl()=default;
-	basic_c_file_impl(native_handle_type hd):T(hd){}
+	template<typename native_hd>
+	requires std::same_as<native_handle_type,std::remove_cvref_t<native_hd>>
+	basic_c_file_impl(native_hd hd):T(hd){}
 /*
 	basic_c_file_impl(std::string_view name,std::string_view mode):T(std::fopen(name.data(),mode.data()))
 	{

@@ -24,17 +24,15 @@ public:
 	{
 		return handle;
 	}
-	inline constexpr void reset() noexcept
-	{
-		handle=nullptr;
-	}
-	inline constexpr void reset(native_handle_type newhandle) noexcept
+	inline constexpr void reset(native_handle_type newhandle=nullptr) noexcept
 	{
 		handle=newhandle;
 	}
-	inline constexpr void swap(basic_socket_io_observer& other) noexcept
+	inline constexpr native_handle_type release() noexcept
 	{
-		std::swap(handle, other.handle);
+		auto temp{handle};
+		handle=nullptr;
+		return temp;
 	}
 };
 template<typename T,std::integral ch_type,std::contiguous_iterator Iter>

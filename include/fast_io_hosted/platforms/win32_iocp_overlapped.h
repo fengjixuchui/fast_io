@@ -61,17 +61,9 @@ public:
 		handle={};
 		return temp;
 	}
-	inline constexpr void reset() noexcept
-	{
-		handle=nullptr;
-	}
-	inline constexpr void reset(native_handle_type newhandle) noexcept
+	inline constexpr void reset(native_handle_type newhandle=nullptr) noexcept
 	{
 		handle=newhandle;
-	}
-	inline constexpr void swap(iocp_overlapped_observer& other) noexcept
-	{
-		std::swap(handle, other.handle);
 	}
 };
 
@@ -110,8 +102,15 @@ public:
 		this->native_handle() = bmv.release();
 		return *this;
 	}
-	
-
+	inline
+#if __cpp_constexpr_dynamic_alloc >= 201907L
+	constexpr
+#endif
+	void reset(native_handle_type newhandle=nullptr) noexcept
+	{
+		delete this->native_handle();
+		this->native_handle()=newhandle;
+	}
 #if __cpp_constexpr_dynamic_alloc >= 201907L
 	constexpr
 #endif
