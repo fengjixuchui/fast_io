@@ -111,7 +111,11 @@ inline auto recv(SOCKET sock,mem_address* add,Args&& ...args)
 	return call_win32_ws2_32<decltype(::recv)*>("recv",sock,static_cast<char*>(static_cast<void*>(add)),std::forward<Args>(args)...);
 }
 
-
+template<typename ...Args>
+inline auto shutdown(Args&& ...args)
+{
+	return call_win32_ws2_32<decltype(::shutdown)*>("shutdown",std::forward<Args>(args)...);
+}
 
 template<typename ...Args>
 inline auto wsasend(Args&& ...args)
@@ -149,7 +153,7 @@ inline void closesocket_ignore_error(Args&& ...args) noexcept
 	auto func{::GetProcAddress(ws2_32_dll.get(),"closesocket")};
 	if(func==nullptr)[[unlikely]]
 		fast_terminate();
-	bit_cast<int __stdcall(*)(socket_type)>(func)(std::forward<Args>(args)...);
+	bit_cast<decltype(::closesocket)*>(func)(std::forward<Args>(args)...);
 }
 
 template<typename ...Args>

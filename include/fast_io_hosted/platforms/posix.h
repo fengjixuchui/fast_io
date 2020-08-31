@@ -10,12 +10,14 @@
 #ifdef __linux__
 #include<sys/uio.h>
 #include<sys/sendfile.h>
+#include<sys/stat.h>
 struct io_uring;
 #endif
 #ifdef __BSD_VISIBLE
 #ifndef __NEWLIB__
 #include <sys/uio.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/socket.h>
 #endif
 #endif
@@ -131,8 +133,12 @@ inline constexpr int calculate_posix_open_mode(open_mode value)
 #endif
 
 #ifdef _O_TEMPORARY
-	if((value&open_mode::temprorary)!=open_mode::none)
+	if((value&open_mode::temporary)!=open_mode::none)
 		mode |= _O_TEMPORARY;
+#endif
+#ifdef O_TMPFILE
+	if((value&open_mode::temporary)!=open_mode::none)
+		mode |= O_TMPFILE;
 #endif
 #ifdef _O_SEQUENTIAL
 	if((value&open_mode::random_access)!=open_mode::none)
@@ -144,6 +150,24 @@ inline constexpr int calculate_posix_open_mode(open_mode value)
 	constexpr auto supported_values{static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::app)|static_cast<utype>(open_mode::in)};
 	switch(static_cast<utype>(value)&static_cast<utype>(supported_values))
 	{
+/*
+https://en.cppreference.com/w/cpp/io/basic_filebuf/open
+
+mode	openmode & ~ate	Action if file already exists	Action if file does not exist
+"r"	in	Read from start	Failure to open
+"w"	out, out|trunc	Destroy contents	Create new
+"a"	app, out|app	Append to file	Create new
+"r+"	out|in	Read from start	Error
+"w+"	out|in|trunc	Destroy contents	Create new
+"a+"	out|in|app, in|app	Write to end	Create new
+"rb"	binary|in	Read from start	Failure to open
+"wb"	binary|out, binary|out|trunc	Destroy contents	Create new
+"ab"	binary|app, binary|out|app	Write to end	Create new
+"r+b"	binary|out|in	Read from start	Error
+"w+b"	binary|out|in|trunc	Destroy contents	Create new
+"a+b"	binary|out|in|app, binary|in|app	Write to end	Create new
+
+*/
 //Action if file already exists;	Action if file does not exist;	c-style mode;	Explanation
 //Read from start;	Failure to open;	"r";	Open a file for reading
 	case static_cast<utype>(open_mode::in):
@@ -173,6 +197,7 @@ struct posix_file_openmode
 {
 	static int constexpr mode = calculate_posix_open_mode(om);
 };
+
 }
 
 #ifdef __linux__
@@ -251,7 +276,9 @@ public:
 	using char_type = ch_type;
 	using native_handle_type = int;
 	constexpr explicit basic_posix_io_handle()=default;
-	constexpr explicit basic_posix_io_handle(int fdd):basic_posix_io_observer<ch_type>{fdd}{}
+	template<typename native_hd>
+	requires std::same_as<native_handle_type,std::remove_cvref_t<native_hd>>
+	constexpr explicit basic_posix_io_handle(native_hd fdd):basic_posix_io_observer<ch_type>{fdd}{}
 	basic_posix_io_handle(basic_posix_io_handle const& dp):basic_posix_io_observer<ch_type>{details::sys_dup(dp.native_handle())}
 	{
 	}
@@ -291,9 +318,16 @@ public:
 	}
 };
 
-template<std::integral ch_type,std::contiguous_iterator Iter>
-inline Iter read(basic_posix_io_observer<ch_type> h,Iter begin,Iter end)
+namespace details
 {
+
+inline std::size_t posix_read_impl(int fd,void* address,std::size_t bytes_to_read)
+{
+#ifdef _WIN32
+	if constexpr(4<sizeof(std::size_t))
+		if(static_cast<std::size_t>(UINT32_MAX)<bytes_to_read)
+			bytes_to_read=static_cast<std::size_t>(UINT32_MAX);
+#endif
 	auto read_bytes(
 #if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
 		system_call<
@@ -306,13 +340,18 @@ inline Iter read(basic_posix_io_observer<ch_type> h,Iter begin,Iter end)
 #else
 		::read
 #endif
-	(h.native_handle(),std::to_address(begin),(end-begin)*sizeof(*begin)));
+	(fd,address,bytes_to_read));
 	system_call_throw_error(read_bytes);
-	return begin+(read_bytes/sizeof(*begin));
+	return read_bytes;
 }
-template<std::integral ch_type,std::contiguous_iterator Iter>
-inline Iter write(basic_posix_io_observer<ch_type> h,Iter begin,Iter end)
+
+inline std::size_t posix_write_impl(int fd,void const* address,std::size_t bytes_to_write)
 {
+#ifdef _WIN32
+	if constexpr(4<sizeof(std::size_t))
+		if(static_cast<std::size_t>(UINT32_MAX)<bytes_to_write)
+			bytes_to_write=static_cast<std::size_t>(UINT32_MAX);
+#endif
 	auto write_bytes(
 #if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
 		system_call<
@@ -325,13 +364,12 @@ inline Iter write(basic_posix_io_observer<ch_type> h,Iter begin,Iter end)
 #else
 		::write
 #endif
-(h.native_handle(),std::to_address(begin),(end-begin)*sizeof(*begin)));
+	(fd,address,bytes_to_write));
 	system_call_throw_error(write_bytes);
-	return begin+(write_bytes/sizeof(*begin));
+	return write_bytes;
 }
 
-template<std::integral ch_type,typename T,std::integral R>
-inline std::common_type_t<std::int64_t, std::size_t> seek(basic_posix_io_observer<ch_type> h,seek_type_t<T>,R i=0,seekdir s=seekdir::cur)
+inline std::common_type_t<std::size_t,std::uint64_t> posix_seek_impl(int fd,std::common_type_t<std::ptrdiff_t,std::int64_t> offset,seekdir s)
 {
 	auto ret(
 #if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
@@ -349,14 +387,28 @@ inline std::common_type_t<std::int64_t, std::size_t> seek(basic_posix_io_observe
 #else
 		::lseek
 #endif
-		(h.native_handle(),seek_precondition<std::int64_t,T,ch_type>(i),static_cast<int>(s)));
-	system_call_throw_error(ret);
+		(fd,offset,static_cast<int>(s)));
+	system_call_throw_error(ret);	
 	return ret;
 }
-template<std::integral ch_type,std::integral R>
-inline auto seek(basic_posix_io_observer<ch_type> h,R i=0,seekdir s=seekdir::cur)
+
+}
+
+template<std::integral ch_type,std::contiguous_iterator Iter>
+inline Iter read(basic_posix_io_observer<ch_type> h,Iter begin,Iter end)
 {
-	return seek(h,seek_type<ch_type>,i,s);
+	return begin+details::posix_read_impl(h.fd,std::to_address(begin),(end-begin)*sizeof(*begin))/sizeof(*begin);
+}
+template<std::integral ch_type,std::contiguous_iterator Iter>
+inline Iter write(basic_posix_io_observer<ch_type> h,Iter cbegin,Iter cend)
+{
+	return cbegin+details::posix_write_impl(h.fd,std::to_address(cbegin),(cend-cbegin)*sizeof(*cbegin))/sizeof(*cbegin);
+}
+
+template<std::integral ch_type>
+inline std::common_type_t<std::size_t,std::uint64_t> seek(basic_posix_io_observer<ch_type> h,std::common_type_t<std::ptrdiff_t,std::int64_t> i=0,seekdir s=seekdir::cur)
+{
+	return details::posix_seek_impl(h.fd,i,s);
 }
 /*
 template<std::integral ch_type>
@@ -367,6 +419,104 @@ inline void flush(basic_posix_io_observer<ch_type>)
 //			throw posix_error();
 }
 */
+
+#if defined(_WIN32)
+template<std::integral ch_type>
+inline auto type(basic_posix_io_observer<ch_type> piob)
+{
+	return type(static_cast<basic_win32_io_observer<ch_type>>(piob));
+}
+template<std::integral ch_type>
+inline auto size(basic_posix_io_observer<ch_type> piob)
+{
+	return size(static_cast<basic_win32_io_observer<ch_type>>(piob));
+}
+#elif !defined(__NEWLIB__)
+
+namespace details
+{
+
+inline void fstat_impl(int fd,struct stat64* st)
+{
+	if(fstat64(fd,st)<0)
+		throw_posix_error();
+}
+
+inline std::common_type_t<std::size_t,std::uint32_t> posix_file_size_impl(int fd)
+{
+	struct stat64 st;
+	fstat_impl(fd,std::addressof(st));
+	return st.st_size;
+}
+
+inline file_type posix_file_type_impl(int fd)
+{
+	struct stat64 st;
+	fstat_impl(fd,std::addressof(st));
+	auto m{st.st_mode};
+/*
+https://linux.die.net/man/2/fstat64
+The following POSIX macros are defined to check the file type using the st_mode field:
+
+S_ISREG(m)
+is it a regular file?
+
+S_ISDIR(m)
+
+directory?
+
+S_ISCHR(m)
+
+character device?
+
+S_ISBLK(m)
+
+block device?
+
+S_ISFIFO(m)
+
+FIFO (named pipe)?
+
+S_ISLNK(m)
+
+symbolic link? (Not in POSIX.1-1996.)
+
+S_ISSOCK(m)
+
+socket? (Not in POSIX.1-1996.)
+*/
+	if(S_ISREG(m))
+		return file_type::regular;
+	else if(S_ISDIR(m))
+		return file_type::directory;
+	else if(S_ISCHR(m))
+		return file_type::character;
+	else if(S_ISBLK(m))
+		return file_type::block;
+	else if(S_ISFIFO(m))
+		return file_type::fifo;
+	else if(S_ISLNK(m))
+		return file_type::symlink;
+	else if(S_ISSOCK(m))
+		return file_type::socket;
+	else
+		return file_type::unknown;
+}
+
+}
+
+template<std::integral ch_type>
+inline std::common_type_t<std::size_t,std::uint32_t> size(basic_posix_io_observer<ch_type> piob)
+{
+	return details::posix_file_size_impl(piob.fd);
+}
+
+template<std::integral ch_type>
+inline auto type(basic_posix_io_observer<ch_type> piob)
+{
+	return details::posix_file_type_impl(piob.fd);
+}
+#endif
 
 #if defined(__linux__) || defined(__BSD_VISIBLE)
 template<std::integral ch_type>
@@ -383,14 +533,14 @@ inline auto zero_copy_out_handle(basic_posix_io_observer<ch_type> h)
 template<std::integral ch_type>
 inline auto redirect_handle(basic_posix_io_observer<ch_type> h)
 {
-#if defined(__WINNT__) || defined(_MSC_VER)
+#if defined(_WIN32)
 	return bit_cast<void*>(_get_osfhandle(h.native_handle()));
 #else
 	return h.native_handle();
 #endif
 }
 
-#if defined(__WINNT__) || defined(_MSC_VER)
+#if defined(_WIN32)
 template<std::integral ch_type,typename... Args>
 requires io_controllable<basic_win32_io_observer<ch_type>,Args...>
 inline decltype(auto) io_control(basic_posix_io_observer<ch_type> h,Args&& ...args)
@@ -554,8 +704,23 @@ public:
 #ifdef __linux__
 	template<typename ...Args>
 	basic_posix_file(io_async_t,io_uring_observer,std::string_view file,Args&& ...args):basic_posix_file(file,std::forward<Args>(args)...){}
-#endif
 
+/*
+To verify whether O_TMPFILE is a thing on FreeBSD. https://github.com/FreeRDP/FreeRDP/pull/6268
+*/
+	basic_posix_file(io_temp_t):basic_posix_file(
+#if defined(__x86_64__)
+		system_call<257,int>
+#elif defined(__arm64__) || defined(__aarch64__)
+		system_call<56,int>
+#else
+		::openat
+#endif
+		(AT_FDCWD,"/tmp",O_EXCL|O_RDWR|O_TMPFILE|O_APPEND|O_NOATIME,S_IRUSR | S_IWUSR))
+	{
+		system_call_throw_error(native_handle());
+	}
+#endif
 #endif
 
 	constexpr basic_posix_file(basic_posix_file const&)=default;
@@ -854,6 +1019,7 @@ inline std::size_t scatter_write(basic_posix_io_observer<ch_type> h,std::span<io
 #ifndef __NEWLIB__
 namespace details
 {
+
 struct __attribute__((__may_alias__)) iovec_may_alias:iovec
 {};
 

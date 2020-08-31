@@ -37,7 +37,7 @@ For Linux, you can watch this video to help you install the latest GCC easily. h
 - Linux
 - BSD platforms (Including FreeBSD, NetBSD, OpenBSD and Mac)
 - Barebone (No any operating system.)
-- Todo: Webassembly
+- Todo: Webassembly, DOS
 
 ## Supported libc FILE* hacks platforms
 - glibc
@@ -68,6 +68,7 @@ A general purpose I/O library to replace stdio.h and iostream
 - Providing RAII for C FILE\*&POSIX fd&win32 HANDLE
 - No dual error reporting mechanism. Exception as the ONLY error reporting mechanism.
 - No std::error_code and std::system_error
+- No useless bounds checking
 
 ### Easy to use
 

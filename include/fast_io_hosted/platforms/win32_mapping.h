@@ -58,146 +58,106 @@ inline constexpr win32_file_map_attribute to_win32_file_map_attribute(file_map_a
 	};
 }
 
-class win32_file_mapping
+class win32_memory_map_io_observer
 {
-	void* handle;
-	void close_impl() noexcept
-	{
-		if(handle)
-			win32::CloseHandle(handle);
-	}
 public:
 	using native_handle_type = void*;
-	template<std::integral ch_type>
-	win32_file_mapping(basic_win32_io_observer<ch_type> bf,file_map_attribute attr,std::size_t size):
-	handle(win32::CreateFileMappingW(
-	bf.native_handle(),nullptr,static_cast<std::uint32_t>(attr),
-#if (_WIN64 || __x86_64__ || __ppc64__)
-			size>>32
-#else
-			0
-#endif
-	,static_cast<std::uint32_t>(size),nullptr))
-	{
-		if(handle==nullptr)
-			throw_win32_error();
-	}
-	win32_file_mapping(win32_file_mapping const&)=delete;
-	win32_file_mapping& operator=(win32_file_mapping const&)=delete;
-	win32_file_mapping(win32_file_mapping&& bmv) noexcept:handle(bmv.handle)
-	{
-		bmv.handle=nullptr;
-	}
-	win32_file_mapping& operator=(win32_file_mapping&& bmv) noexcept
-	{
-		if(handle!=bmv.handle)
-		{
-			close_impl();
-			handle=bmv.handle;
-			bmv.handle=nullptr;
-		}
-		return *this;
-	}
-	auto native_handle() const
+	void* handle{};
+	std::byte *address_begin{},*address_end{};
+	constexpr auto& native_handle() const noexcept
 	{
 		return handle;
 	}
-	void close() noexcept
+	constexpr auto& native_handle() noexcept
 	{
-		close_impl();
-		handle=nullptr;
+		return handle;
 	}
-	~win32_file_mapping()
+	constexpr std::size_t bytes() const noexcept
 	{
-		close_impl();
+		return address_end-address_begin;
 	}
 };
 
-class win32_map_view_of_file
+namespace win32::details
 {
-	std::span<std::byte> rg;
+
+inline void* create_file_mapping_impl(void* handle,file_map_attribute attr)
+{
+	void* addr{win32::CreateFileMappingW(handle,nullptr,static_cast<std::uint32_t>(attr),0,0,nullptr)};
+	if(addr==nullptr)
+		throw_win32_error();
+	return addr;
+}
+
+}
+
+
+class win32_memory_map_file:public win32_memory_map_io_observer
+{
 public:
-	win32_map_view_of_file(win32_file_mapping& wm,win32_file_map_attribute attr,std::size_t bytes,std::size_t start_address=0):
-			rg({reinterpret_cast<std::byte*>(win32::MapViewOfFile(wm.native_handle(),static_cast<std::uint32_t>(attr),
-#if (_WIN64 || __x86_64__ || __ppc64__)
-			start_address>>32
-#else
-			0
-#endif
-			,static_cast<std::uint32_t>(start_address),bytes)),bytes})
+	using native_handle_type = void*;
+	constexpr win32_memory_map_file()=default;
+	win32_memory_map_file(void* handle,std::byte* address_begin,std::byte* address_end):win32_memory_map_io_observer{handle,address_begin,address_end}{}
+	template<std::integral char_type>
+	win32_memory_map_file(basic_win32_io_observer<char_type> bf,file_map_attribute attr,std::size_t bytes,std::common_type_t<std::size_t,std::uint64_t> start_address=0):
+		win32_memory_map_io_observer{win32::details::create_file_mapping_impl(bf.native_handle(),attr)}
 	{
-		if(rg.data()==nullptr)
+		void *base_ptr{win32::MapViewOfFile(this->native_handle(),static_cast<std::uint32_t>(to_win32_file_map_attribute(attr)),start_address>>32,static_cast<std::uint32_t>(start_address),bytes)};
+		if(base_ptr==nullptr)
+		{
+			if(this->native_handle())[[likely]]
+				win32::CloseHandle(this->native_handle());
 			throw_win32_error();
+		}
+		this->address_begin=reinterpret_cast<std::byte*>(base_ptr);
+		this->address_end=this->address_begin+bytes;
 	}
-	win32_map_view_of_file(win32_map_view_of_file const&)=delete;
-	win32_map_view_of_file& operator=(win32_map_view_of_file const&)=delete;
-	win32_map_view_of_file(win32_map_view_of_file&& wm) noexcept:rg(wm.rg)
+	win32_memory_map_file(win32_memory_map_file const&)=delete;
+	win32_memory_map_file& operator=(win32_memory_map_file const&)=delete;
+	constexpr win32_memory_map_file(win32_memory_map_file&& other) noexcept:win32_memory_map_io_observer{other.handle,other.address_begin,other.address_end}
 	{
-		wm.rg={};
+		other.handle=nullptr;
+		other.address_end=other.address_begin=nullptr;
+	}
+	win32_memory_map_file& operator=(win32_memory_map_file&& other) noexcept
+	{
+		if(std::addressof(other)==this)
+			return *this;
+		if(this->address_begin)[[likely]]
+			win32::UnmapViewOfFile(this->address_begin);
+		if(this->handle)[[likely]]
+			win32::CloseHandle(this->handle);
+		this->handle=other.handle;
+		this->address_begin=other.address_begin;
+		this->address_end=other.address_end;
+		other.handle=nullptr;
+		other.address_end=other.address_begin=nullptr;
+		return *this;
 	}
 	void close() noexcept
 	{
-		if(rg.data())
-			win32::UnmapViewOfFile(rg.data());
-		rg={};
-	}
-	win32_map_view_of_file& operator=(win32_map_view_of_file&& wm) noexcept
-	{
-		if(std::addressof(wm)!=this)
+		if(this->address_begin)[[likely]]
 		{
-			if(rg.data())
-				win32::UnmapViewOfFile(rg.data());
-			rg=wm.rg;
-			wm.rg={};
+			win32::UnmapViewOfFile(this->address_begin);
+			this->address_begin=nullptr;
 		}
-		return *this;
+		if(this->handle)[[likely]]
+		{
+			win32::CloseHandle(this->handle);
+			this->handle=nullptr;
+		}
 	}
-	auto& region()
+	~win32_memory_map_file()
 	{
-		return rg;
-	}
-	~win32_map_view_of_file()
-	{
-		if(rg.data())
-			win32::UnmapViewOfFile(rg.data());
+		if(this->address_begin)[[likely]]
+			win32::UnmapViewOfFile(this->address_begin);
+		if(this->handle)[[likely]]
+			win32::CloseHandle(this->handle);
 	}
 };
 
+using native_memory_map_io_observer = win32_memory_map_io_observer;
+using native_memory_map_file = win32_memory_map_file;
 
-class win32_file_map
-{
-	win32_file_mapping wfm;
-	win32_map_view_of_file view;
-public:
-	template<std::integral ch_type>
-	win32_file_map(basic_win32_io_observer<ch_type> bf,file_map_attribute attr,std::size_t bytes,std::size_t start_address=0):
-		wfm(bf,attr,bytes),view(wfm,to_win32_file_map_attribute(attr),bytes,start_address)
-	{
-	}
-	win32_file_map(win32_file_map const&)=delete;
-	win32_file_map& operator=(win32_file_map const&)=delete;
-	win32_file_map(win32_file_map&& wm) noexcept:wfm(std::move(wm.wfm)),view(std::move(wm.view))
-	{
-	}
-	win32_file_map& operator=(win32_file_map&& wm) noexcept
-	{
-		if(std::addressof(wm)!=this)
-		{
-			wfm=std::move(wm.wfm);
-			view=std::move(wm.view);
-		}
-		return *this;
-	}
-	auto native_handle() const {return wfm.native_handle();}
-	auto& region()
-	{
-		return view.region();
-	}
-	void close()
-	{
-		wfm.close();
-		view.close();
-	}
-};
 
 }

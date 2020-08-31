@@ -2,6 +2,12 @@
 #include<cstdio>
 #include<cwchar>
 
+#ifdef _WIN32
+#if defined(_MSC_VER)||defined(_UCRT)
+#else
+#include"msvcrt_lock.h"
+#endif
+#endif
 namespace fast_io
 {
 
@@ -267,6 +273,11 @@ public:
 	}
 	explicit operator basic_posix_io_observer<char_type>() const noexcept
 	{
+		if(fp==nullptr)
+		{
+			errno=EBADF;
+			return {-1};
+		}
 		return basic_posix_io_observer<char_type>{
 #if defined(__WINNT__) || defined(_MSC_VER)
 			_fileno(fp)
@@ -308,41 +319,14 @@ inline auto redirect_handle(basic_c_io_observer_unlocked<ch_type> h)
 using c_io_observer_unlocked = basic_c_io_observer_unlocked<char>;
 
 template<std::integral T,std::contiguous_iterator Iter>
-inline Iter read(basic_c_io_observer_unlocked<T> cfhd,Iter begin,Iter end)
-{
-	std::size_t const count(end-begin);
-	std::size_t const r(
-//mingw
-#ifdef _MSC_VER
-	_fread_nolock
-#elif _POSIX_SOURCE
-	fread_unlocked
-#else
-	fread
-#endif
-	(std::to_address(begin),sizeof(*begin),count,cfhd.native_handle()));
-	if(r==count||std::feof(cfhd.native_handle()))
-		return begin+r;
-	throw_posix_error();
-}
+requires (std::same_as<T,std::iter_value_t<Iter>>||std::same_as<T,char>)
+inline Iter read(basic_c_io_observer_unlocked<T> cfhd,Iter begin,Iter end);
+
 
 template<std::integral T,std::contiguous_iterator Iter>
-inline void write(basic_c_io_observer_unlocked<T> cfhd,Iter begin,Iter end);
-/*
-{
-	std::size_t const count(end-begin);
-	if(
-#ifdef _MSC_VER
-	_fwrite_nolock
-#elif defined(_POSIX_SOURCE)
-	fwrite_unlocked
-#else
-	fwrite
-#endif
-	(std::to_address(begin),sizeof(*begin),count,cfhd.native_handle())<count)
-		throw_posix_error();
-}
-*/
+requires (std::same_as<T,std::iter_value_t<Iter>>||std::same_as<T,char>)
+inline Iter write(basic_c_io_observer_unlocked<T> cfhd,Iter begin,Iter end);
+
 template<std::integral T>
 inline void flush(basic_c_io_observer_unlocked<T> cfhd)
 {
@@ -358,28 +342,61 @@ inline void flush(basic_c_io_observer_unlocked<T> cfhd)
 		throw_posix_error();
 }
 
-
-template<std::integral ch_type,typename T,std::integral U>
-inline auto seek(basic_c_io_observer_unlocked<ch_type> cfhd,seek_type_t<T>,U i,seekdir s=seekdir::beg)
+namespace details
 {
+
+inline std::common_type_t<std::size_t,std::uint64_t> c_io_seek_impl(std::FILE* fp,std::common_type_t<std::ptrdiff_t,std::int64_t> offset,seekdir s)
+{
+/*
+We avoid standard C functions since they cannot deal with large file on 32 bits platforms
+
+Reference:
+
+https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/fseek-nolock-fseeki64-nolock?view=vs-2019
+
+https://www.gnu.org/software/libc/manual/html_node/File-Positioning.html
+
+*/
 	if(
-#if defined(__WINNT__) || defined(_MSC_VER)
-		_fseek_nolock
+#if defined(_WIN32)
+		_fseeki64
 #else
-		fseek
+		fseeko64
 #endif
-	(cfhd.native_handle(),seek_precondition<long,T,char>(i),static_cast<int>(s)))
-		throw_posix_error(); 
-	auto val(std::ftell(cfhd.native_handle()));
+		(fp,offset,static_cast<int>(s)))
+		throw_posix_error();
+	auto val{
+#if defined(_WIN32)
+		_ftelli64
+#else
+		ftello64 
+#endif
+		(fp)};
 	if(val<0)
 		throw_posix_error();
 	return val;
 }
-
-template<std::integral ch_type,std::integral U>
-inline auto seek(basic_c_io_observer_unlocked<ch_type> cfhd,U i,seekdir s=seekdir::beg)
+#if defined(_WIN32)
+inline std::common_type_t<std::size_t,std::uint64_t> c_io_seek_no_lock_impl(std::FILE* fp,std::common_type_t<std::ptrdiff_t,std::int64_t> offset,seekdir s)
 {
-	return seek(cfhd,seek_type<char>,i,s);
+	if(_fseeki64_nolock(fp,offset,static_cast<int>(s)))
+		throw_posix_error();
+	auto val{_ftelli64_nolock(fp)};
+	if(val<0)
+		throw_posix_error();
+	return val;
+}
+#endif
+
+}
+template<std::integral ch_type,std::integral U>
+inline std::common_type_t<std::size_t,std::uint64_t> seek(basic_c_io_observer_unlocked<ch_type> cfhd,std::common_type_t<std::ptrdiff_t,std::int64_t> offset=0,seekdir s=seekdir::cur)
+{
+#if defined(_WIN32)
+	return details::c_io_seek_no_lock_impl(cfhd.fp,offset,s);
+#else
+	return details::c_io_seek_impl(cfhd.fp,offset,s);
+#endif
 }
 
 template<std::integral ch_type,typename... Args>
@@ -411,27 +428,29 @@ public:
 	{
 		return fp;
 	}
-	explicit operator basic_posix_io_observer<char_type>() const
+	explicit operator basic_posix_io_observer<char_type>() const noexcept
 	{
-		auto fd(
+		if(fp==nullptr)
+		{
+			errno=EBADF;
+			return {-1};
+		}
+		return basic_posix_io_observer<char_type>{
 #if defined(__WINNT__) || defined(_MSC_VER)
-	_fileno(fp)
+			_fileno(fp)
 #elif defined(__NEWLIB__)
-	fp->_file
+			fp->_file
 #else
-	::fileno(fp)
+			::fileno(fp)
 #endif
-);
-		if(fd<0)
-			throw_posix_error();
-		return basic_posix_io_observer<char_type>{fd};
+		};
 	}
 #if defined(__WINNT__) || defined(_MSC_VER)
-	explicit operator basic_win32_io_observer<char_type>() const
+	explicit operator basic_win32_io_observer<char_type>() const noexcept
 	{
 		return static_cast<basic_win32_io_observer<char_type>>(static_cast<basic_posix_io_observer<char_type>>(*this));
 	}
-	explicit operator basic_nt_io_observer<char_type>() const
+	explicit operator basic_nt_io_observer<char_type>() const noexcept
 	{
 		return static_cast<basic_nt_io_observer<char_type>>(static_cast<basic_posix_io_observer<char_type>>(*this));
 	}
@@ -454,7 +473,7 @@ inline auto mutex(basic_c_io_observer<T> h)
 	return h.native_handle();
 }
 template<std::integral T>
-inline basic_c_io_observer_unlocked<T> unlocked_handle(basic_c_io_observer<T>& h)
+inline basic_c_io_observer_unlocked<T> unlocked_handle(basic_c_io_observer<T> h)
 {
 	return {h.native_handle()};
 }
@@ -465,8 +484,10 @@ class c_io_lock_guard
 public:
 	c_io_lock_guard(std::FILE* f):fp(f)
 	{
-#if defined(__WINNT__) || defined(_MSC_VER)
+#if defined(_MSC_VER)||defined(_UCRT)
 		_lock_file(fp);
+#elif defined(_WIN32)
+		win32::my_msvcrt_lock_file(fp);
 #elif defined(__NEWLIB__)
 #ifndef __SINGLE_THREAD__
 //		flockfile(fp);	//TO FIX
@@ -479,8 +500,10 @@ public:
 	c_io_lock_guard& operator=(c_io_lock_guard const&) = delete;
 	~c_io_lock_guard()
 	{
-#if defined(__WINNT__) || defined(_MSC_VER)
+#if defined(_MSC_VER)||defined(_UCRT)
 		_unlock_file(fp);
+#elif defined(_WIN32)
+		win32::my_msvcrt_unlock_file(fp);
 #elif defined(__NEWLIB__)
 #ifndef __SINGLE_THREAD__
 //		_funlockfile(fp); //TO FIX
@@ -495,19 +518,17 @@ public:
 template<std::integral T,std::contiguous_iterator Iter>
 inline Iter read(basic_c_io_observer<T> cfhd,Iter begin,Iter end)
 {
-	std::size_t const count(end-begin);
-	std::size_t const r(std::fread(std::to_address(begin),sizeof(*begin),count,cfhd.native_handle()));
-	if(r==count||std::feof(cfhd.native_handle()))
-		return begin+r;
-	throw_posix_error();
+	c_io_lock_guard lg{cfhd.fp};
+	basic_c_io_observer_unlocked<T> cfhd_unlocked{cfhd.fp};
+	return read(cfhd_unlocked,begin,end);
 }
 
 template<std::integral T,std::contiguous_iterator Iter>
-inline void write(basic_c_io_observer<T> cfhd,Iter begin,Iter end)
+inline decltype(auto) write(basic_c_io_observer<T> cfhd,Iter begin,Iter end)
 {
-	std::size_t const count(end-begin);
-	if(std::fwrite(std::to_address(begin),sizeof(*begin),count,cfhd.native_handle())<count)
-		throw_posix_error();
+	c_io_lock_guard lg{cfhd.fp};
+	basic_c_io_observer_unlocked<T> cfhd_unlocked{cfhd.fp};
+	return write(cfhd_unlocked,begin,end);
 }
 
 template<std::integral T>
@@ -517,22 +538,12 @@ inline void flush(basic_c_io_observer<T> cfhd)
 		throw_posix_error();
 }
 
-template<typename P,typename T,std::integral U>
-inline auto seek(basic_c_io_observer<P> cfhd,seek_type_t<T>,U i,seekdir s=seekdir::beg)
+template<std::integral ch_type,std::integral U>
+inline std::common_type_t<std::size_t,std::uint64_t> seek(basic_c_io_observer<ch_type> cfhd,std::common_type_t<std::ptrdiff_t,std::int64_t> offset=0,seekdir s=seekdir::cur)
 {
-	if(std::fseek(cfhd.native_handle(),seek_precondition<long,T,typename basic_c_io_observer<P>::char_type>(i),static_cast<int>(s)))
-		throw_posix_error();
-	auto val(std::ftell(cfhd.native_handle()));
-	if(val<0)
-		throw_posix_error();
-	return val;
+	return details::c_io_seek_impl(cfhd.fp,offset,s);
 }
 
-template<typename P,std::integral U>
-inline auto seek(basic_c_io_observer<P> cfhd,U i,seekdir s=seekdir::beg)
-{
-	return seek(cfhd,seek_type<typename basic_c_io_observer<P>::char_type>,i,s);
-}
 namespace details
 {
 template<typename T>
@@ -542,7 +553,9 @@ public:
 	using char_type = typename T::char_type;
 	using native_handle_type = std::FILE*;
 	constexpr basic_c_io_handle_impl()=default;
-	constexpr basic_c_io_handle_impl(native_handle_type fp2) noexcept:T{fp2}{}
+	template<typename native_hd>
+	requires std::same_as<native_handle_type,std::remove_cvref_t<native_hd>>
+	constexpr basic_c_io_handle_impl(native_hd fp2) noexcept:T{fp2}{}
 	basic_c_io_handle_impl(basic_c_io_handle_impl const&)=delete;
 	basic_c_io_handle_impl& operator=(basic_c_io_handle_impl const&)=delete;
 	constexpr basic_c_io_handle_impl(basic_c_io_handle_impl&& b) noexcept : T{b.native_handle()}
@@ -569,8 +582,8 @@ public:
 	}
 	inline constexpr void reset(native_handle_type newfp=nullptr) noexcept
 	{
-		if(std::fclose(this->native_handle())==EOF)
-			throw_posix_error();
+		if(this->native_handle())[[likely]]
+			std::fclose(this->native_handle());
 		this->native_handle()=newfp;
 	}
 };
@@ -583,10 +596,10 @@ public:
 	using T::native_handle;
 	using char_type=typename T::char_type;
 	using native_handle_type=typename T::native_handle_type;
-	basic_c_file_impl()=default;
+	constexpr basic_c_file_impl()=default;
 	template<typename native_hd>
 	requires std::same_as<native_handle_type,std::remove_cvref_t<native_hd>>
-	basic_c_file_impl(native_hd hd):T(hd){}
+	explicit constexpr basic_c_file_impl(native_hd hd):T(hd){}
 /*
 	basic_c_file_impl(std::string_view name,std::string_view mode):T(std::fopen(name.data(),mode.data()))
 	{
@@ -635,7 +648,7 @@ public:
 		basic_c_file_impl(native_interface,std::move(posix_handle),details::c_open_mode<om>::value.data()){}
 	basic_c_file_impl(basic_posix_io_handle<char_type>&& posix_handle,std::string_view mode):
 		basic_c_file_impl(native_interface,std::move(posix_handle),to_c_mode(from_c_mode(mode)).data()){}
-#if defined(__WINNT__) || defined(_MSC_VER)
+#if defined(_WIN32)
 //windows specific. open posix file from win32 io handle
 	basic_c_file_impl(basic_win32_io_handle<char_type>&& win32_handle,std::string_view mode):
 		basic_c_file_impl(basic_posix_file<char_type>(std::move(win32_handle),mode),mode)
@@ -741,6 +754,45 @@ using basic_c_io_handle_unlocked=details::basic_c_io_handle_impl<basic_c_io_obse
 template<std::integral ch_type>
 using basic_c_file_unlocked=details::basic_c_file_impl<basic_c_io_handle_unlocked<ch_type>>;
 
+template<std::integral ch_type>
+requires requires(basic_posix_io_observer<ch_type> piob)
+{
+	size(piob);
+}
+inline constexpr auto size(basic_c_io_observer<ch_type> ciob)
+{
+	return size(static_cast<basic_posix_io_observer<ch_type>>(ciob));
+}
+
+template<std::integral ch_type>
+requires requires(basic_posix_io_observer<ch_type> piob)
+{
+	type(piob);
+}
+inline constexpr auto type(basic_c_io_observer<ch_type> ciob)
+{
+	return type(static_cast<basic_posix_io_observer<ch_type>>(ciob));
+}
+
+template<std::integral ch_type>
+requires requires(basic_posix_io_observer<ch_type> piob)
+{
+	size(piob);
+}
+inline constexpr auto size(basic_c_io_observer_unlocked<ch_type> ciob)
+{
+	return size(static_cast<basic_posix_io_observer<ch_type>>(ciob));
+}
+
+template<std::integral ch_type>
+requires requires(basic_posix_io_observer<ch_type> piob)
+{
+	type(piob);
+}
+inline constexpr auto type(basic_c_io_observer_unlocked<ch_type> ciob)
+{
+	return type(static_cast<basic_posix_io_observer<ch_type>>(ciob));
+}
 
 template<std::integral ch_type>
 inline auto redirect_handle(basic_c_io_observer<ch_type> h)

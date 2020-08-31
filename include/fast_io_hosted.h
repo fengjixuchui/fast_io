@@ -9,7 +9,6 @@ For hosted implementations the set of standard library headers required by the C
 #include"fast_io_freestanding.h"
 #include"fast_io_hosted/mmap.h"
 #include"fast_io_hosted/platforms/native.h"
-#include"fast_io_hosted/omap.h"
 #if !defined(__NEWLIB__)||defined(_GLIBCXX_HAS_GTHREADS)
 #include"fast_io_hosted/iomutex.h"
 #include"fast_io_hosted/parallel.h"
@@ -17,6 +16,5 @@ For hosted implementations the set of standard library headers required by the C
 #include"fast_io_hosted/chrono.h"
 #include"fast_io_hosted/process/native.h"
 #include"fast_io_hosted/white_hole/white_hole.h"
-#include"fast_io_hosted/secure_clear.h"
 #include<memory_resource>
 #include"fast_io_hosted/pmr_resource.h"

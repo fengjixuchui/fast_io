@@ -40,8 +40,10 @@ inline constexpr bool scan_with_space_temporary_buffer(input& in,T&& t)
 	}
 	else if constexpr(reserve_size_scanable<no_cvref>)
 	{
-		std::array<typename std::remove_cvref_t<input>::char_type,scan_reserve_size(io_reserve_type<std::remove_cvref_t<T>>)> array;
-		ospan osp(array);
+		using char_type = typename std::remove_cvref_t<input>::char_type;
+		constexpr std::size_t reserve_size{scan_reserve_size(io_reserve_type<std::remove_cvref_t<T>>)};
+		std::array<char_type,reserve_size> array;
+		fast_io::ospan<char_type,reserve_size,true> osp(array);
 		return scan_with_space_temporary_buffer_impl<space>(osp,in,std::forward<T>(t));
 	}
 	else
@@ -124,7 +126,7 @@ inline constexpr auto scan_with_space(input &in,T&& t)
 		}
 	}
 }
-/*
+
 template<character_input_stream input,typename T>
 inline constexpr void scan_with_ex(input &in,T&& t)
 {
@@ -132,7 +134,7 @@ inline constexpr void scan_with_ex(input &in,T&& t)
 		scan_with_space(in,std::forward<T>(t));
 	else
 	{
-		if(!scan_with_space(in,t))
+		if(!scan_with_space(in,t))[[unlikely]]
 #ifdef __cpp_exceptions
 			throw eof();
 #else
@@ -140,7 +142,7 @@ inline constexpr void scan_with_ex(input &in,T&& t)
 #endif
 	}
 }
-*/
+
 template<bool report_eof,character_input_stream input,typename ...Args>
 requires((general_scanable<input,Args>||
 	general_reserve_scanable<Args,internal_temporary_buffer<typename input::char_type>,input>)&&...)
@@ -149,7 +151,7 @@ inline constexpr auto normal_scan(input &ip,Args&& ...args)
 	if constexpr(report_eof)
 		return (static_cast<std::size_t>(scan_with_space(ip,std::forward<Args>(args)))+...);
 	else
-		(scan_with_space(ip,std::forward<Args>(args)),...);
+		(scan_with_ex(ip,std::forward<Args>(args)),...);
 }
 
 
@@ -164,7 +166,9 @@ inline constexpr void print_control(output& out,T&& t)
 	if constexpr(reserve_printable<T>)
 	{
 		constexpr std::size_t size{print_reserve_size(io_reserve_type<no_cvref>)};
-		if constexpr(buffer_output_stream<output>)
+		if constexpr(contiguous_buffer_output_stream<output>)
+			obuffer_set_curr(out,print_reserve_define(io_reserve_type<no_cvref>,obuffer_curr(out),std::forward<T>(t)));
+		else if constexpr(buffer_output_stream<output>)
 		{
 			auto bcurr{obuffer_curr(out)};
 			if(bcurr+size<obuffer_end(out))[[likely]]
@@ -213,7 +217,13 @@ inline constexpr void print_control(output& out,manip::follow_character<T,ch_typ
 	{
 		using char_type = typename output::char_type;
 		constexpr std::size_t size{print_reserve_size(io_reserve_type<std::remove_cvref_t<T>>)+1};
-		if constexpr(buffer_output_stream<output>)
+		if constexpr(contiguous_buffer_output_stream<output>)
+		{
+			auto it{print_reserve_define(io_reserve_type<std::remove_cvref_t<T>>,obuffer_curr(out),std::forward<T>(t))};
+			*it=t.character;
+			obuffer_set_curr(out,++it);
+		}
+		else if constexpr(buffer_output_stream<output>)
 		{
 			auto bcurr{obuffer_curr(out)};
 			if(bcurr+size<obuffer_end(out))[[likely]]
@@ -277,7 +287,13 @@ inline constexpr void print_control_line(output& out,T&& t)
 	{
 		using char_type = typename output::char_type;
 		constexpr std::size_t size{print_reserve_size(io_reserve_type<std::remove_cvref_t<T>>)+1};
-		if constexpr(buffer_output_stream<output>)
+		if constexpr(contiguous_buffer_output_stream<output>)
+		{
+			auto it{print_reserve_define(io_reserve_type<std::remove_cvref_t<T>>,obuffer_curr(out),std::forward<T>(t))};
+			*it=u8'\n';
+			obuffer_set_curr(out,++it);
+		}
+		else if constexpr(buffer_output_stream<output>)
 		{
 			auto bcurr{obuffer_curr(out)};
 			if(bcurr+size<obuffer_end(out))[[likely]]
@@ -356,6 +372,14 @@ inline constexpr raiter print_reserve_define(io_reserve_type_t<manip::line<T>>,r
 	*it=u8'\n';
 	return ++it;
 }
+namespace details
+{
+template<bool report_eof,typename T,typename... Args>
+concept test_normal_scan = requires(T t,Args&& ...args)
+{
+	details::normal_scan<report_eof>(t,std::forward<Args>(args)...);
+};
+}
 
 template<bool report_eof=false,input_stream input,typename ...Args>
 inline constexpr auto scan(input &&in,Args&& ...args)
@@ -373,10 +397,7 @@ inline constexpr auto scan(input &&in,Args&& ...args)
 		single_character_input_buffer<std::remove_cvref_t<input>> scib{in};
 		return scan<report_eof>(scib,std::forward<Args>(args)...);
 	}
-	else if constexpr(!requires()
-	{
-		details::normal_scan<report_eof>(in,std::forward<Args>(args)...);
-	})
+	else if constexpr(!details::test_normal_scan<report_eof,std::remove_cvref_t<input>,Args&&...>)
 	{
 		static_assert(!character_input_stream<input>,
 		"\n\n\tThe type is not defined for scanning. Please consider defining as with scan_define or space_scan_define.\n");
@@ -496,6 +517,15 @@ inline constexpr void scatter_print_with_reserve_recursive(char_type* ptr,
 	scatter_print_with_reserve_recursive(ptr,arr+1,std::forward<Args>(args)...);
 }
 
+
+
+
+template<typename T,typename... Args>
+concept test_print_control_line = requires(T t,Args&& ...args)
+{
+	((details::print_control_line(t,std::forward<Args>(args))),...);
+};
+
 template<bool line,output_stream output,typename ...Args>
 inline constexpr void print_fallback(output &out,Args&& ...args)
 {
@@ -532,10 +562,7 @@ inline constexpr void print_fallback(output &out,Args&& ...args)
 	{
 		using internal_buffer_type = internal_temporary_buffer<typename output::char_type>;
 		internal_buffer_type buffer;
-		if constexpr(requires(Args&& ...args)
-		{
-			((details::print_control_line(buffer,std::forward<Args>(args))),...);
-		})
+		if constexpr(test_print_control_line<internal_buffer_type,Args&&...>)
 		{
 			if constexpr(line)
 			{

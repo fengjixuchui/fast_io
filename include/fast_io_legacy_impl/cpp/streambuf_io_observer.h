@@ -34,25 +34,25 @@ public:
 		rdb=newrdb;
 	}
 #if defined(__GLIBCXX__) || defined(__LIBCPP_VERSION)  || defined(_MSVC_STL_UPDATE)
-	explicit operator basic_c_io_observer_unlocked<char_type>()
+	explicit operator basic_c_io_observer_unlocked<char_type>() const noexcept
 	{
 		return basic_c_io_observer_unlocked<char_type>{details::streambuf_hack::fp_hack(rdb)};
 	}
-	explicit operator basic_c_io_observer<char_type>()
+	explicit operator basic_c_io_observer<char_type>() const noexcept
 	{
 		return basic_c_io_observer<char_type>{details::streambuf_hack::fp_hack(rdb)};
 	}
-	explicit operator basic_posix_io_observer<char_type>()
+	explicit operator basic_posix_io_observer<char_type>() const noexcept
 	{
 		return static_cast<basic_posix_io_observer<char_type>>(static_cast<basic_c_io_observer<char_type>>(*this));
 	}
-#if defined(__WINNT__) || defined(_MSC_VER)
-	explicit operator basic_win32_io_observer<char_type>()
+#if defined(_WIN32)
+	explicit operator basic_win32_io_observer<char_type>() const noexcept
 	{
 		return static_cast<basic_win32_io_observer<char_type>>
 		(static_cast<basic_posix_io_observer<char_type>>(*this));
 	}
-	explicit operator basic_nt_io_observer<char_type>()
+	explicit operator basic_nt_io_observer<char_type>() const noexcept
 	{
 		return static_cast<basic_nt_io_observer<char_type>>
 		(static_cast<basic_posix_io_observer<char_type>>(*this));
@@ -163,6 +163,47 @@ inline decltype(auto) io_control(basic_filebuf_io_observer<ch_type> h,Args&& ...
 {
 	return io_control(static_cast<basic_c_io_observer_unlocked<ch_type>>(h),std::forward<Args>(args)...);
 }
+
+template<std::integral ch_type>
+requires requires(basic_c_io_observer_unlocked<ch_type> piob)
+{
+	size(piob);
+}
+inline constexpr auto size(basic_streambuf_io_observer<ch_type> ciob)
+{
+	return size(static_cast<basic_c_io_observer_unlocked<ch_type>>(ciob));
+}
+
+template<std::integral ch_type>
+requires requires(basic_c_io_observer_unlocked<ch_type> piob)
+{
+	type(piob);
+}
+inline constexpr auto type(basic_streambuf_io_observer<ch_type> ciob)
+{
+	return type(static_cast<basic_c_io_observer_unlocked<ch_type>>(ciob));
+}
+
+template<std::integral ch_type>
+requires requires(basic_c_io_observer_unlocked<ch_type> piob)
+{
+	size(piob);
+}
+inline constexpr auto size(basic_filebuf_io_observer<ch_type> ciob)
+{
+	return size(static_cast<basic_c_io_observer_unlocked<ch_type>>(ciob));
+}
+
+template<std::integral ch_type>
+requires requires(basic_c_io_observer_unlocked<ch_type> piob)
+{
+	type(piob);
+}
+inline constexpr auto type(basic_filebuf_io_observer<ch_type> ciob)
+{
+	return type(static_cast<basic_c_io_observer_unlocked<ch_type>>(ciob));
+}
+
 #endif
 
 template<typename T>
