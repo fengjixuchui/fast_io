@@ -4,12 +4,6 @@ namespace fast_io
 {
 
 
-namespace details
-{
-struct empty
-{};
-}
-
 template<std::integral ch_type>
 class basic_socket_io_observer
 {
@@ -26,10 +20,6 @@ public:
 		auto temp{soc};
 		soc=sock::details::invalid_socket;
 		return temp;
-	}
-	inline constexpr void reset(native_handle_type newsoc=sock::details::invalid_socket) noexcept
-	{
-		soc=newsoc;
 	}
 	inline constexpr auto& native_handle() const noexcept
 	{	

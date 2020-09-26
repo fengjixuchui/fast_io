@@ -16,7 +16,7 @@ namespace details
 template<open_mode om>
 struct c_open_mode
 {
-inline static constexpr std::string_view value=to_c_mode(om);
+inline static constexpr char const* value=to_c_mode(om);
 };
 
 }
@@ -267,7 +267,7 @@ public:
 	{
 		return fp;
 	}
-	explicit operator bool() const noexcept
+	constexpr operator bool() const noexcept
 	{
 		return fp;
 	}
@@ -299,10 +299,6 @@ public:
 		auto temp{fp};
 		fp=nullptr;
 		return temp;
-	}
-	inline constexpr void reset(native_handle_type newfp=nullptr) noexcept
-	{
-		fp=newfp;
 	}
 };
 
@@ -406,13 +402,10 @@ inline decltype(auto) io_control(basic_c_io_observer_unlocked<ch_type> h,Args&& 
 	return io_control(static_cast<basic_posix_io_observer<ch_type>>(h),std::forward<Args>(args)...);
 }
 
-class c_io_lock_guard;
-
 template<std::integral ch_type>
 class basic_c_io_observer
 {
 public:
-	using lock_guard_type = c_io_lock_guard;
 	using char_type = ch_type;
 	using native_handle_type = std::FILE*;
 	native_handle_type fp{};
@@ -424,7 +417,7 @@ public:
 	{
 		return fp;
 	}
-	explicit operator bool() const noexcept
+	constexpr operator bool() const noexcept
 	{
 		return fp;
 	}
@@ -461,64 +454,56 @@ public:
 		fp=nullptr;
 		return temp;
 	}
-	inline constexpr void reset(native_handle_type newfp=nullptr) noexcept
-	{
-		fp=newfp;
-	}
-};
-
-template<std::integral T>
-inline auto mutex(basic_c_io_observer<T> h)
-{
-	return h.native_handle();
-}
-template<std::integral T>
-inline basic_c_io_observer_unlocked<T> unlocked_handle(basic_c_io_observer<T> h)
-{
-	return {h.native_handle()};
-}
-
-class c_io_lock_guard
-{
-	std::FILE* const fp;
-public:
-	c_io_lock_guard(std::FILE* f):fp(f)
+	inline void lock() const
 	{
 #if defined(_MSC_VER)||defined(_UCRT)
-		_lock_file(fp);
+	_lock_file(fp);
 #elif defined(_WIN32)
-		win32::my_msvcrt_lock_file(fp);
+	win32::my_msvcrt_lock_file(fp);
 #elif defined(__NEWLIB__)
 #ifndef __SINGLE_THREAD__
-//		flockfile(fp);	//TO FIX
+//	flockfile(fp);	//TO FIX
 #endif
 #else
-		flockfile(fp);
+	flockfile(fp);
 #endif
 	}
-	c_io_lock_guard(c_io_lock_guard const&) = delete;
-	c_io_lock_guard& operator=(c_io_lock_guard const&) = delete;
-	~c_io_lock_guard()
+	inline void unlock() const
 	{
 #if defined(_MSC_VER)||defined(_UCRT)
-		_unlock_file(fp);
+	_unlock_file(fp);
 #elif defined(_WIN32)
-		win32::my_msvcrt_unlock_file(fp);
+	win32::my_msvcrt_unlock_file(fp);
 #elif defined(__NEWLIB__)
 #ifndef __SINGLE_THREAD__
 //		_funlockfile(fp); //TO FIX
 #endif
 #else
-		funlockfile(fp);
+	funlockfile(fp);
 #endif
+	}
+	inline constexpr basic_c_io_observer_unlocked<ch_type> unlocked_handle() const noexcept
+	{
+		return {fp};
 	}
 };
 
+template<std::integral T>
+inline constexpr basic_c_io_observer<T> io_value_handle(basic_c_io_observer<T> other)
+{
+	return other;
+}
+
+template<std::integral T>
+inline constexpr basic_c_io_observer_unlocked<T> io_value_handle(basic_c_io_observer_unlocked<T> other)
+{
+	return other;
+}
 
 template<std::integral T,std::contiguous_iterator Iter>
 inline Iter read(basic_c_io_observer<T> cfhd,Iter begin,Iter end)
 {
-	c_io_lock_guard lg{cfhd.fp};
+	details::lock_guard lg{cfhd};
 	basic_c_io_observer_unlocked<T> cfhd_unlocked{cfhd.fp};
 	return read(cfhd_unlocked,begin,end);
 }
@@ -526,7 +511,7 @@ inline Iter read(basic_c_io_observer<T> cfhd,Iter begin,Iter end)
 template<std::integral T,std::contiguous_iterator Iter>
 inline decltype(auto) write(basic_c_io_observer<T> cfhd,Iter begin,Iter end)
 {
-	c_io_lock_guard lg{cfhd.fp};
+	details::lock_guard lg{cfhd};
 	basic_c_io_observer_unlocked<T> cfhd_unlocked{cfhd.fp};
 	return write(cfhd_unlocked,begin,end);
 }
@@ -601,18 +586,18 @@ public:
 	requires std::same_as<native_handle_type,std::remove_cvref_t<native_hd>>
 	explicit constexpr basic_c_file_impl(native_hd hd):T(hd){}
 /*
-	basic_c_file_impl(std::string_view name,std::string_view mode):T(std::fopen(name.data(),mode.data()))
+	basic_c_file_impl(cstring_view name,cstring_view mode):T(std::fopen(name.data(),mode.data()))
 	{
 		if(native_handle()==nullptr)
 			throw_posix_error();
 	}
-	basic_c_file_impl(std::string_view file,open_mode const& m):basic_c_file_impl(file,c_style(m))
+	basic_c_file_impl(cstring_view file,open_mode const& m):basic_c_file_impl(file,c_style(m))
 	{
 		if(with_ate(m))
 			seek(*this,0,seekdir::end);
 	}*/
 //fdopen interface
-	basic_c_file_impl(native_interface_t,basic_posix_io_handle<typename T::char_type>&& posix_handle,char const* mode):T(
+	basic_c_file_impl(native_interface_t,int fd,char const* mode):T(
 #if defined(__WINNT__) || defined(_MSC_VER)
 			::_fdopen(
 #elif defined(__NEWLIB__)
@@ -620,40 +605,26 @@ public:
 #else
 			::fdopen(
 #endif
-		posix_handle.fd,mode)
+		fd,mode)
 			)
 	{
 		if(native_handle()==nullptr)
 			throw_posix_error();
-		posix_handle.release();
-		if constexpr(std::same_as<wchar_t,typename T::char_type>)
-		{
-			fwide(this->native_handle(),1);
-		}
-		else if constexpr(!std::same_as<char,typename T::char_type>)
-		{
-		//close buffer for non char and wchar_t types like libstdc++ does. All these hacks just violate strict-aliasing rule
-			if(setvbuf(this->native_handle(),nullptr,_IONBF,0))
-			{
-				std::fclose(this->native_handle());
-				throw_posix_error();
-			}
-		}
 	}
 
 	basic_c_file_impl(basic_posix_io_handle<char_type>&& posix_handle,open_mode om):
-		basic_c_file_impl(native_interface,std::move(posix_handle),to_c_mode(om).data()){}
+		basic_c_file_impl(native_interface,posix_handle.fd,to_c_mode(om))
+	{
+		posix_handle.release();
+	}
 	template<open_mode om>
 	basic_c_file_impl(basic_posix_io_handle<char_type>&& posix_handle,open_interface_t<om>):
-		basic_c_file_impl(native_interface,std::move(posix_handle),details::c_open_mode<om>::value.data()){}
-	basic_c_file_impl(basic_posix_io_handle<char_type>&& posix_handle,std::string_view mode):
-		basic_c_file_impl(native_interface,std::move(posix_handle),to_c_mode(from_c_mode(mode)).data()){}
+		basic_c_file_impl(native_interface,posix_handle.fd,details::c_open_mode<om>::value)
+	{
+		posix_handle.release();
+	}
 #if defined(_WIN32)
 //windows specific. open posix file from win32 io handle
-	basic_c_file_impl(basic_win32_io_handle<char_type>&& win32_handle,std::string_view mode):
-		basic_c_file_impl(basic_posix_file<char_type>(std::move(win32_handle),mode),mode)
-	{
-	}
 	basic_c_file_impl(basic_win32_io_handle<char_type>&& win32_handle,open_mode om):
 		basic_c_file_impl(basic_posix_file<char_type>(std::move(win32_handle),om),to_c_mode(om))
 	{
@@ -667,41 +638,54 @@ public:
 #endif
 
 	template<open_mode om,typename... Args>
-	basic_c_file_impl(std::string_view file,open_interface_t<om>,Args&& ...args):
+	basic_c_file_impl(cstring_view file,open_interface_t<om>,Args&& ...args):
 		basic_c_file_impl(basic_posix_file<typename T::char_type>(file,open_interface<om>,std::forward<Args>(args)...),
 			open_interface<om>)
 	{}
 	template<typename... Args>
-	basic_c_file_impl(std::string_view file,open_mode om,Args&& ...args):
+	basic_c_file_impl(cstring_view file,open_mode om,Args&& ...args):
 		basic_c_file_impl(basic_posix_file<typename T::char_type>(file,om,std::forward<Args>(args)...),om)
 	{}
+
+	template<open_mode om,typename... Args>
+	basic_c_file_impl(io_at_t,native_io_observer niob,cstring_view file,open_interface_t<om>,Args&& ...args):
+		basic_c_file_impl(basic_posix_file<typename T::char_type>(io_at,niob,file,open_interface<om>,std::forward<Args>(args)...),
+			open_interface<om>)
+	{}
 	template<typename... Args>
-	basic_c_file_impl(std::string_view file,std::string_view mode,Args&& ...args):
-		basic_c_file_impl(basic_posix_file<typename T::char_type>(file,mode,std::forward<Args>(args)...),mode)
+	basic_c_file_impl(io_at_t,native_io_observer niob,cstring_view file,open_mode om,Args&& ...args):
+		basic_c_file_impl(basic_posix_file<typename T::char_type>(io_at,niob,file,om,std::forward<Args>(args)...),om)
 	{}
 
-#if defined (__linux__) || defined(__WINNT__) || defined(_MSC_VER)
+
+#if defined (__linux__) || defined(_WIN32)
 	template<open_mode om,typename... Args>
-	basic_c_file_impl(io_async_t,io_async_observer ioa,std::string_view file,open_interface_t<om>,Args&& ...args):
+	basic_c_file_impl(io_async_t,io_async_observer ioa,cstring_view file,open_interface_t<om>,Args&& ...args):
 		basic_c_file_impl(basic_posix_file<typename T::char_type>(io_async,ioa,file,open_interface<om>,std::forward<Args>(args)...),
 			open_interface<om>)
 	{}
 	template<typename... Args>
-	basic_c_file_impl(io_async_t,io_async_observer ioa,std::string_view file,open_mode om,Args&& ...args):
+	basic_c_file_impl(io_async_t,io_async_observer ioa,cstring_view file,open_mode om,Args&& ...args):
 		basic_c_file_impl(basic_posix_file<typename T::char_type>(io_async,ioa,file,om,std::forward<Args>(args)...),om)
 	{}
+
+	template<open_mode om,typename... Args>
+	basic_c_file_impl(io_async_t,io_async_observer ioa,io_at_t,native_io_observer niob,cstring_view file,open_interface_t<om>,Args&& ...args):
+		basic_c_file_impl(basic_posix_file<typename T::char_type>(io_async,ioa,io_at,niob,file,open_interface<om>,std::forward<Args>(args)...),
+			open_interface<om>)
+	{}
 	template<typename... Args>
-	basic_c_file_impl(io_async_t,io_async_observer ioa,std::string_view file,std::string_view mode,Args&& ...args):
-		basic_c_file_impl(basic_posix_file<typename T::char_type>(io_async,ioa,file,mode,std::forward<Args>(args)...),mode)
+	basic_c_file_impl(io_async_t,io_async_observer ioa,io_at_t,native_io_observer niob,cstring_view file,open_mode om,Args&& ...args):
+		basic_c_file_impl(basic_posix_file<typename T::char_type>(io_async,ioa,io_at,niob,file,om,std::forward<Args>(args)...),om)
 	{}
 #endif
 
 	template<stream stm,typename... Args>
-	basic_c_file_impl(io_cookie_t,std::string_view mode,std::in_place_type_t<stm>,Args&& ...args)
+	basic_c_file_impl(io_cookie_t,cstring_view mode,std::in_place_type_t<stm>,Args&& ...args)
 	{
 #if defined(_GNU_SOURCE) || defined(__MUSL__)
 		std::unique_ptr<stm> up{std::make_unique<std::remove_cvref_t<stm>>(std::forward<std::remove_cvref_t<stm>>(args)...)};
-		if(!(this->native_handle()=fopencookie(up.get(),mode.data(),c_io_cookie_functions<std::remove_cvref_t<stm>>.native_functions)))[[unlikely]]
+		if(!(this->native_handle()=fopencookie(up.get(),mode.c_str(),c_io_cookie_functions<std::remove_cvref_t<stm>>.native_functions)))[[unlikely]]
                			throw_posix_error();
 		up.release();
 #elif defined(__BSD_VISIBLE) || defined(__BIONIC__) || defined(__NEWLIB__)
@@ -714,10 +698,10 @@ public:
 	}
 
 	template<stream stm>
-	basic_c_file_impl(io_cookie_t,std::string_view mode,stm& reff)
+	basic_c_file_impl(io_cookie_t,cstring_view mode,stm& reff)
 	{
 #if defined(_GNU_SOURCE) || defined(__MUSL__)
-		if(!(this->native_handle()=fopencookie(std::addressof(reff),mode.data(),c_io_cookie_functions<stm&>.native_functions)))[[unlikely]]
+		if(!(this->native_handle()=fopencookie(std::addressof(reff),mode.c_str(),c_io_cookie_functions<stm&>.native_functions)))[[unlikely]]
                			throw_posix_error();
 #elif defined(__BSD_VISIBLE) || defined(__BIONIC__) || defined(__NEWLIB__)
 		this->native_handle()=details::funopen_wrapper<stm&>(std::addressof(reff));
@@ -726,7 +710,7 @@ public:
 #endif
 	}
 	template<stream stm>
-	basic_c_file_impl(io_cookie_t,std::string_view mode,stm&& rref):basic_c_file_impl(io_cookie,mode,std::in_place_type<stm>,std::move(rref)){}
+	basic_c_file_impl(io_cookie_t,cstring_view mode,stm&& rref):basic_c_file_impl(io_cookie,mode.c_str(),std::in_place_type<stm>,std::move(rref)){}
 
 
 	basic_c_file_impl(basic_c_file_impl const&)=default;
@@ -888,28 +872,17 @@ inline decltype(auto) zero_copy_out_handle(basic_c_io_observer_unlocked<ch_type>
 	return zero_copy_out_handle(static_cast<basic_posix_io_observer<ch_type>>(h));
 }
 
-template<std::integral char_type>
-inline constexpr std::size_t print_reserve_size(io_reserve_type_t<basic_c_io_observer_unlocked<char_type>>)
-{
-	return print_reserve_size(io_reserve_type<void*>);
-}
 
-template<std::integral char_type,std::contiguous_iterator caiter,typename U>
-inline constexpr caiter print_reserve_define(io_reserve_type_t<basic_c_io_observer_unlocked<char_type>>,caiter iter,U&& v)
+template<std::integral char_type>
+inline constexpr void const* print_alias_define(io_alias_t,basic_c_io_observer_unlocked<char_type> v)
 {
-	return print_reserve_define(io_reserve_type<void*>,iter,v.fp);
+	return v.fp;
 }
 
 template<std::integral char_type>
-inline constexpr std::size_t print_reserve_size(io_reserve_type_t<basic_c_io_observer<char_type>>)
+inline constexpr void const* print_alias_define(io_alias_t,basic_c_io_observer<char_type> v)
 {
-	return print_reserve_size(io_reserve_type<void*>);
-}
-
-template<std::integral char_type,std::contiguous_iterator caiter,typename U>
-inline constexpr caiter print_reserve_define(io_reserve_type_t<basic_c_io_observer<char_type>>,caiter iter,U&& v)
-{
-	return print_reserve_define(io_reserve_type<void*>,iter,v.fp);
+	return v.fp;
 }
 
 }

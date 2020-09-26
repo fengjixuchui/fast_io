@@ -13,7 +13,7 @@ std::uint32_t FileAttributes{};
 std::uint32_t ShareAccess{1|2};
 std::uint32_t CreateDisposition{};
 std::uint32_t CreateOptions{};
-std::uint32_t ObjAttributes{0x00000040};
+std::uint32_t ObjAttributes{};
 };
 
 /*
@@ -24,12 +24,99 @@ inline constexpr nt_open_mode calculate_nt_open_mode(open_mode value,perms pm)
 {
 	value&=~open_mode::ate;
 	nt_open_mode mode;
+	bool generic_write{};
+	bool generic_read{};
 	if((value&open_mode::app)!=open_mode::none)
 		mode.DesiredAccess|=4;		//FILE_APPEND_DATA
 	else if((value&open_mode::out)!=open_mode::none)
+	{
 		mode.DesiredAccess|=0x120116;	//FILE_GENERIC_WRITE
+		generic_write=true;
+	}
 	if((value&open_mode::in)!=open_mode::none)
+	{
 		mode.DesiredAccess|=0x120089;	//FILE_GENERIC_READ
+		generic_read=true;
+		if((value&open_mode::out)!=open_mode::none&&((value&open_mode::app)!=open_mode::none&&(value&open_mode::trunc)!=open_mode::none))
+		{
+			mode.DesiredAccess|=0x120116;
+			generic_write=true;
+		}
+	}
+
+
+
+/*
+
+https://doxygen.reactos.org/d6/d0e/ndk_2iotypes_8h.html
+#define 	FILE_SUPERSEDE   0x00000000
+#define 	FILE_OPEN   0x00000001
+#define 	FILE_CREATE   0x00000002
+#define 	FILE_OPEN_IF   0x00000003
+#define 	FILE_OVERWRITE   0x00000004
+#define 	FILE_OVERWRITE_IF   0x00000005
+
+https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntcreatefile
+CreateDisposition value	Action if file exists	Action if file does not exist
+FILE_SUPERSEDE	Replace the file.	Create the file. 0x00000000
+FILE_OPEN	Open the file.	Return an error. 0x00000001
+FILE_CREATE	Return an error.	Create the file. 0x00000002
+FILE_OPEN_IF	Open the file.	Create the file. 0x00000003
+FILE_OVERWRITE	Open the file, and overwrite it.	Return an error. 0x00000004
+FILE_OVERWRITE_IF	Open the file, and overwrite it.	Create the file. 0x00000005
+
+
+https://doxygen.reactos.org/dd/d83/dll_2win32_2kernel32_2client_2file_2create_8c_source.html
+Line 88:
+
+win32		=>	nt
+CREATE_NEW	=>	FILE_CREATE		(0x00000002)
+CREATE_ALWAYS	=>	FILE_OVERWRITE_IF	(0x00000005)
+OPEN_EXISITNG	=>	FILE_OPEN		(0x00000001)
+OPEN_ALWAYS	=>	FILE_OPEN_IF		(0x00000003)
+TRUNCATING_EXISITING=>	FILE_OVERWRITE		(0x00000004)
+
+File access
+mode string	Meaning	Explanation	Action if file
+already exists	Action if file
+does not exist
+"r"	read	Open a file for reading	read from start	failure to open
+"w"	write	Create a file for writing	destroy contents	create new
+"a"	append	Append to a file	write to end	create new
+"r+"	read extended	Open a file for read/write	read from start	error
+"w+"	write extended	Create a file for read/write	destroy contents	create new
+"a+"	append extended	Open a file for read/write	write to end	create new
+*/
+	if ((value&open_mode::trunc)!=open_mode::none)
+	{
+		if((value&open_mode::excl)!=open_mode::none)
+			mode.CreateDisposition=0x00000002;// CREATE_NEW	=>	FILE_CREATE		(0x00000002)
+		else
+			mode.CreateDisposition=0x00000005;// CREATE_ALWAYS	=>	FILE_OVERWRITE_IF	(0x00000005)
+	}
+	else if((value&open_mode::in)==open_mode::none)
+	{
+		if((value&open_mode::app)!=open_mode::none)
+			mode.CreateDisposition=0x00000003;//OPEN_ALWAYS	=>	FILE_OPEN_IF		(0x00000003)
+		else if((value&open_mode::out)!=open_mode::none)
+		{
+			if((value&open_mode::excl)!=open_mode::none)
+				mode.CreateDisposition=0x00000002;// CREATE_NEW	=>	FILE_CREATE		(0x00000002)
+			else
+				mode.CreateDisposition=0x00000005;// CREATE_ALWAYS	=>	FILE_OVERWRITE_IF	(0x00000005)
+		}
+	}
+	else if((value&open_mode::app)!=open_mode::none)
+		mode.CreateDisposition=0x00000003;//OPEN_ALWAYS		=>	FILE_OPEN_IF		(0x00000003)
+	else
+		mode.CreateDisposition=0x00000001;//OPEN_EXISTING	=>	FILE_OPEN		(0x00000001)
+
+
+	if((value&open_mode::direct)!=open_mode::none)
+		mode.CreateOptions |= 0x00000008;//FILE_NO_INTERMEDIATE_BUFFERING
+	if((value&open_mode::sync)!=open_mode::none)
+		mode.CreateOptions |= 0x00000002;//FILE_WRITE_THROUGH
+
 	bool set_normal{true};
 	if((value&open_mode::archive)!=open_mode::none)
 	{
@@ -61,64 +148,18 @@ inline constexpr nt_open_mode calculate_nt_open_mode(open_mode value,perms pm)
 		mode.FileAttributes|=0x1000;						//FILE_ATTRIBUTE_OFFLINE
 		set_normal={};
 	}
-	if((value&open_mode::directory)!=open_mode::none)
-	{
-		mode.FileAttributes|=0x10;						//FILE_ATTRIBUTE_DIRECTORY
-		mode.CreateOptions|=0x00000001;						//FILE_DIRECTORY_FILE
-		set_normal={};
-	}
 	if(set_normal)[[likely]]
 		mode.FileAttributes|=0x80;						//FILE_ATTRIBUTE_NORMAL
 
-
-/*
-
-https://doxygen.reactos.org/d6/d0e/ndk_2iotypes_8h.html
-#define 	FILE_SUPERSEDE   0x00000000
-#define 	FILE_OPEN   0x00000001
-#define 	FILE_CREATE   0x00000002
-#define 	FILE_OPEN_IF   0x00000003
-#define 	FILE_OVERWRITE   0x00000004
-#define 	FILE_OVERWRITE_IF   0x00000005
-
-https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntcreatefile
-CreateDisposition value	Action if file exists	Action if file does not exist
-FILE_SUPERSEDE	Replace the file.	Create the file. 0x00000000
-FILE_OPEN	Open the file.	Return an error. 0x00000001
-FILE_CREATE	Return an error.	Create the file. 0x00000002
-FILE_OPEN_IF	Open the file.	Create the file. 0x00000003
-FILE_OVERWRITE	Open the file, and overwrite it.	Return an error. 0x00000004
-FILE_OVERWRITE_IF	Open the file, and overwrite it.	Create the file. 0x00000005
-
-*/
-	if((value&open_mode::excl)!=open_mode::none)
-	{
-		mode.CreateDisposition=1;		//FILE_OPEN
-		if((value&open_mode::trunc)!=open_mode::none)
-			throw_posix_error(EINVAL);
-	}
-	else if ((value&open_mode::trunc)!=open_mode::none)
-	{
-		if((value&open_mode::creat)!=open_mode::none)
-			mode.CreateDisposition=2;	//FILE_CREATE
-		else if((value&open_mode::in)!=open_mode::none)
-			mode.CreateDisposition=0;	//FILE_SUPERSEDE
-		else
-			throw_posix_error(EINVAL);
-	}
-	else if((value&open_mode::in)==open_mode::none)
-	{
-		if((value&open_mode::app)!=open_mode::none)
-			mode.CreateDisposition=3;	//FILE_OPEN_IF
-		else
-			mode.CreateDisposition=5; 	//FILE_OVERWRITE_IF
-	}
-	else
-		mode.CreateDisposition=1;		//FILE_OPEN
 	if((value&open_mode::directory)==open_mode::none)
 		mode.CreateOptions|=0x00000040;	//FILE_NON_DIRECTORY_FILE 0x00000040
 	else
-		mode.CreateOptions|=0x00000001;	//FILE_DIRECTORY_FILE 0x00000001
+	{
+		if(generic_read)
+			mode.CreateOptions |= 0x00004000;		//FILE_OPEN_FOR_BACKUP_INTENT
+		if(generic_write)
+			mode.CreateOptions |= 0x00000400;		//FILE_OPEN_REMOTE_INSTANCE
+	}
 	if((value&open_mode::no_block)==open_mode::none)
 		mode.CreateOptions|=0x00000020;	//FILE_SYNCHRONOUS_IO_NONALERT 0x00000020
 	else
@@ -127,6 +168,21 @@ FILE_OVERWRITE_IF	Open the file, and overwrite it.	Create the file. 0x00000005
 		mode.CreateOptions|=0x00000004;	//FILE_SEQUENTIAL_ONLY 0x00000004
 	else
 		mode.CreateOptions|=0x00000800;
+	if((value&open_mode::no_recall)!=open_mode::none)
+		mode.CreateOptions|=0x00400000;	//FILE_OPEN_NO_RECALL 0x00400000
+
+	if((value&open_mode::posix_semantics)==open_mode::none)
+		mode.ObjAttributes|=0x00000040;	//OBJ_CASE_INSENSITIVE
+	if((value&open_mode::inherit)!=open_mode::none)
+		mode.ObjAttributes|=0x00000002;	//OBJ_INHERIT
+
+	if((value&open_mode::session_aware)!=open_mode::none)
+		mode.CreateOptions|=0x00040000;	//FILE_SESSION_AWARE
+	if((value&open_mode::temporary)!=open_mode::none)
+	{
+		mode.CreateOptions|=0x00001000;					//FILE_DELETE_ON_CLOSE
+		mode.FileAttributes|=0x100;				//FILE_ATTRIBUTE_TEMPORARY??
+	}
 	if((pm&perms::owner_write)==perms::none)
 		mode.FileAttributes|=0x00000001;  //FILE_ATTRIBUTE_READONLY
 	return mode;
@@ -137,21 +193,21 @@ struct nt_file_openmode
 	inline static constexpr nt_open_mode mode = calculate_nt_open_mode(om,pm);
 };
 
-inline void nt_write_file_rtl_path(std::string_view filename,char16_t* buffer_data,win32::nt::unicode_string& nt_name,char16_t const*& part_name,win32::nt::rtl_relative_name_u& relative_name)
+inline void nt_write_file_rtl_path(cstring_view filename,char16_t* buffer_data,win32::nt::unicode_string& nt_name,char16_t const*& part_name,win32::nt::rtl_relative_name_u& relative_name)
 {
 	*utf_code_convert(filename.data(),filename.data()+filename.size(),buffer_data)=0;
 	if(!win32::nt::rtl_dos_path_name_to_nt_path_name_u(buffer_data,std::addressof(nt_name),std::addressof(part_name),std::addressof(relative_name)))
 		throw_nt_error(0xC0000039);
 }
 
-//inline void* nt_create_file_common_impl(void* directory,win32::nt::unicode_string* relative_path,nt_open_mode const& mode);
-
 inline void* nt_create_file_common_impl(void* directory,win32::nt::unicode_string* relative_path,nt_open_mode const& mode)
 {
+	win32::security_attributes sec_attr{sizeof(win32::security_attributes),nullptr,true};
 	win32::nt::object_attributes obj{.Length=sizeof(win32::nt::object_attributes),
 		.RootDirectory=directory,
 		.ObjectName=relative_path,
-		.Attributes=mode.ObjAttributes	//Todo
+		.Attributes=mode.ObjAttributes,
+		.SecurityDescriptor=mode.ObjAttributes&0x00000002?std::addressof(sec_attr):nullptr,
 	};
 	void* handle{};
 	win32::nt::io_status_block block{};
@@ -165,6 +221,7 @@ inline void* nt_create_file_common_impl(void* directory,win32::nt::unicode_strin
 
 inline std::uint16_t filename_bytes(std::size_t sz)
 {
+	sz<<=1;
 	if constexpr(sizeof(sz)<=sizeof(std::uint16_t))
 		return static_cast<std::uint16_t>(sz);
 	if(static_cast<std::size_t>(std::numeric_limits<std::uint16_t>::max())<sz)
@@ -172,7 +229,7 @@ inline std::uint16_t filename_bytes(std::size_t sz)
 	return static_cast<std::uint16_t>(sz);
 }
 
-inline void* nt_create_file_directory_impl(void* directory,std::string_view filename,nt_open_mode const& mode)
+inline void* nt_create_file_directory_impl(void* directory,cstring_view filename,nt_open_mode const& mode)
 {
 	details::temp_unique_arr_ptr<char16_t> buffer(filename.size());
 	auto buffer_data_end=utf_code_convert(filename.data(),filename.data()+filename.size(),buffer.data());
@@ -184,7 +241,7 @@ inline void* nt_create_file_directory_impl(void* directory,std::string_view file
 	return nt_create_file_common_impl(directory,std::addressof(relative_path),mode);
 }
 
-inline void* nt_create_file_impl(std::string_view filename,nt_open_mode const& mode)
+inline void* nt_create_file_impl(cstring_view filename,nt_open_mode const& mode)
 {
 	char16_t const* part_name{};
 	win32::nt::rtl_relative_name_u relative_name{};
@@ -226,6 +283,9 @@ inline std::size_t nt_write_impl(void* handle,void const* begin,std::size_t size
 }
 
 template<std::integral ch_type>
+class basic_win32_io_observer;
+
+template<std::integral ch_type>
 class basic_nt_io_observer
 {
 public:
@@ -244,17 +304,24 @@ public:
 	{
 		return handle;
 	}
+	explicit constexpr operator basic_win32_io_observer<char_type>() const noexcept
+	{
+		return basic_win32_io_observer<char_type>{handle};
+	}
 	inline constexpr native_handle_type release() noexcept
 	{
 		auto temp{handle};
 		handle=nullptr;
 		return temp;
 	}
-	inline constexpr void reset(native_handle_type newhandle=nullptr) noexcept
-	{
-		handle=newhandle;
-	}
 };
+
+template<std::integral ch_type>
+inline constexpr basic_nt_io_observer<ch_type> io_value_handle(basic_nt_io_observer<ch_type> other)
+{
+	return other;
+}
+
 
 template<std::integral ch_type,std::contiguous_iterator Iter>
 inline Iter read(basic_nt_io_observer<ch_type> obs,Iter begin,Iter end)
@@ -361,15 +428,14 @@ public:
 	template<typename native_hd>
 	requires std::same_as<native_handle_type,std::remove_cvref_t<native_hd>>
 	constexpr basic_nt_file(native_hd hd):basic_nt_io_handle<ch_type>(hd){}
-	basic_nt_file(std::string_view filename,open_mode om,perms pm=static_cast<perms>(420)):
+	basic_nt_file(cstring_view filename,open_mode om,perms pm=static_cast<perms>(420)):
 		basic_nt_io_handle<ch_type>(details::nt::nt_create_file_impl(filename,details::nt::calculate_nt_open_mode(om,pm)))
 	{
 		if((om&open_mode::ate)!=open_mode::none)
 			seek_end_local();
 	}
 
-	template<std::integral dir_char_type>
-	basic_nt_file(basic_nt_io_observer<dir_char_type> diob,std::string_view filename,open_mode om,perms pm=static_cast<perms>(420)):
+	basic_nt_file(fast_io::io_at_t,basic_nt_io_observer<char> diob,cstring_view filename,open_mode om,perms pm=static_cast<perms>(420)):
 		basic_nt_io_handle<char_type>(details::nt::nt_create_file_directory_impl(diob.handle,filename,details::nt::calculate_nt_open_mode(om,pm)))
 	{
 		if((om&open_mode::ate)!=open_mode::none)
@@ -395,15 +461,9 @@ using u8nt_io_handle=basic_nt_io_handle<char8_t>;
 using u8nt_file=basic_nt_file<char8_t>;
 
 template<std::integral char_type>
-inline constexpr std::size_t print_reserve_size(io_reserve_type_t<basic_nt_io_observer<char_type>>)
+inline constexpr void const* print_alias_define(io_alias_t,basic_nt_io_observer<char_type> v)
 {
-	return print_reserve_size(io_reserve_type<void*>);
-}
-
-template<std::integral char_type,std::contiguous_iterator caiter,typename U>
-inline constexpr caiter print_reserve_define(io_reserve_type_t<basic_nt_io_observer<char_type>>,caiter iter,U&& v)
-{
-	return print_reserve_define(io_reserve_type<void*>,iter,v.handle);
+	return v.handle;
 }
 
 }

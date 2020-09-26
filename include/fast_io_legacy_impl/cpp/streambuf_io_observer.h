@@ -29,10 +29,6 @@ public:
 	{
 		return rdb;
 	}
-	inline constexpr void reset(native_handle_type newrdb=nullptr) noexcept
-	{
-		rdb=newrdb;
-	}
 #if defined(__GLIBCXX__) || defined(__LIBCPP_VERSION)  || defined(_MSVC_STL_UPDATE)
 	explicit operator basic_c_io_observer_unlocked<char_type>() const noexcept
 	{
@@ -110,8 +106,11 @@ inline void async_read_callback(io_async_observer ioa,basic_general_streambuf_io
 	async_read_callback(ioa,static_cast<basic_c_io_observer_unlocked<typename T::char_type>>(h),std::forward<Args>(args)...);
 }
 
-
-
+template<typename T>
+inline constexpr basic_general_streambuf_io_observer<T> io_value_handle(basic_general_streambuf_io_observer<T> other)
+{
+	return other;
+}
 
 template<std::integral CharT,typename Traits = std::char_traits<CharT>>
 using basic_streambuf_io_observer = basic_general_streambuf_io_observer<std::basic_streambuf<CharT,Traits>>;
@@ -207,17 +206,10 @@ inline constexpr auto type(basic_filebuf_io_observer<ch_type> ciob)
 #endif
 
 template<typename T>
-inline constexpr std::size_t print_reserve_size(io_reserve_type_t<basic_general_streambuf_io_observer<T>>)
+inline constexpr void const* print_alias_define(io_alias_t,basic_general_streambuf_io_observer<T> v)
 {
-	return print_reserve_size(io_reserve_type<void*>);
+	return v.rdb;
 }
-
-template<typename T,std::contiguous_iterator caiter,typename U>
-inline constexpr caiter print_reserve_define(io_reserve_type_t<basic_general_streambuf_io_observer<T>>,caiter iter,U&& v)
-{
-	return print_reserve_define(io_reserve_type<void*>,iter,v.rdb);
-}
-
 }
 
 

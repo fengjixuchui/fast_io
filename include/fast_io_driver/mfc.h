@@ -32,10 +32,6 @@ public:
 		phandle=nullptr;
 		return temp;
 	}
-	inline constexpr void reset(native_handle_type newhandle=nullptr) noexcept
-	{
-		phandle=newhandle;
-	}
 };
 
 
@@ -68,6 +64,12 @@ public:
 			mcf.native_handle()=nullptr;
 		}
 		return *this;
+	}
+
+	inline constexpr void reset(native_handle_type newhandle=nullptr) noexcept
+	{
+		delete this->native_handle();
+		this->native_handle()=newhandle;
 	}
 };
 
@@ -121,16 +123,12 @@ public:
 		hd.release();
 	}
 	template<open_mode om,typename... Args>
-	basic_mfc_file(std::string_view file,open_interface_t<om>,Args&& ...args):
+	basic_mfc_file(cstring_view file,open_interface_t<om>,Args&& ...args):
 		basic_mfc_file(basic_win32_file<char_type>(file,open_interface<om>,std::forward<Args>(args)...),open_interface<om>)
 	{}
 	template<typename... Args>
-	basic_mfc_file(std::string_view file,open_mode om,Args&& ...args):
+	basic_mfc_file(cstring_view file,open_mode om,Args&& ...args):
 		basic_mfc_file(basic_win32_file<char_type>(file,om,std::forward<Args>(args)...),om)
-	{}
-	template<typename... Args>
-	basic_mfc_file(std::string_view file,std::string_view mode,Args&& ...args):
-		basic_mfc_file(basic_win32_file<char_type>(file,mode,std::forward<Args>(args)...),mode)
 	{}
 	basic_mfc_file(basic_mfc_file const&)=default;
 	basic_mfc_file& operator=(basic_mfc_file const&)=default;

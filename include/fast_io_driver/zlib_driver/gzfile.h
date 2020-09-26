@@ -84,10 +84,6 @@ public:
 	{
 		return {details::hack_gz_file_fd(gzfile)};
 	}
-	inline constexpr void reset(native_handle_type newhandle=nullptr) noexcept
-	{
-		gzfile=newhandle;
-	}
 #if defined(__WINNT__) || defined(_MSC_VER)
 	explicit operator basic_win32_io_observer<char_type>() const
 	{
@@ -127,8 +123,8 @@ public:
 	}
 
 
-	basic_gz_file(basic_posix_io_handle<char_type>&& posix_handle,std::string_view mode):
-		basic_gz_io_observer<char_type>(gzdopen(posix_handle.native_handle(),mode.data()))
+	basic_gz_file(native_interface_t,int fd,char const* mode):
+		basic_gz_io_observer<char_type>(gzdopen(pfd,mode.data()))
 	{
 		if(this->native_handle()==nullptr)
 			throw_posix_error();
@@ -136,17 +132,19 @@ public:
 	}
 
 	basic_gz_file(basic_posix_io_handle<char_type>&& posix_handle,open_mode om):
-		basic_gz_file(std::move(posix_handle),to_c_mode(om)){}
+		basic_gz_file(native_interface,posix_handle.fd,to_c_mode(om))
+	{
+		posix_handle.release();
+	}
 	template<open_mode om>
 	basic_gz_file(basic_posix_io_handle<char_type>&& posix_handle,open_interface_t<om>):
-		basic_gz_file(std::move(posix_handle),fast_io::details::c_open_mode<om>::value){}
+		basic_gz_file(native_interface,posix_handle.fd,fast_io::details::c_open_mode<om>::value)
+	{
+		posix_handle.release();
+	}
 
 #if defined(__WINNT__) || defined(_MSC_VER)
 //windows specific. open posix file from win32 io handle
-	basic_gz_file(basic_win32_io_handle<char_type>&& win32_handle,std::string_view mode):
-		basic_gz_file(basic_posix_file<char_type>(std::move(win32_handle),mode),mode)
-	{
-	}
 	basic_gz_file(basic_win32_io_handle<char_type>&& win32_handle,open_mode om):
 		basic_gz_file(basic_posix_file<char_type>(std::move(win32_handle),om),to_c_mode(om))
 	{
@@ -167,19 +165,14 @@ public:
 	}
 
 	template<open_mode om,typename... Args>
-	basic_gz_file(std::string_view file,open_interface_t<om>,Args&& ...args):
+	basic_gz_file(cstring_view file,open_interface_t<om>,Args&& ...args):
 		basic_gz_file(basic_posix_file<char_type>(file,open_interface<om>,std::forward<Args>(args)...),
 			open_interface<om>)
 	{}
 	template<typename... Args>
-	basic_gz_file(std::string_view file,open_mode om,Args&& ...args):
+	basic_gz_file(cstring_view file,open_mode om,Args&& ...args):
 		basic_gz_file(basic_posix_file<char_type>(file,om,std::forward<Args>(args)...),om)
 	{}
-	template<typename... Args>
-	basic_gz_file(std::string_view file,std::string_view mode,Args&& ...args):
-		basic_gz_file(basic_posix_file<char_type>(file,mode,std::forward<Args>(args)...),mode)
-	{}
-
 };
 
 using gz_io_observer = basic_gz_io_observer<char>;

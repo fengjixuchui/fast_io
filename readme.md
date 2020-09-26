@@ -24,6 +24,9 @@ int main()
 }
 ```
 
+## Examples
+https://github.com/expnkx/fast_io_examples
+
 ## Compiler Support
 - GCC 11.
 You can download the latest GCC compiler for windows here. https://bitbucket.org/ejsvifq_mabmip/mingw-gcc/src/master/ 
@@ -92,7 +95,6 @@ A general purpose I/O library to replace stdio.h and iostream
 - Dynamic Type Support
 - Multi Process
 - Memory map
-- Cryptography (Under construction) to replace openssl
 - debugging IO
 - GUI debugging IO
 - Freestanding mode
@@ -101,7 +103,7 @@ A general purpose I/O library to replace stdio.h and iostream
 - Intrinsic SHA-1, Intrinsic HMAC-SHA1, Intrinsic SHA-256, Intrinsic HMAC-SHA256, SHA-512, HMAC-SHA512
 - zlib compression/decompression support
 - Non crypto hash algorithms support. Jenkins Hash
-- fmtlib support
+- Filesystem
 
 ## Post C++20 Plan
   1. Module support
@@ -366,3 +368,6 @@ This project is made possible by referencing from other open-source projects. (I
 |UTF-utils| https://github.com/BobSteagall/utf_utils|
 |jenkins-hash-java|https://github.com/vkandy/jenkins-hash-java |
 |md5|https://github.com/JieweiWei/md5 |
+|ReactOS|https://github.com/reactos/reactos |
+|dirent_h|https://github.com/win32ports/dirent_h|
+|GNU C library|https://www.gnu.org/software/libc/|

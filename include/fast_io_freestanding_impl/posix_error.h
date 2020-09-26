@@ -3,6 +3,7 @@
 namespace fast_io
 {
 
+
 class posix_error:public fast_io_error
 {
 public:
@@ -17,7 +18,16 @@ public:
 #endif
 	void report(error_reporter& report) const override
 	{
-		print(report,chvw(strerror(ec)));
+#ifdef _MSC_VER
+		std::array<char,256> buffer;
+		int fail{::strerror_s(buffer.data(),buffer.size(),ec)};
+		if(fail)
+			print_freestanding(report,"strerror_s() failed\n");
+		else
+			print_freestanding(report,fast_io::chvw(buffer.data()));
+#else
+		print_freestanding(report,chvw(strerror(ec)));
+#endif
 	}
 };
 
