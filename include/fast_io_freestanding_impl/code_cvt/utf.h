@@ -20,6 +20,10 @@ namespace fast_io
 template<std::integral T>
 requires ((std::unsigned_integral<T>&&sizeof(T)==2)||sizeof(T)==1)
 inline constexpr std::size_t utf_get_code_units(char32_t cdpt, T* pDst)
+/*
+ noexcept
+Has not done. Cannot be noexcept
+*/
 {
 	if constexpr(sizeof(T)==2)
 	{
@@ -67,7 +71,6 @@ inline constexpr std::size_t utf_get_code_units(char32_t cdpt, T* pDst)
 		throw fast_io_text_error("illegal utf32 code unit");
 #else
 		fast_terminate();
-		return 0;
 #endif
 	}
 
@@ -124,9 +127,9 @@ inline void convert_ascii_with_sse(T*& pSrc, U*& pDst) noexcept
 template<std::input_iterator input>
 constexpr inline uint32_t advance_with_big_table(input& pSrc, input pSrcEnd, char32_t& cdpt) noexcept
 {
-	std::array<char8_t,2> const info{utf_util_table<>::first_unit_info[static_cast<char8_t>(*pSrc)]};
-	cdpt = info.front();                                //- From it, get the initial code point value
-	std::int32_t curr{info.back()};                                 //- From it, get the second state
+	char8_t const* info{first_unit_info[static_cast<char8_t>(*pSrc)]};
+	cdpt = *info;                                //- From it, get the initial code point value
+	std::int32_t curr{info[1]};                                 //- From it, get the second state
 	for(++pSrc;12<curr;)
 	{
 		if (pSrc < pSrcEnd)[[likely]]
@@ -134,7 +137,7 @@ constexpr inline uint32_t advance_with_big_table(input& pSrc, input pSrcEnd, cha
 			char8_t const unit(*pSrc);
 			++pSrc;                                 //- Cache the current code unit
 			cdpt = (cdpt << 6) | (unit & 0x3F);             //- Adjust code point with continuation bits
-			curr = utf_util_table<>::transitions[curr + utf_util_table<>::octet_category[unit]];
+			curr = transitions[curr + octet_category[unit]];
 			//- Look up the next state
 		}
 		else
@@ -182,11 +185,23 @@ inline constexpr to_iter utf_code_convert_details(from_iter& p_src_begin_iter,fr
 						p_dst+=utf_get_code_units(cdpt, p_dst);
 				}
 				else
+				{
+#if 0
+					if constexpr(sizeof(std::iter_value_t<to_iter>)==4)
+					{
+						*p_dst=0xFFFD;
+						++p_dst;
+					}
+					else
+						p_dst+=utf_get_code_units(cdpt, p_dst);
+#else
 #ifdef __cpp_exceptions
 					throw fast_io_text_error("illegal utf8");
 #else
 					fast_terminate();
 #endif
+#endif
+				}
 			}
 		}
 
@@ -279,18 +294,33 @@ inline constexpr to_iter utf_code_convert(from_iter p_src_begin_iter,from_iter p
 	return details::utf::utf_code_convert_details<false>(p_src_begin_iter,p_src_end_iter,p_dst_iter);
 }
 
-template<std::ranges::contiguous_range rg>
-requires (std::integral<std::ranges::range_value_t<rg>>&&std::convertible_to<rg,std::basic_string_view<std::ranges::range_value_t<rg>>>)
-inline constexpr manip::code_cvt<std::basic_string_view<std::ranges::range_value_t<rg>>> code_cvt(rg&& f){return {{std::forward<rg>(f)}};}
+template<std::integral char_type>
+inline constexpr manip::code_cvt<basic_io_scatter_t<char_type>> code_cvt(basic_io_scatter_t<char_type> b) noexcept
+{
+	return {b};
+}
+
+
+template<std::integral char_type,std::size_t n>
+inline constexpr manip::code_cvt<basic_io_scatter_t<char_type>> code_cvt(char_type const(&s)[n]) noexcept
+{
+	return {{s,n-1}};
+}
+
+template<std::integral char_type>
+inline constexpr manip::code_cvt<basic_io_scatter_t<char_type>> code_cvt(std::basic_string_view<char_type> sv) noexcept
+{
+	return {{sv.data(),sv.size()}};
+}
 
 template<output_stream output,std::integral ch_type>
-inline constexpr void print_define(output& out,manip::code_cvt<std::basic_string_view<ch_type>> view)
+inline constexpr void print_define(output out,manip::code_cvt<basic_io_scatter_t<ch_type>> view)
 {
 	constexpr std::size_t coff{sizeof(typename output::char_type)<sizeof(ch_type)?2:0};
-	reserve_write(out,view.reference.size()<<coff,[&](auto ptr)
+	reserve_write(out,view.reference.len<<coff,[&](auto ptr)
 	{
-		auto refbegin{view.reference.data()};
-		return details::utf::utf_code_convert_details<false>(refbegin,view.reference.data()+view.reference.size(),ptr);
+		auto refbegin{view.reference.base};
+		return details::utf::utf_code_convert_details<false>(refbegin,view.reference.base+view.reference.len,ptr);
 	});
 }
 

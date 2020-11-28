@@ -1,8 +1,11 @@
 #pragma once
 
-#if defined(__WINNT__) || defined(_MSC_VER)
+#if defined(__WINNT__) || defined(_MSC_VER) || defined(__MSDOS__)
 #include<io.h>
-#else
+#include<sys/stat.h>
+#include<sys/types.h>
+#endif
+#ifndef _MSC_VER
 #include<unistd.h>
 #endif
 #include"systemcall_details.h"
@@ -24,12 +27,12 @@ struct io_uring;
 
 namespace fast_io
 {
-	
+
 namespace details
 {
-#if defined(__WINNT__) || defined(_MSC_VER)
+#ifdef _WIN32
 template<bool wide_char=false>
-inline constexpr int calculate_posix_open_mode_for_win32_handle(open_mode value)
+inline constexpr int calculate_posix_open_mode_for_win32_handle(open_mode value) noexcept
 {
 	int mode{};
 	if((value&open_mode::binary)!=open_mode::none)
@@ -64,8 +67,7 @@ inline constexpr int calculate_posix_open_mode_for_win32_handle(open_mode value)
 		return mode | O_APPEND;
 //Destroy contents;	Error;	"wx";	Create a file for writing
 	default:
-		throw_posix_error(EINVAL);
-		return -1;
+		return mode;
 	}
 }
 template<open_mode om>
@@ -96,30 +98,31 @@ inline constexpr int calculate_posix_open_mode(open_mode value)
 	if((value&open_mode::binary)!=open_mode::none)
 		mode |= O_BINARY;
 #endif
+	if((value&open_mode::creat)!=open_mode::none)
+		mode |= O_CREAT;
 	if((value&open_mode::excl)!=open_mode::none)
-		mode |= O_CREAT | O_EXCL;
+		mode |= O_EXCL;
 	if((value&open_mode::trunc)!=open_mode::none)
 		mode |= O_TRUNC;
 #ifdef O_DIRECT
 	if((value&open_mode::direct)!=open_mode::none)
 		mode |= O_DIRECT;
 #endif
-
 #ifdef O_SYNC
 	if((value&open_mode::sync)!=open_mode::none)
 		mode |= O_SYNC;
 #endif
-/*
-	if((value&open_mode::directory)!=open_mode::none)
-#ifdef O_DIRECTORY
-		mode |= O_DIRECTORY;
-#else
-		throw_posix_error(EOPNOTSUPP);
+#ifdef O_TTY_INIT
+	if((value&open_mode::tty_init)!=open_mode::none)
+		mode != O_TTY_INIT;
 #endif
-*/
 #ifdef O_NOCTTY
 	if((value&open_mode::no_ctty)!=open_mode::none)
 		mode |= O_NOCTTY;
+#endif
+#ifdef O_PATH
+	if((value&open_mode::path)!=open_mode::none)
+		mode |= O_PATH;
 #endif
 #ifdef O_NOATIME
 	if((value&open_mode::no_atime)!=open_mode::none)
@@ -129,9 +132,8 @@ inline constexpr int calculate_posix_open_mode(open_mode value)
 #ifdef O_NONBLOCK
 		mode |= O_NONBLOCK;
 #else
-		throw_posix_error(EOPNOTSUPP);
+		throw_posix_error(ENOTSUP);
 #endif
-
 #ifdef _O_TEMPORARY
 	if((value&open_mode::temporary)!=open_mode::none)
 		mode |= _O_TEMPORARY;
@@ -147,9 +149,16 @@ inline constexpr int calculate_posix_open_mode(open_mode value)
 		mode |= _O_RANDOM;
 #endif
 #ifdef O_LARGEFILE
-	if((value&open_mode::large_file)!=open_mode::none)
-		mode |= O_LARGEFILE;
+	mode |= O_LARGEFILE;
 #endif
+
+	if((value&open_mode::directory)!=open_mode::none)
+#ifdef O_DIRECTORY
+		mode |= O_DIRECTORY;
+#else
+		throw_posix_error(ENOTSUP);
+#endif
+
 	using utype = typename std::underlying_type<open_mode>::type;
 	constexpr auto supported_values{static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::app)|static_cast<utype>(open_mode::in)};
 	switch(static_cast<utype>(value)&static_cast<utype>(supported_values))
@@ -192,8 +201,7 @@ mode	openmode & ~ate	Action if file already exists	Action if file does not exist
 		return mode | O_RDWR | O_CREAT | O_APPEND;
 //Destroy contents;	Error;	"wx";	Create a file for writing
 	default:
-		throw_posix_error(EINVAL);
-		return 0;
+		return mode;
 	}
 }
 template<open_mode om>
@@ -203,6 +211,46 @@ struct posix_file_openmode
 };
 
 }
+
+
+
+struct posix_io_redirection
+{
+	int *pipe_fds{};
+	int fd{-1};
+	bool dev_null{};
+};
+
+struct posix_io_redirection_std:posix_io_redirection
+{
+	constexpr posix_io_redirection_std() noexcept=default;
+	template<typename T>
+	requires requires(T&& t)
+	{
+		{redirect(std::forward<T>(t))}->std::same_as<posix_io_redirection>;
+	}
+	constexpr posix_io_redirection_std(T&& t) noexcept:posix_io_redirection(redirect(std::forward<T>(t))){}
+};
+
+struct posix_process_io
+{
+	posix_io_redirection_std in;
+	posix_io_redirection_std out;
+	posix_io_redirection_std err;
+};
+
+struct posix_dev_null_t{};
+
+inline constexpr posix_dev_null_t posix_dev_null() noexcept
+{
+	return {};
+}
+
+inline constexpr posix_io_redirection redirect(posix_dev_null_t) noexcept
+{
+	return {.dev_null=true};
+}
+
 
 #ifdef __linux__
 class io_uring_observer
@@ -247,14 +295,15 @@ public:
 	{
 		return fd!=-1;
 	}
-#if defined(__WINNT__) || defined(_MSC_VER)
+#ifdef _WIN32
 	explicit operator basic_win32_io_observer<char_type>() const noexcept
 	{
-		return {bit_cast<void*>(_get_osfhandle(fd))};
+		return {reinterpret_cast<void*>(details::_get_osfhandle(fd))};
 	}
-	explicit operator basic_nt_io_observer<char_type>() const noexcept
+	template<nt_family family>
+	explicit operator basic_nt_family_io_observer<family,char_type>() const noexcept
 	{
-		return {bit_cast<void*>(_get_osfhandle(fd))};
+		return {reinterpret_cast<void*>(details::_get_osfhandle(fd))};
 	}
 #endif
 	constexpr native_handle_type release() noexcept
@@ -265,8 +314,30 @@ public:
 	}
 };
 
+#if __cpp_lib_three_way_comparison >= 201907L
+
 template<std::integral ch_type>
-inline constexpr basic_posix_io_observer<ch_type> io_value_handle(basic_posix_io_observer<ch_type> other)
+inline constexpr bool operator==(basic_posix_io_observer<ch_type> a,basic_posix_io_observer<ch_type> b)
+{
+	return a.fd==b.fd;
+}
+
+template<std::integral ch_type>
+inline constexpr auto operator<=>(basic_posix_io_observer<ch_type> a,basic_posix_io_observer<ch_type> b)
+{
+	return a.fd<=>b.fd;
+}
+
+#endif
+
+template<std::integral ch_type>
+inline constexpr posix_at_entry at(basic_posix_io_observer<ch_type> piob) noexcept
+{
+	return posix_at_entry{piob.fd};
+}
+
+template<std::integral ch_type>
+inline constexpr basic_posix_io_observer<ch_type> io_value_handle(basic_posix_io_observer<ch_type> other) noexcept
 {
 	return other;
 }
@@ -327,19 +398,13 @@ inline std::size_t posix_read_impl(int fd,void* address,std::size_t bytes_to_rea
 {
 #ifdef _WIN32
 	if constexpr(4<sizeof(std::size_t))
-		if(static_cast<std::size_t>(UINT32_MAX)<bytes_to_read)
-			bytes_to_read=static_cast<std::size_t>(UINT32_MAX);
+		if(static_cast<std::size_t>(INT32_MAX)<bytes_to_read)
+			bytes_to_read=static_cast<std::size_t>(INT32_MAX);
 #endif
 	auto read_bytes(
-#if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
-		system_call<
-#if defined(__x86_64__)
-		0
-#elif defined(__arm64__) || defined(__aarch64__)
-		63
-#endif
-		,std::ptrdiff_t>
-#elif _WIN32
+#if defined(__linux__)
+		system_call<__NR_read,std::ptrdiff_t>
+#elif _WIN32 || __MSDOS__
 		::_read
 #else
 		::read
@@ -349,45 +414,118 @@ inline std::size_t posix_read_impl(int fd,void* address,std::size_t bytes_to_rea
 	return read_bytes;
 }
 
-inline std::size_t posix_write_impl(int fd,void const* address,std::size_t bytes_to_write)
+#ifdef _WIN32
+
+inline io_scatter_status_t posix_scatter_read_impl(int fd,std::span<io_scatter_t const> sp)
+{
+	std::size_t total_size{};
+	for(std::size_t i{};i!=sp.size();++i)
+	{
+		std::size_t pos_in_span{posix_read_impl(fd,const_cast<void*>(sp[i].base),sp[i].len)};
+		total_size+=pos_in_span;
+		if(pos_in_span<sp[i].len)[[unlikely]]
+			return {total_size,i,pos_in_span};
+	}
+	return {total_size,sp.size()};
+}
+
+inline std::uint32_t posix_write_simple_impl(int fd,void const* address,std::uint32_t bytes_to_write)
+{
+	auto ret{_write(fd,address,static_cast<std::uint32_t>(bytes_to_write))};
+	if(ret==-1)
+		throw_posix_error();
+	return ret;
+}
+
+inline std::size_t posix_write_nolock_impl(int fd,void const* address,std::size_t to_write)
+{
+	if constexpr(4<sizeof(std::size_t))		//above the size of std::uint32_t, unfortunately, we cannot guarantee the atomicity of syscall
+	{
+		std::size_t written{};
+		for(;to_write;)
+		{
+			std::uint32_t to_write_this_round{INT32_MAX};
+			if(to_write<static_cast<std::size_t>(INT32_MAX))
+				to_write_this_round=static_cast<std::uint32_t>(to_write);
+			std::uint32_t number_of_bytes_written{posix_write_simple_impl(fd,address,to_write_this_round)};
+			written+=number_of_bytes_written;
+			if(number_of_bytes_written<to_write_this_round)
+				break;
+			to_write-=to_write_this_round;
+		}
+		return written;
+	}
+	else
+		return posix_write_simple_impl(fd,address,to_write);
+}
+
+
+inline std::size_t posix_write_lock_impl(int fd,void const* address,std::size_t to_write)
+{
+	auto handle{reinterpret_cast<void*>(_get_osfhandle(fd))};
+	fast_io::win32::overlapped overlap{};
+	fast_io::win32::details::file_lock_guard gd{
+		fast_io::win32::LockFileEx(handle,0x00000002,0,UINT32_MAX,UINT32_MAX,std::addressof(overlap))?
+		handle:
+		reinterpret_cast<void*>(static_cast<std::uintptr_t>(-1))
+	};
+	return posix_write_nolock_impl(fd,address,to_write);
+}
+
+
+inline io_scatter_status_t posix_scatter_write_impl(int fd,std::span<io_scatter_t const> sp)
+{
+	auto handle{reinterpret_cast<void*>(_get_osfhandle(fd))};
+	fast_io::win32::overlapped overlap{};
+	fast_io::win32::details::file_lock_guard gd{
+		fast_io::win32::LockFileEx(handle,0x00000002,0,UINT32_MAX,UINT32_MAX,std::addressof(overlap))?
+		handle:
+		reinterpret_cast<void*>(static_cast<std::uintptr_t>(-1))
+	};
+	std::size_t total_size{};
+	for(std::size_t i{};i!=sp.size();++i)
+	{
+		std::size_t written{posix_write_nolock_impl(fd,sp[i].base,sp[i].len)};
+		total_size+=written;
+		if(sp[i].len<written)[[unlikely]]
+			return {total_size,i,written};
+	}
+	return {total_size,sp.size()};
+}
+#endif
+
+inline std::size_t posix_write_impl(int fd,void const* address,std::size_t to_write)
 {
 #ifdef _WIN32
 	if constexpr(4<sizeof(std::size_t))
-		if(static_cast<std::size_t>(UINT32_MAX)<bytes_to_write)
-			bytes_to_write=static_cast<std::size_t>(UINT32_MAX);
-#endif
+	{
+		if(static_cast<std::size_t>(INT32_MAX)<to_write)[[unlikely]]
+			return posix_write_lock_impl(fd,address,to_write);
+		else
+			return posix_write_simple_impl(fd,address,to_write);
+	}
+	else
+		return posix_write_simple_impl(fd,address,to_write);
+#else
 	auto write_bytes(
-#if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
-		system_call<
-#if defined(__x86_64__)
-		1
-#elif defined(__arm64__) || defined(__aarch64__)
-		64
-#endif
-		,std::ptrdiff_t>
-#elif _WIN32
+#if defined(__linux__)
+		system_call<__NR_write,std::ptrdiff_t>
+#elif _WIN32 || __MSDOS__
 		::_write
 #else
 		::write
 #endif
-	(fd,address,bytes_to_write));
+	(fd,address,to_write));
 	system_call_throw_error(write_bytes);
 	return write_bytes;
+#endif
 }
 
-inline std::common_type_t<std::size_t,std::uint64_t> posix_seek_impl(int fd,std::common_type_t<std::ptrdiff_t,std::int64_t> offset,seekdir s)
+inline std::uintmax_t posix_seek_impl(int fd,std::intmax_t offset,seekdir s)
 {
 	auto ret(
-#if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
-		system_call<
-#if defined(__x86_64__)
-		8
-#elif defined(__arm64__) || defined(__aarch64__)
-		62
-#endif
-		,std::ptrdiff_t>
-#elif defined(__linux__)
-		::lseek64
+#if defined(__linux__)
+		system_call<__NR_lseek,std::ptrdiff_t>
 #elif defined(__WINNT__) || defined(_MSC_VER)
 		::_lseeki64
 #else
@@ -401,7 +539,7 @@ inline std::common_type_t<std::size_t,std::uint64_t> posix_seek_impl(int fd,std:
 }
 
 template<std::integral ch_type,std::contiguous_iterator Iter>
-inline Iter read(basic_posix_io_observer<ch_type> h,Iter begin,Iter end)
+[[nodiscard]] inline Iter read(basic_posix_io_observer<ch_type> h,Iter begin,Iter end)
 {
 	return begin+details::posix_read_impl(h.fd,std::to_address(begin),(end-begin)*sizeof(*begin))/sizeof(*begin);
 }
@@ -412,7 +550,7 @@ inline Iter write(basic_posix_io_observer<ch_type> h,Iter cbegin,Iter cend)
 }
 
 template<std::integral ch_type>
-inline std::common_type_t<std::size_t,std::uint64_t> seek(basic_posix_io_observer<ch_type> h,std::common_type_t<std::ptrdiff_t,std::int64_t> i=0,seekdir s=seekdir::cur)
+inline std::uintmax_t seek(basic_posix_io_observer<ch_type> h,std::intmax_t i=0,seekdir s=seekdir::cur)
 {
 	return details::posix_seek_impl(h.fd,i,s);
 }
@@ -426,40 +564,21 @@ inline void flush(basic_posix_io_observer<ch_type>)
 }
 */
 
-#if defined(_WIN32)
-template<std::integral ch_type>
-inline auto type(basic_posix_io_observer<ch_type> piob)
-{
-	return type(static_cast<basic_win32_io_observer<ch_type>>(piob));
-}
-template<std::integral ch_type>
-inline auto size(basic_posix_io_observer<ch_type> piob)
-{
-	return size(static_cast<basic_win32_io_observer<ch_type>>(piob));
-}
-#elif !defined(__NEWLIB__)
-
+#if !defined(__NEWLIB__)
 namespace details
 {
 
-inline void fstat_impl(int fd,struct stat64* st)
+#ifdef _WIN32
+using mode_t = int;
+#endif
+
+inline constexpr perms st_mode_to_perms(mode_t m) noexcept
 {
-	if(fstat64(fd,st)<0)
-		throw_posix_error();
+	return static_cast<perms>(m);
 }
 
-inline std::common_type_t<std::size_t,std::uint32_t> posix_file_size_impl(int fd)
+inline constexpr file_type st_mode_to_file_type(mode_t m) noexcept
 {
-	struct stat64 st;
-	fstat_impl(fd,std::addressof(st));
-	return st.st_size;
-}
-
-inline file_type posix_file_type_impl(int fd)
-{
-	struct stat64 st;
-	fstat_impl(fd,std::addressof(st));
-	auto m{st.st_mode};
 /*
 https://linux.die.net/man/2/fstat64
 The following POSIX macros are defined to check the file type using the st_mode field:
@@ -491,6 +610,30 @@ S_ISSOCK(m)
 
 socket? (Not in POSIX.1-1996.)
 */
+#if defined(_WIN32)
+/*
+https://github.com/Alexpux/mingw-w64/blob/master/mingw-w64-headers/crt/sys/stat.h
+
+#define _S_IFDIR 0x4000
+#define _S_IFCHR 0x2000
+#define _S_IFIFO 0x1000
+#define _S_IFREG 0x8000
+#define	_S_IFBLK 0x3000
+*/
+	if((m&0xF000)==0x8000)
+		return file_type::regular;
+	else if((m&0xF000)==0x4000)
+		return file_type::directory;
+	else if((m&0xF000)==0x2000)
+		return file_type::character;
+	else if((m&0xF000)==0x3000)
+		return file_type::block;
+	else if((m&0xF000)==0x1000)
+		return file_type::fifo;
+	else
+		return file_type::unknown;
+
+#else
 	if(S_ISREG(m))
 		return file_type::regular;
 	else if(S_ISDIR(m))
@@ -501,28 +644,78 @@ socket? (Not in POSIX.1-1996.)
 		return file_type::block;
 	else if(S_ISFIFO(m))
 		return file_type::fifo;
+#ifdef S_ISLNK
 	else if(S_ISLNK(m))
 		return file_type::symlink;
+#endif
+#ifdef S_ISSOCK
 	else if(S_ISSOCK(m))
 		return file_type::socket;
+#endif
 	else
 		return file_type::unknown;
-}
-
-}
-
-template<std::integral ch_type>
-inline std::common_type_t<std::size_t,std::uint32_t> size(basic_posix_io_observer<ch_type> piob)
-{
-	return details::posix_file_size_impl(piob.fd);
-}
-
-template<std::integral ch_type>
-inline auto type(basic_posix_io_observer<ch_type> piob)
-{
-	return details::posix_file_type_impl(piob.fd);
-}
 #endif
+}
+
+inline posix_file_status fstat_impl(int fd)
+{
+#ifdef _WIN32
+	struct __stat64 st;
+#elif defined(__MSDOS__)
+	struct stat st;
+#else
+	struct stat64 st;
+#endif
+	if(
+#ifdef _WIN32
+_fstat64
+#elif defined(__MSDOS__)
+fstat
+#else
+fstat64
+#endif
+(fd,std::addressof(st))<0)
+		throw_posix_error();
+
+	return {static_cast<std::uintmax_t>(st.st_dev),
+	static_cast<std::uintmax_t>(st.st_ino),
+	st_mode_to_perms(st.st_mode),
+	st_mode_to_file_type(st.st_mode),
+	static_cast<std::uintmax_t>(st.st_nlink),
+	static_cast<std::uintmax_t>(st.st_uid),
+	static_cast<std::uintmax_t>(st.st_gid),
+	static_cast<std::uintmax_t>(st.st_rdev),
+	static_cast<std::uintmax_t>(st.st_size),
+#if defined(_WIN32)||defined(__MSDOS__)
+	65536,
+	static_cast<std::uintmax_t>(st.st_size/512),
+	{st.st_atime,{}},{st.st_mtime,{}},{st.st_ctime,{}},
+#else
+	static_cast<std::uintmax_t>(st.st_blksize),
+	static_cast<std::uintmax_t>(st.st_blocks),st.st_atim,st.st_mtim,st.st_ctim,
+#endif
+#ifdef __BSD_VISIBLE
+	st.st_st_flags,st.st_gen
+#else
+	0,0
+#endif
+};
+}
+
+}
+
+template<std::integral ch_type>
+inline posix_file_status status(basic_posix_io_observer<ch_type> piob)
+{
+#ifdef _WIN32
+	return status(static_cast<basic_win32_io_observer<ch_type>>(piob));
+#else
+	return details::fstat_impl(piob.fd);
+#endif
+}
+
+#endif
+
 
 #if defined(__linux__) || defined(__BSD_VISIBLE)
 template<std::integral ch_type>
@@ -536,8 +729,11 @@ inline auto zero_copy_out_handle(basic_posix_io_observer<ch_type> h)
 	return h.native_handle();
 }
 #endif
+
+
+#ifdef _WIN32
 template<std::integral ch_type>
-inline auto redirect_handle(basic_posix_io_observer<ch_type> h)
+inline auto redirect_handle(basic_posix_io_observer<ch_type> h) noexcept
 {
 #if defined(_WIN32)
 	return bit_cast<void*>(_get_osfhandle(h.native_handle()));
@@ -545,6 +741,16 @@ inline auto redirect_handle(basic_posix_io_observer<ch_type> h)
 	return h.native_handle();
 #endif
 }
+#else
+
+
+template<std::integral ch_type>
+inline constexpr posix_io_redirection redirect(basic_posix_io_observer<ch_type> h) noexcept
+{
+	return {.fd=h.fd};
+}
+
+#endif
 
 #if defined(_WIN32)
 template<std::integral ch_type,typename... Args>
@@ -563,33 +769,100 @@ requires requires(basic_posix_io_observer<ch_type> h,Args&& ...args)
 }
 inline void io_control(basic_posix_io_observer<ch_type> h,Args&& ...args)
 {
-#if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
-	system_call_throw_error(system_call<
-#if defined(__x86_64__)
-		16
-#elif defined(__arm64__) || defined(__aarch64__)
-		29
-#endif
-	,int>(h.native_handle(),std::forward<Args>(args)...));
+#if defined(__linux__)
+	system_call_throw_error(system_call<__NR_ioctl,int>(h.native_handle(),std::forward<Args>(args)...));
 #else
 	if(ioctl(h.native_handle(),std::forward<Args>(args)...)==-1)
-	{
 		throw_posix_error();
-	}
 #endif
 }
 #endif
 
+namespace details
+{
+
+#ifdef _WIN32
+
+inline int open_fd_from_handle(void* handle,open_mode md)
+{
+	int fd{_open_osfhandle(bit_cast<std::intptr_t>(handle),
+		details::calculate_posix_open_mode_for_win32_handle(md))};
+	if(fd==-1)
+		throw_posix_error();
+	return fd;
+}
+
+#else
+
+template<bool always_terminate=false>
+inline int my_posix_openat(int dirfd,char const* pathname,int flags,mode_t mode)
+{
+#if defined(__NEWLIB__)||defined(__MSDOS__)
+	if constexpr(always_terminate)
+		fast_terminate();
+	else
+		throw_posix_error(ENOTSUP);
+#else
+	int fd{
+#if defined(__linux__)
+	system_call<__NR_openat,int>
+#else
+	::openat
+#endif
+	(dirfd,pathname,flags,mode)};
+	system_call_throw_error<always_terminate>(fd);
+	return fd;
+#endif
+}
+
+#ifdef __MSDOS__
+extern "C" unsigned int _dos_creat(char const*,short unsigned,int*) noexcept;
+extern "C" unsigned int _dos_creatnew(char const*,short unsigned,int*) noexcept;
+extern "C" unsigned int _dos_open(char const*,short unsigned,int*) noexcept;
+#endif
+template<bool always_terminate=false>
+inline int my_posix_open(char const* pathname,int flags,mode_t mode)
+{
+#ifdef __MSDOS__
+/*
+Referenced from
+https://dl.acm.org/doi/pdf/10.1145/70931.70935?casa_token=rWDy5JyhhkMAAAAA:BdkF0zbbWgurns3mU3yEJI2HnHXWhe6wyYGtKxjRewlEgLg6lk-cGGNLZTTdr3vUjtFg6Cnia2b4
+An Example of Multiple Inheritance in C++: A Model of the Iostream Library
+*/
+	int fd{-1};
+	unsigned int ret{};
+	if(((flags&O_CREAT)==O_CREAT))
+	{
+		if((flags&O_EXCL)!=O_EXCL)
+			ret=_dos_creat(pathname,0,&fd);
+		else
+			ret=_dos_creatnew(pathname,0,&fd);
+	}
+	else
+		ret=_dos_open(pathname,flags,&fd);
+	if(ret)
+	{
+		if constexpr(always_terminate)
+			fast_terminate();
+		else
+			throw_posix_error();
+	}
+	return fd;
+#elif defined(__NEWLIB__)
+	int fd{::open(pathname,flags,mode)};
+	system_call_throw_error<always_terminate>(fd);
+	return fd;
+#else
+	return my_posix_openat<always_terminate>(AT_FDCWD,pathname,flags,mode);
+#endif
+}
+#endif
+}
+
 template<std::integral ch_type>
 class basic_posix_file:public basic_posix_io_handle<ch_type>
 {
-	void seek_end_local()
-	{
-		basic_posix_file<ch_type> local{this->native_handle()};
-		seek(*this,0,seekdir::end);
-		local.release();
-	};
-#if defined(__WINNT__) || defined(_MSC_VER)
+#ifdef _WIN32
 	using mode_t = int;
 #endif
 public:
@@ -603,179 +876,41 @@ public:
 
 	basic_posix_file(io_dup_t,basic_posix_io_observer<ch_type> piob):basic_posix_io_handle<ch_type>(details::sys_dup(piob.native_handle()))
 	{}
-
-#if !defined(_WIN32)&&!defined(__NEWLIB__)
-	template<typename ...Args>
-	requires requires(Args&& ...args)
-	{
-		{::openat(std::forward<Args>(args)...)}->std::same_as<int>;
-	}
-	basic_posix_file(io_at_t,native_interface_t,Args&& ...args):basic_posix_io_handle<ch_type>(
-#if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
-		system_call<
-#if defined(__x86_64__)
-		257
-#elif defined(__arm64__) || defined(__aarch64__)
-		56
-#endif
-		,int>
-#else
-		::openat
-#endif
-		(std::forward<Args>(args)...))
-	{
-		system_call_throw_error(native_handle());
-	}
-#endif
-	template<typename ...Args>
-	requires requires(Args&& ...args)
-	{
-		{
-#if defined(__WINNT__) || defined(_MSC_VER)
-			::_open(
-#elif defined(__NEWLIB__)
-			::open(
-#else
-			::openat(AT_FDCWD,
-#endif
-		std::forward<Args>(args)...)}->std::same_as<int>;
-	}
-	basic_posix_file(native_interface_t,Args&& ...args):basic_posix_io_handle<ch_type>(
-#if defined(__WINNT__) || defined(_MSC_VER)
-			::_open(
-#elif defined(__NEWLIB__)
-			::open(
-#else
-#if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
-		system_call<
-#if defined(__x86_64__)
-		257
-#elif defined(__arm64__) || defined(__aarch64__)
-		56
-#endif
-		,int>(AT_FDCWD,
-#else
-		::openat(AT_FDCWD,
-#endif
-#endif
-	std::forward<Args>(args)...))
-	{
-		system_call_throw_error(native_handle());
-	}
 #if defined(_WIN32)
 //windows specific. open posix file from win32 io handle
-	template<open_mode om>
-	basic_posix_file(basic_win32_io_handle<char_type>&& hd,open_interface_t<om>):
-		basic_posix_io_handle<char_type>(::_open_osfhandle(bit_cast<std::intptr_t>(hd.native_handle()),details::posix_file_openmode_for_win32_handle<om>::mode))
-	{
-		if(native_handle()==-1)
-			throw_posix_error();
-		hd.release();
-	}
 	basic_posix_file(basic_win32_io_handle<char_type>&& hd,open_mode m):
-		basic_posix_io_handle<char_type>(::_open_osfhandle(bit_cast<std::intptr_t>(hd.native_handle()),details::calculate_posix_open_mode_for_win32_handle(m)))
+		basic_posix_io_handle<char_type>{details::open_fd_from_handle(hd.handle,m)}
 	{
-		if(native_handle()==-1)
-			throw_posix_error();
 		hd.release();
 	}
-	template<open_mode om,typename... Args>
-	basic_posix_file(cstring_view file,open_interface_t<om>,Args&& ...args):
-		basic_posix_file(basic_win32_file<char_type>(file,open_interface<om>,std::forward<Args>(args)...),open_interface<om>)
+	template<nt_family family>
+	basic_posix_file(basic_nt_family_io_handle<family,char_type>&& hd,open_mode m):
+		basic_posix_io_handle<char_type>{details::open_fd_from_handle(hd.handle,m)}
+	{
+		hd.release();
+	}
+	basic_posix_file(cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_posix_file(basic_win32_file<char_type>(file,om,pm),om)
 	{}
-	template<typename... Args>
-	basic_posix_file(cstring_view file,open_mode om,Args&& ...args):
-		basic_posix_file(basic_win32_file<char_type>(file,om,std::forward<Args>(args)...),om)
+	basic_posix_file(wcstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_posix_file(basic_win32_file<char_type>(file,om,pm),om)
 	{}
-
-	template<open_mode om,typename... Args>
-	basic_posix_file(io_async_t,io_async_observer ioa,cstring_view file,open_interface_t<om>,Args&& ...args):
-		basic_posix_file(basic_win32_file<char_type>(io_async,ioa,file,open_interface<om>,std::forward<Args>(args)...),open_interface<om>)
+	basic_posix_file(nt_at_entry nate,cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_posix_file(basic_win32_file<char_type>(nate,file,om,pm),om)
 	{}
-	template<typename... Args>
-	basic_posix_file(io_async_t,io_async_observer ioa,cstring_view file,open_mode om,Args&& ...args):
-		basic_posix_file(basic_win32_file<char_type>(io_async,ioa,file,om,std::forward<Args>(args)...),om)
-	{}
-
-
-
-	template<open_mode om,typename... Args>
-	basic_posix_file(io_at_t,win32_io_observer wiob,cstring_view file,open_interface_t<om>,Args&& ...args):
-		basic_posix_file(basic_win32_file<char_type>(io_at,wiob,file,open_interface<om>,std::forward<Args>(args)...),open_interface<om>)
-	{}
-	template<typename... Args>
-	basic_posix_file(io_at_t,win32_io_observer wiob,cstring_view file,open_mode om,Args&& ...args):
-		basic_posix_file(basic_win32_file<char_type>(io_at,wiob,file,om,std::forward<Args>(args)...),om)
-	{}
-
-	template<open_mode om,typename... Args>
-	basic_posix_file(io_async_t,io_async_observer ioa,io_at_t,win32_io_observer wiob,cstring_view file,open_interface_t<om>,Args&& ...args):
-		basic_posix_file(basic_win32_file<char_type>(io_async,ioa,at,wiob,file,open_interface<om>,std::forward<Args>(args)...),open_interface<om>)
-	{}
-	template<typename... Args>
-	basic_posix_file(io_async_t,io_async_observer ioa,io_at_t,win32_io_observer wiob,cstring_view file,open_mode om,Args&& ...args):
-		basic_posix_file(basic_win32_file<char_type>(io_async,ioa,at,wiob,file,om,std::forward<Args>(args)...),om)
+	basic_posix_file(nt_at_entry nate,wcstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_posix_file(basic_win32_file<char_type>(nate,file,om,pm),om)
 	{}
 #else
-	template<open_mode om,perms pm>
-	basic_posix_file(cstring_view file,open_interface_t<om>,perms_interface_t<pm>):basic_posix_file(native_interface,file.data(),details::posix_file_openmode<om>::mode,static_cast<mode_t>(pm))
-	{
-		if constexpr ((om&open_mode::ate)!=open_mode::none)
-			seek_end_local();
-	}
-	template<open_mode om>
-	basic_posix_file(cstring_view file,open_interface_t<om>):basic_posix_file(native_interface,file.data(),details::posix_file_openmode<om>::mode,static_cast<mode_t>(436))
-	{
-		if constexpr ((om&open_mode::ate)!=open_mode::none)
-			seek_end_local();
-	}
-	template<open_mode om>
-	basic_posix_file(cstring_view file,open_interface_t<om>,perms pm):basic_posix_file(native_interface,file.data(),details::posix_file_openmode<om>::mode,static_cast<mode_t>(pm))
-	{
-		if constexpr ((om&open_mode::ate)!=open_mode::none)
-			seek_end_local();
-	}
 	//potential support modification prv in the future
-	basic_posix_file(cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):basic_posix_file(native_interface,file.data(),details::calculate_posix_open_mode(om),static_cast<mode_t>(pm))
+	basic_posix_file(cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):basic_posix_file(details::my_posix_open(file.data(),details::calculate_posix_open_mode(om),static_cast<mode_t>(pm)))
 	{
-		if((om&open_mode::ate)!=open_mode::none)
-			seek_end_local();
 	}
-
-#ifndef __NEWLIB__
-	template<open_mode om,perms pm>
-	basic_posix_file(io_at_t,basic_posix_io_observer<char> diriob,cstring_view file,open_interface_t<om>,perms_interface_t<pm>):basic_posix_file(io_at,native_interface,diriob.fd,file.data(),details::posix_file_openmode<om>::mode,static_cast<mode_t>(pm))
+	basic_posix_file(posix_at_entry pate,cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):basic_posix_file(details::my_posix_openat(pate.fd,file.data(),details::calculate_posix_open_mode(om),static_cast<mode_t>(pm)))
 	{
-		if constexpr ((om&open_mode::ate)!=open_mode::none)
-			seek_end_local();
 	}
-	template<open_mode om>
-	basic_posix_file(io_at_t,basic_posix_io_observer<char> diriob,cstring_view file,open_interface_t<om>):basic_posix_file(io_at,native_interface,diriob.fd,file.data(),details::posix_file_openmode<om>::mode,static_cast<mode_t>(436))
-	{
-		if constexpr ((om&open_mode::ate)!=open_mode::none)
-			seek_end_local();
-	}
-	template<open_mode om>
-	basic_posix_file(io_at_t,basic_posix_io_observer<char> diriob,cstring_view file,open_interface_t<om>,perms pm):basic_posix_file(io_at,native_interface,diriob.fd,file.data(),details::posix_file_openmode<om>::mode,static_cast<mode_t>(pm))
-	{
-		if constexpr ((om&open_mode::ate)!=open_mode::none)
-			seek_end_local();
-	}
-	//potential support modification prv in the future
-	basic_posix_file(io_at_t,basic_posix_io_observer<char> diriob,cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):basic_posix_file(io_at,native_interface,diriob.fd,file.data(),details::calculate_posix_open_mode(om),static_cast<mode_t>(pm))
-	{
-		if((om&open_mode::ate)!=open_mode::none)
-			seek_end_local();
-	}
-#endif
 
 #ifdef __linux__
-	template<typename ...Args>
-	basic_posix_file(io_async_t,io_uring_observer,cstring_view file,Args&& ...args):basic_posix_file(file,std::forward<Args>(args)...){}
-
-	template<typename ...Args>
-	basic_posix_file(io_async_t,io_uring_observer,io_at_t,basic_posix_io_observer<char> diriob,cstring_view file,Args&& ...args):basic_posix_file(io_at,diriob,file,std::forward<Args>(args)...){}
-
 /*
 To verify whether O_TMPFILE is a thing on FreeBSD. https://github.com/FreeRDP/FreeRDP/pull/6268
 */
@@ -807,9 +942,9 @@ To verify whether O_TMPFILE is a thing on FreeBSD. https://github.com/FreeRDP/Fr
 };
 #if !defined(__NEWLIB__)
 template<std::integral ch_type>
-inline void truncate(basic_posix_io_observer<ch_type> h,std::size_t size)
+inline void truncate(basic_posix_io_observer<ch_type> h,std::uintmax_t size)
 {
-#if defined(__WINNT__) || defined(_MSC_VER)
+#ifdef _WIN32
 	auto err(_chsize_s(h.native_handle(),size));
 	if(err)
 		throw_posix_error(err);
@@ -871,13 +1006,22 @@ inline void flush(basic_posix_pipe<ch_type>&)
 //		if(::fsync(fd)==-1)
 //			throw posix_error();
 }
-
+#ifdef _WIN32
 template<std::integral ch_type>
 inline std::array<int*,2> redirect_handle(basic_posix_pipe<ch_type>& h)
 {
 	return {std::addressof(h.in().native_handle()),
 		std::addressof(h.out().native_handle())};
 }
+#else
+template<std::integral ch_type>
+inline constexpr posix_io_redirection redirect(basic_posix_pipe<ch_type>& h) noexcept
+{
+	return {.pipe_fds=std::addressof(h.in().fd)};
+}
+
+#endif
+
 
 #ifdef __linux__
 template<std::integral ch_type>
@@ -897,21 +1041,33 @@ using posix_io_handle=basic_posix_io_handle<char>;
 using posix_file=basic_posix_file<char>;
 using posix_pipe=basic_posix_pipe<char>;
 
+#ifndef __MSDOS__
+using wposix_io_observer=basic_posix_io_observer<wchar_t>;
+using wposix_io_handle=basic_posix_io_handle<wchar_t>;
+using wposix_file=basic_posix_file<wchar_t>;
+using wposix_pipe=basic_posix_pipe<wchar_t>;
+#endif
+
 using u8posix_io_observer=basic_posix_io_observer<char8_t>;
 using u8posix_io_handle=basic_posix_io_handle<char8_t>;
 using u8posix_file=basic_posix_file<char8_t>;
 using u8posix_pipe=basic_posix_pipe<char8_t>;
 
-using wposix_io_observer=basic_posix_io_observer<wchar_t>;
-using wposix_io_handle=basic_posix_io_handle<wchar_t>;
-using wposix_file=basic_posix_file<wchar_t>;
-using wposix_pipe=basic_posix_pipe<wchar_t>;
+using u16posix_io_observer=basic_posix_io_observer<char16_t>;
+using u16posix_io_handle=basic_posix_io_handle<char16_t>;
+using u16posix_file=basic_posix_file<char16_t>;
+using u16posix_pipe=basic_posix_pipe<char16_t>;
+
+using u32posix_io_observer=basic_posix_io_observer<char32_t>;
+using u32posix_io_handle=basic_posix_io_handle<char32_t>;
+using u32posix_file=basic_posix_file<char32_t>;
+using u32posix_pipe=basic_posix_pipe<char32_t>;
 
 inline int constexpr posix_stdin_number = 0;
 inline int constexpr posix_stdout_number = 1;
 inline int constexpr posix_stderr_number = 2;
 
-#if defined(__linux__)||(defined(__BSD_VISIBLE)&&!defined(__NEWLIB__))
+#if defined(__linux__)
 
 //zero copy IO for linux
 
@@ -921,10 +1077,10 @@ namespace details
 
 template<bool random_access=false,bool report_einval=false,zero_copy_output_stream output,zero_copy_input_stream input>
 inline std::conditional_t<report_einval,std::pair<std::size_t,bool>,std::size_t>
-	zero_copy_transmit_once(output& outp,input& inp,std::size_t bytes,std::common_type_t<std::ptrdiff_t,std::int64_t> offset)
+	zero_copy_transmit_once(output& outp,input& inp,std::size_t bytes,std::intmax_t offset)
 {
 #ifdef __linux__
-	std::common_type_t<std::ptrdiff_t,std::int64_t> *np{};
+	std::intmax_t *np{};
 	if constexpr(random_access)
 		np=std::addressof(offset);
 	auto transmitted_bytes(::sendfile(zero_copy_out_handle(outp),zero_copy_in_handle(inp),np,bytes));
@@ -954,11 +1110,11 @@ inline std::conditional_t<report_einval,std::pair<std::size_t,bool>,std::size_t>
 
 
 template<bool random_access=false,bool report_einval=false,zero_copy_output_stream output,zero_copy_input_stream input>
-inline std::conditional_t<report_einval,std::pair<std::common_type_t<std::size_t,std::uint64_t>,bool>,std::common_type_t<std::size_t,std::uint64_t>> zero_copy_transmit
-(output& outp,input& inp,std::common_type_t<std::size_t,std::uint64_t> bytes,std::common_type_t<std::ptrdiff_t,std::int64_t> offset)
+inline std::conditional_t<report_einval,std::pair<std::uintmax_t,bool>,std::uintmax_t> zero_copy_transmit
+(output& outp,input& inp,std::uintmax_t bytes,std::intmax_t offset)
 {
 	constexpr std::size_t maximum_transmit_bytes(2147479552);
-	std::common_type_t<std::size_t,std::uint64_t> transmitted{};
+	std::uintmax_t transmitted{};
 	for(;bytes;)
 	{
 		std::size_t should_transfer(maximum_transmit_bytes);
@@ -990,10 +1146,10 @@ inline std::conditional_t<report_einval,std::pair<std::common_type_t<std::size_t
 		return transmitted;
 }
 template<bool random_access=false,bool report_einval=false,zero_copy_output_stream output,zero_copy_input_stream input>
-inline std::conditional_t<report_einval,std::pair<std::common_type_t<std::size_t,std::uint64_t>,bool>,std::common_type_t<std::size_t,std::uint64_t>> zero_copy_transmit(output& outp,input& inp,std::common_type_t<std::ptrdiff_t,std::int64_t> offset)
+inline std::conditional_t<report_einval,std::pair<std::uintmax_t,bool>,std::uintmax_t> zero_copy_transmit(output& outp,input& inp,std::intmax_t offset)
 {
 	constexpr std::size_t maximum_transmit_bytes(2147479552);
-	for(std::common_type_t<std::size_t,std::uint64_t> transmitted{};;)
+	for(std::uintmax_t transmitted{};;)
 	{
 		std::size_t transferred_this_round{};
 		auto ret(details::zero_copy_transmit_once<random_access,report_einval>(outp,inp,maximum_transmit_bytes,offset));
@@ -1060,7 +1216,6 @@ inline void async_read_callback(io_async_observer ioa,basic_posix_io_observer<ch
 	async_read_callback(ioa,static_cast<basic_win32_io_observer<char_type>>(h),std::forward<Args>(args)...);
 }
 
-
 #else
 template<std::integral char_type=char>
 inline constexpr basic_posix_io_observer<char_type> native_stdin()
@@ -1077,40 +1232,22 @@ inline constexpr basic_posix_io_observer<char_type> native_stderr()
 {
 	return basic_posix_io_observer<char_type>{posix_stderr_number};
 }
-/*
-template<std::integral ch_type>
-inline std::size_t scatter_read(basic_posix_io_observer<ch_type> h,std::span<io_scatter_t> sp)
-{
-	return h.fd;
-}
-template<std::integral ch_type>
-inline std::size_t scatter_write(basic_posix_io_observer<ch_type> h,std::span<io_scatter_t> sp)
-{
-}*/
 
-#ifndef __NEWLIB__
+#if !defined(__NEWLIB__) && !defined(__MSDOS__)
 namespace details
 {
 
 struct __attribute__((__may_alias__)) iovec_may_alias:iovec
 {};
 
-inline std::size_t posix_scatter_read_impl(int fd,std::span<io_scatter_t const> sp)
+inline std::size_t posix_scatter_read_size_impl(int fd,std::span<io_scatter_t const> sp)
 {
-
-#if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
+#if defined(__linux__)
 	static_assert(sizeof(unsigned long)==sizeof(std::size_t));
-	auto val{system_call<
-#if defined(__x86_64__)
-		19
-#elif defined(__arm64__) || defined(__aarch64__) 
-		65
-#endif
-,std::ptrdiff_t>(static_cast<unsigned int>(fd),sp.data(),sp.size())};
+	auto val{system_call<__NR_readv,std::ptrdiff_t>(static_cast<unsigned int>(fd),sp.data(),sp.size())};
 	system_call_throw_error(val);
 	return val;
 #else
-
 	std::size_t sz{sp.size()};
 	if(static_cast<std::size_t>(std::numeric_limits<int>::max())<sz)
 		sz=static_cast<std::size_t>(std::numeric_limits<int>::max());
@@ -1122,18 +1259,11 @@ inline std::size_t posix_scatter_read_impl(int fd,std::span<io_scatter_t const> 
 #endif
 }
 
-inline std::size_t posix_scatter_write_impl(int fd,std::span<io_scatter_t const> sp)
+inline std::size_t posix_scatter_write_size_impl(int fd,std::span<io_scatter_t const> sp)
 {
-
-#if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
+#if defined(__linux__)
 	static_assert(sizeof(unsigned long)==sizeof(std::size_t));
-	auto val{system_call<
-#if defined(__x86_64__)
-		20
-#else
-		66
-#endif
-,std::ptrdiff_t>(static_cast<unsigned int>(fd),sp.data(),sp.size())};
+	auto val{system_call<__NR_writev,std::ptrdiff_t>(static_cast<unsigned int>(fd),sp.data(),sp.size())};
 	system_call_throw_error(val);
 	return val;
 #else
@@ -1148,39 +1278,59 @@ inline std::size_t posix_scatter_write_impl(int fd,std::span<io_scatter_t const>
 #endif
 }
 
+inline constexpr io_scatter_status_t scatter_size_to_status(std::size_t sz,std::span<io_scatter_t const> sp) noexcept
+{
+	std::size_t total{sz};
+	for(std::size_t i{};i!=sp.size();++i)
+	{
+		if(total<sp[i].len)[[unlikely]]
+			return {sz,i,total};
+		total-=sp[i].len;
+	}
+	return {sz,sp.size()};
 }
 
-template<std::integral ch_type,typename... Args>
-inline auto scatter_read(basic_posix_io_observer<ch_type> h,Args&& ...args)
+inline io_scatter_status_t posix_scatter_write_impl(int fd,std::span<io_scatter_t const> sp)
 {
-	return details::posix_scatter_read_impl(h.fd,std::forward<Args>(args)...);
+	return scatter_size_to_status(posix_scatter_write_size_impl(fd,sp),sp);
 }
 
-template<std::integral ch_type,typename... Args>
-inline auto scatter_write(basic_posix_io_observer<ch_type> h,Args&& ...args)
+[[nodiscard]] inline io_scatter_status_t posix_scatter_read_impl(int fd,std::span<io_scatter_t const> sp)
 {
-	return details::posix_scatter_write_impl(h.fd,std::forward<Args>(args)...);
+	return scatter_size_to_status(posix_scatter_read_size_impl(fd,sp),sp);
 }
 
-template<std::integral ch_type,typename... Args>
-inline auto scatter_read(basic_posix_pipe<ch_type>& h,Args&& ...args)
-{
-	return details::posix_scatter_read_impl(h.in().fd,std::forward<Args>(args)...);
 }
 
-template<std::integral ch_type,typename... Args>
-inline auto scatter_write(basic_posix_pipe<ch_type>& h,Args&& ...args)
-{
-	return details::posix_scatter_write_impl(h.out().fd,std::forward<Args>(args)...);
-}
 #endif
 #endif
 
-template<std::integral char_type>
-inline constexpr int print_alias_define(io_alias_t,basic_posix_io_observer<char_type> v)
+#if !defined(__NEWLIB__) && !defined(__MSDOS__)
+
+template<std::integral ch_type>
+[[nodiscard]] inline io_scatter_status_t scatter_read(basic_posix_io_observer<ch_type> h,std::span<io_scatter_t const> sp)
 {
-	return v.fd;
+	return details::posix_scatter_read_impl(h.fd,sp);
 }
 
+template<std::integral ch_type>
+inline io_scatter_status_t scatter_write(basic_posix_io_observer<ch_type> h,std::span<io_scatter_t const> sp)
+{
+	return details::posix_scatter_write_impl(h.fd,sp);
+}
+
+template<std::integral ch_type>
+inline io_scatter_status_t scatter_read(basic_posix_pipe<ch_type>& h,std::span<io_scatter_t const> sp)
+{
+	return details::posix_scatter_read_impl(h.in().fd,sp);
+}
+
+template<std::integral ch_type>
+inline io_scatter_status_t scatter_write(basic_posix_pipe<ch_type>& h,std::span<io_scatter_t const> sp)
+{
+	return details::posix_scatter_write_impl(h.out().fd,sp);
+}
+
+#endif
 
 }

@@ -27,6 +27,14 @@ int main()
 ## Examples
 https://github.com/expnkx/fast_io_examples
 
+Deprecated examples are in
+https://bitbucket.org/ejsvifq_mabmip/fast_io_deprecated
+
+However, they might not work current fast_io since fast_io keeps changing.
+
+This i18n repo stores the i18n source files.
+https://bitbucket.org/ejsvifq_mabmip/fast_io_i18n
+
 ## Compiler Support
 - GCC 11.
 You can download the latest GCC compiler for windows here. https://bitbucket.org/ejsvifq_mabmip/mingw-gcc/src/master/ 
@@ -39,8 +47,9 @@ For Linux, you can watch this video to help you install the latest GCC easily. h
 - Windows
 - Linux
 - BSD platforms (Including FreeBSD, NetBSD, OpenBSD and Mac)
+- Microsoft DOS
 - Barebone (No any operating system.)
-- Todo: Webassembly, DOS
+- Todo: Webassembly
 
 ## Supported libc FILE* hacks platforms
 - glibc
@@ -48,6 +57,7 @@ For Linux, you can watch this video to help you install the latest GCC easily. h
 - Universal CRT
 - BSD libc
 - MUSL libc
+- MSDOS CRT
 - Newlib (Compilation success. Luckily newlib shares the same code as BSD libc. However, we still need to test on a bare bone operating system.)
 - To do (before we supported them, they will be emulated with POSIX apis):
 - Bionic
@@ -57,12 +67,16 @@ For Linux, you can watch this video to help you install the latest GCC easily. h
 - LLVM libc++
 - MSVC STL
 
+## Special Support
+- LLVM Address Sanitizer
+
 ## Design Goal
 
 A general purpose I/O library to replace stdio.h and iostream
 
 - As close to system call as possible.
 - No default locale. It is optional.
+- To do. Correctly deal with EBCDIC exec-charset (where no libc correctly deals it).
 
 ### Safe
 
@@ -72,6 +86,7 @@ A general purpose I/O library to replace stdio.h and iostream
 - No dual error reporting mechanism. Exception as the ONLY error reporting mechanism.
 - No std::error_code and std::system_error
 - No useless bounds checking
+- Addresss Sanitizer special code for protecting memory safety issues.
 
 ### Easy to use
 

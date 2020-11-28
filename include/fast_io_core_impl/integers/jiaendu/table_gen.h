@@ -3,7 +3,16 @@
 namespace fast_io::details::jiaendu
 {
 
-inline constexpr auto calculate_offset()
+template<typename T>
+inline constexpr char8_t cal_ebcdic_start(char8_t start) noexcept
+{
+	if constexpr(exec_charset_is_ebcdic<std::remove_cvref_t<T>>())
+		if(start==u8'0')
+			return 0xF0;
+	return start;
+}
+
+inline constexpr auto calculate_offset() noexcept
 {
 	std::array<char8_t,1000> gen{};
 	for(std::size_t i(0);i!=10;++i)
@@ -14,20 +23,11 @@ inline constexpr auto calculate_offset()
 		gen[i]=3;
 	return gen;
 }
-/*
-template<typename T>
-inline constexpr auto calculate_table1()
-{
-	std::array<std::array<T,4>,10> gen{};
-	for(char8_t i(0);i!=gen.size();++i)
-		gen[i].front()=i+u8'0';
-	return gen;
-}
-*/
 
-template<typename T,char8_t start>
-inline constexpr auto calculate_table2()
+template<typename T>
+inline constexpr auto calculate_table2(char8_t start) noexcept
 {
+	start=cal_ebcdic_start<T>(start);
 	std::array<std::array<T,2>,100> gen{};
 	for(char8_t i(0);i!=10;++i)
 		for(char8_t j(0);j!=10;++j)
@@ -39,9 +39,10 @@ inline constexpr auto calculate_table2()
 		}
 	return gen;
 }
-template<typename T,char8_t start>
-inline constexpr auto calculate_table3()
+template<typename T>
+inline constexpr auto calculate_table3(char8_t start) noexcept
 {
+	start=cal_ebcdic_start<T>(start);
 	std::array<std::array<T,4>,1000> gen{};
 	for(char8_t i(0);i!=10;++i)
 		for(char8_t j(0);j!=10;++j)
@@ -57,9 +58,10 @@ inline constexpr auto calculate_table3()
 			}
 	return gen;
 }
-template<typename T,char8_t start>
-inline constexpr auto calculate_table4()
+template<typename T>
+inline constexpr auto calculate_table4(char8_t start) noexcept
 {
+	start=cal_ebcdic_start<T>(start);
 	std::array<std::array<T,4>,10000> gen{};
 	for(char8_t i(0);i!=10;++i)
 		for(char8_t j(0);j!=10;++j)
@@ -77,9 +79,10 @@ inline constexpr auto calculate_table4()
 				}
 	return gen;
 }
-template<typename T,char8_t start>
-inline constexpr auto calculate_table5()
+template<typename T>
+inline constexpr auto calculate_table5(char8_t start) noexcept
 {
+	start=cal_ebcdic_start<T>(start);
 	std::array<std::array<T,4>,1000> gen{};
 	for(char8_t i(0);i!=10;++i)
 		gen[i].front()=i+start;
@@ -116,14 +119,15 @@ template<std::integral ch_type = char8_t,char8_t start=u8'0'>
 class static_tables
 {
 public:
-//Is table 1 useless??
-	using type = std::conditional_t<sizeof(ch_type)==1,char8_t,
+	using type = std::conditional_t<
+		exec_charset_is_ebcdic<std::remove_cvref_t<ch_type>>(),ch_type,
+		std::conditional_t<sizeof(ch_type)==1,char8_t,
 		std::conditional_t<sizeof(ch_type)==2,char16_t,
-		std::conditional_t<sizeof(ch_type)==4,char32_t,ch_type>>>;
-	inline static constexpr auto table2{calculate_table2<type,start>()};
-	inline static constexpr auto table3{calculate_table3<type,start>()};
-	inline static constexpr auto table4{calculate_table4<type,start>()};
-	inline static constexpr auto table5{calculate_table5<type,start>()};
+		std::conditional_t<sizeof(ch_type)==4,char32_t,ch_type>>>>;
+	inline static constexpr auto table2{calculate_table2<type>(start)};
+	inline static constexpr auto table3{calculate_table3<type>(start)};
+	inline static constexpr auto table4{calculate_table4<type>(start)};
+	inline static constexpr auto table5{calculate_table5<type>(start)};
 };
 
 }

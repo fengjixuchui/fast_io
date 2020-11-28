@@ -3,8 +3,8 @@
 namespace fast_io
 {
 
-template<std::floating_point fp_type,buffer_output_stream output,character_input_stream input>
-inline constexpr bool scan_reserve_transmit(io_reserve_type_t<fp_type>,output& out,input& in)
+template<std::integral char_type,std::floating_point fp_type,buffer_output_stream output,character_input_stream input>
+inline constexpr bool scan_reserve_transmit(io_reserve_type_t<char_type,fp_type>,output& out,input& in)
 {
 	constexpr auto sgn{st_single([](char8_t ch)
 	{
@@ -27,7 +27,7 @@ namespace details::ryu
 {
 
 template<std::floating_point floating_type>
-inline constexpr typename floating_traits<floating_type>::mantissa_type me10_to_me2_revamp(typename floating_traits<floating_type>::mantissa_type m10,std::int32_t e10)
+inline constexpr typename floating_traits<floating_type>::mantissa_type me10_to_me2_revamp(typename floating_traits<floating_type>::mantissa_type m10,std::int32_t e10) noexcept
 {
 	using floating_trait = floating_traits<floating_type>;
 	using mantissa_type = typename floating_trait::mantissa_type;
@@ -101,7 +101,7 @@ inline constexpr typename floating_traits<floating_type>::mantissa_type me10_to_
 }
 
 template<bool end_test,std::contiguous_iterator Iter,std::floating_point fp_type>
-inline constexpr Iter real_sto(Iter begin,Iter end,fp_type& t)
+inline constexpr Iter real_sto(Iter begin,Iter end,fp_type& t) noexcept
 {
 	using char_type = std::iter_value_t<Iter>;
 	using floating_type = std::remove_cvref_t<fp_type>;
@@ -283,8 +283,8 @@ inline constexpr Iter real_sto(Iter begin,Iter end,fp_type& t)
 }
 }
 
-template<std::floating_point fp_type,bool end_test,std::contiguous_iterator Iter,typename T>
-inline constexpr auto space_scan_reserve_define(io_reserve_type_t<fp_type,end_test>,Iter begin,Iter end,T& t)
+template<std::integral char_type,std::floating_point fp_type,bool end_test,std::contiguous_iterator Iter,typename T>
+inline constexpr auto space_scan_reserve_define(io_reserve_type_t<char_type,fp_type,end_test>,Iter begin,Iter end,T& t)
 {
 	if constexpr(std::same_as<std::remove_cvref_t<fp_type>,long double>)
 	{

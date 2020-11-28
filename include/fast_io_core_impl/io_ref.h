@@ -3,34 +3,13 @@
 namespace fast_io
 {
 
-template<bool pass_by_value,typename T>
-struct io_print_define_rv_wrapper
-{
-	using value_type = T;
-	[[no_unique_address]] std::conditional_t<pass_by_value,T,T const*> value;
-	inline constexpr auto& operator*() noexcept
-	{
-		if constexpr(pass_by_value)
-			return value;
-		else
-			return *value;
-	}
-	inline constexpr auto& operator*() const noexcept
-	{
-		if constexpr(pass_by_value)
-			return value;
-		else
-			return *value;
-	}
-};
-
 template<typename T>
 inline constexpr auto io_forward(T const& t) noexcept
 {
-	if constexpr(std::is_trivially_copyable_v<T>&&sizeof(t)<=(sizeof(std::size_t)<<1))		//predict the cost of passing by value
-		return io_print_define_rv_wrapper<true,std::remove_reference_t<T>>{t};
+	if constexpr(std::is_trivially_copyable_v<T>&&sizeof(t)<=alignof(std::max_align_t))		//predict the cost of passing by value
+		return std::remove_cvref_t<T>(t);
 	else
-		return io_print_define_rv_wrapper<false,std::remove_reference_t<T>>{std::addressof(t)};
+		return parameter<std::remove_reference_t<T>>{t};
 }
 
 template<stream stm>
@@ -52,8 +31,8 @@ struct io_reference_wrapper
 		return ptr->unlocked_handle();
 	}
 };
-template<stream strm>
-inline constexpr auto io_ref(strm& stm)
+template<typename strm>
+inline constexpr auto io_ref(strm& stm) noexcept
 {
 	if constexpr(value_based_stream<std::remove_cvref_t<strm>>)
 		return io_value_handle(stm);
@@ -172,6 +151,23 @@ constexpr decltype(auto) ibuffer_cap(io_reference_wrapper<input> in)
 	return ibuffer_cap(*in.ptr);
 }
 
+template<buffer_input_stream input>
+constexpr decltype(auto) ibuffer_begin(io_reference_wrapper<input> in)
+{
+	return ibuffer_begin(*in.ptr);
+}
+
+template<buffer_input_stream input>
+constexpr decltype(auto) ibuffer_curr(io_reference_wrapper<input> in)
+{
+	return ibuffer_curr(*in.ptr);
+}
+template<buffer_input_stream input>
+constexpr decltype(auto) ibuffer_end(io_reference_wrapper<input> in)
+{
+	return ibuffer_end(*in.ptr);
+}
+
 template<buffer_input_stream input,typename... Args>
 constexpr decltype(auto) ibuffer_set_curr(io_reference_wrapper<input> in,Args&& ...args)
 {
@@ -230,7 +226,7 @@ constexpr decltype(auto) require_secure_clear(io_reference_wrapper<scrs> sc)
 }
 
 template<contiguous_input_stream cis>
-constexpr decltype(auto) underflow_forever_false(io_reference_wrapper<cis> ci)
+constexpr void underflow_forever_false(io_reference_wrapper<cis> ci)
 {
 	return underflow_forever_false(*ci.ptr);
 }
@@ -257,24 +253,6 @@ template<fill_nc_output_stream T>
 constexpr void fill_nc_define(io_reference_wrapper<T> fnc,std::size_t n,typename std::remove_cvref_t<T>::char_type ch)
 {
 	fill_nc_define(*fnc.ptr,n,ch);
-}
-
-template<status_output_stream output,typename... Args>
-inline constexpr void print_status_define(io_reference_wrapper<output> out,Args&& ...args)
-{
-	print_status_define(*out.ptr,std::forward<Args>(args)...);
-}
-
-template<status_output_stream output,typename... Args>
-inline constexpr void println_status_define(io_reference_wrapper<output> out,Args&& ...args)
-{
-	println_status_define(*out.ptr,std::forward<Args>(args)...);
-}
-
-template<bool rac=false,status_input_stream input,typename... Args>
-inline constexpr void scan_status_define(io_reference_wrapper<input> out,Args&& ...args)
-{
-	scan_status_define<rac>(*out.ptr,std::forward<Args>(args)...);
 }
 
 }

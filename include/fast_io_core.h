@@ -2,13 +2,15 @@
 
 //fast_io_core.h is required to be usable in freestanding environment with EVEN dynamic memory allocation and exceptions are disabled.
 #include<cstddef>
+#include<version>
 #include"fast_io_concept.h"
 #include<memory>
 #include<limits>
 #include<cstdint>
-
 //I know functions like memcpy would probably not be provided in freestanding environment. However, you can implement them on these platforms.
-
+#if __cpp_lib_three_way_comparison >= 201907L
+#include<compare>
+#endif
 
 //The C++20 standard does not require these headers to be freestanding.
 //However, they are clearly necessary and usable even in freestanding environment.
@@ -22,6 +24,8 @@
 #include<cstring>		//for memcpy
 #include<bit>			//for std::endian, std::rotl and std::bit_cast etc
 
+
+#include"fast_io_core_impl/ebcdic.h"
 //fast_io core
 #include"fast_io_core_impl/utils.h"
 
@@ -46,8 +50,12 @@
 #include"fast_io_core_impl/io_ref.h"
 #include"fast_io_core_impl/print_scan.h"
 #include"fast_io_core_impl/print_freestanding.h"
-#include"fast_io_core_impl/print_reserver.h"
+//#include"fast_io_core_impl/print_reserver.h"
 #include"fast_io_core_impl/scan_transmit/scan_transmit.h"
+
+
+
+#include"fast_io_core_impl/scan_freestanding.h"
 
 // This should provide an option macro to disable any generation for table in freestanding environments.
 #include"fast_io_core_impl/integers/integer.h"
@@ -73,3 +81,5 @@
 #include"fast_io_core_impl/read_write_all.h"
 #include"fast_io_core_impl/crtp/crtp.h"
 #include"fast_io_core_impl/malformed_input.h"
+
+

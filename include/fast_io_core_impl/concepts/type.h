@@ -18,6 +18,13 @@ struct basic_io_scatter_t
 
 using io_scatter_t = basic_io_scatter_t<void>;
 
+struct io_scatter_status_t
+{
+	std::size_t total_size;
+	std::size_t span_position;
+	std::size_t pos_in_span;
+};
+
 template<typename T>
 struct basic_message_hdr
 {
@@ -63,16 +70,18 @@ struct io_async_overlapped_t
 	using type = typename std::remove_cvref_t<decltype(async_overlapped_type(*static_cast<T*>(nullptr)))>::type;
 };
 
-template<typename T,bool end_test=false>
+template<std::integral char_type,typename T,bool end_test=false>
 struct io_reserve_type_t
 {
+explicit constexpr io_reserve_type_t() noexcept =default;
 };
-template<typename T,bool end_test=false>
-inline constexpr io_reserve_type_t<T,end_test> io_reserve_type{};
+template<std::integral char_type,typename T,bool end_test=false>
+inline constexpr io_reserve_type_t<char_type,T,end_test> io_reserve_type{};
 
 template<typename T>
 struct print_scatter_type_t
 {
+explicit constexpr print_scatter_type_t() noexcept =default;
 };
 
 template<typename T>
@@ -80,8 +89,18 @@ inline constexpr print_scatter_type_t<T> print_scatter_type{};
 
 struct io_alias_t
 {
+explicit constexpr io_alias_t() noexcept =default;
 };
 
 inline constexpr io_alias_t io_alias{};
+
+template<std::integral char_type>
+struct io_alias_type_t
+{
+explicit constexpr io_alias_type_t() noexcept = default;
+};
+
+template<std::integral char_type>
+inline constexpr io_alias_type_t<char_type> io_alias_type{};
 
 }

@@ -132,27 +132,15 @@ public:
 	}
 
 	basic_gz_file(basic_posix_io_handle<char_type>&& posix_handle,open_mode om):
-		basic_gz_file(native_interface,posix_handle.fd,to_c_mode(om))
-	{
-		posix_handle.release();
-	}
-	template<open_mode om>
-	basic_gz_file(basic_posix_io_handle<char_type>&& posix_handle,open_interface_t<om>):
-		basic_gz_file(native_interface,posix_handle.fd,fast_io::details::c_open_mode<om>::value)
+		basic_gz_file(native_interface,posix_handle.fd,to_native_c_mode(om))
 	{
 		posix_handle.release();
 	}
 
-#if defined(__WINNT__) || defined(_MSC_VER)
+#ifdef _WIN32
 //windows specific. open posix file from win32 io handle
 	basic_gz_file(basic_win32_io_handle<char_type>&& win32_handle,open_mode om):
-		basic_gz_file(basic_posix_file<char_type>(std::move(win32_handle),om),to_c_mode(om))
-	{
-	}
-	template<open_mode om>
-	basic_gz_file(basic_win32_io_handle<char_type>&& win32_handle,open_interface_t<om>):
-		basic_gz_file(basic_posix_file<char_type>(std::move(win32_handle),open_interface<om>),
-			fast_io::details::c_open_mode<om>::value)//open::c_style_interface_t<om>::mode)
+		basic_gz_file(basic_posix_file<char_type>(std::move(win32_handle),om),to_native_c_mode(om))
 	{
 	}
 #endif
@@ -164,14 +152,11 @@ public:
 		this->native_handle()=hd;
 	}
 
-	template<open_mode om,typename... Args>
-	basic_gz_file(cstring_view file,open_interface_t<om>,Args&& ...args):
-		basic_gz_file(basic_posix_file<char_type>(file,open_interface<om>,std::forward<Args>(args)...),
-			open_interface<om>)
+	basic_gz_file(cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_gz_file(basic_posix_file<char_type>(file,om,pm),om)
 	{}
-	template<typename... Args>
-	basic_gz_file(cstring_view file,open_mode om,Args&& ...args):
-		basic_gz_file(basic_posix_file<char_type>(file,om,std::forward<Args>(args)...),om)
+	basic_gz_file(native_at_entry nate,cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_gz_file(basic_posix_file<char_type>(nate,file,om,pm),om)
 	{}
 };
 

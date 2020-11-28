@@ -9,7 +9,7 @@ namespace fast_io
 namespace details
 {
 
-inline constexpr std::ios::openmode calculate_fstream_file_open_mode(open_mode om)
+inline constexpr std::ios::openmode calculate_fstream_file_open_mode(open_mode om) noexcept
 {
 	std::ios::openmode ios_om{};
 	if((om&open_mode::app)!=open_mode::none)
@@ -22,32 +22,15 @@ inline constexpr std::ios::openmode calculate_fstream_file_open_mode(open_mode o
 		ios_om=ios_om|std::ios::out;
 	if((om&open_mode::trunc)!=open_mode::none)
 		ios_om=ios_om|std::ios::trunc;
-	if((om&open_mode::ate)!=open_mode::none)
-		ios_om=ios_om|std::ios::ate;
+	if(((om&open_mode::directory)!=open_mode::none)&&ios_om==std::ios::openmode{})
+		ios_om=ios_om|std::ios::in;
 	return ios_om;
 }
 
-template<open_mode om>
-struct fstream_open_mode
-{
-	inline static constexpr auto value=calculate_fstream_file_open_mode(om);
-};
-
-template<open_mode om>
-inline constexpr std::ios::openmode calculate_fstream_open_value(open_interface_t<om>)
-{
-	return details::fstream_open_mode<om>::value;
-}
-
-inline constexpr std::ios::openmode calculate_fstream_open_value(open_mode om)
+inline constexpr std::ios::openmode calculate_fstream_open_value(open_mode om) noexcept
 {
 	return calculate_fstream_file_open_mode(om);
 }
-inline constexpr std::ios::openmode calculate_fstream_open_value(cstring_view c_mode)
-{
-	return calculate_fstream_open_value(from_c_mode(c_mode));
-}
-
 }
 
 
@@ -61,11 +44,10 @@ public:
 	constexpr basic_filebuf_file()=default;
 	template<typename native_hd>
 	requires std::same_as<native_handle_type,std::remove_cvref_t<native_hd>>
-	constexpr basic_filebuf_file(native_hd rdb):basic_filebuf_io_observer<CharT,Traits>{rdb}{}
+	constexpr basic_filebuf_file(native_hd fb):basic_filebuf_io_observer<CharT,Traits>{fb}{}
 #if defined(__GLIBCXX__)
-	template<typename T>
-	basic_filebuf_file(basic_posix_io_handle<char_type>&& piohd,T&& t):
-		basic_filebuf_io_observer<CharT,Traits>{new __gnu_cxx::stdio_filebuf<char_type,traits_type>(piohd.native_handle(),details::calculate_fstream_open_value(std::forward<T>(t)),fast_io::details::cal_buffer_size<CharT,true>())}
+	basic_filebuf_file(basic_posix_io_handle<char_type>&& piohd,open_mode mode):
+		basic_filebuf_io_observer<CharT,Traits>{new __gnu_cxx::stdio_filebuf<char_type,traits_type>(piohd.native_handle(),details::calculate_fstream_open_value(mode),fast_io::details::cal_buffer_size<CharT,true>())}
 	{
 /*
 https://github.com/gcc-mirror/gcc/blob/41d6b10e96a1de98e90a7c0378437c3255814b16/libstdc%2B%2B-v3/config/io/basic_file_stdio.cc#L216
@@ -80,11 +62,10 @@ This function never fails. but what if fdopen fails?
 		piohd.release();
 	}
 #elif defined(__LIBCPP_VERSION)
-	template<typename T>
-	basic_filebuf_file(basic_posix_io_handle<char_type>&& piohd,T&& t):
+	basic_filebuf_file(basic_posix_io_handle<char_type>&& piohd,open_mode mode):
 		basic_filebuf_io_observer<CharT,Traits>{new std::basic_filebuf<char_type,traits_type>}
 	{
-		fb.__open(piohd.native_handle(),details::calculate_fstream_open_value(std::forward<T>(t)));
+		fb.__open(piohd.native_handle(),details::calculate_fstream_open_value(mode));
 		if(!this->native_handle()->is_open())
 		{
 			delete this->native_handle();
@@ -93,8 +74,7 @@ This function never fails. but what if fdopen fails?
 		piohd.release();
 	}
 #else
-	template<typename T>
-	basic_filebuf_file(basic_c_io_handle_unlocked<char_type>&& chd,T&& t):basic_filebuf_io_observer<CharT,Traits>{new std::basic_filebuf<char_type,traits_type>(chd.native_handle())}
+	basic_filebuf_file(basic_c_io_handle_unlocked<char_type>&& chd,open_mode):basic_filebuf_io_observer<CharT,Traits>{new std::basic_filebuf<char_type,traits_type>(chd.native_handle())}
 	{
 		if(!this->native_handle()->is_open())
 		{
@@ -103,63 +83,37 @@ This function never fails. but what if fdopen fails?
 		}
 		chd.release();
 	}
-	template<typename T>
-	basic_filebuf_file(basic_posix_io_handle<char_type>&& piohd,T&& t):
-		basic_filebuf_file(basic_c_file_unlocked<char_type>(std::move(piohd),std::forward<T>(t)),std::forward<T>(t))
+	basic_filebuf_file(basic_posix_io_handle<char_type>&& piohd,open_mode mode):
+		basic_filebuf_file(basic_c_file_unlocked<char_type>(std::move(piohd),mode),mode)
 	{
 	}
 #endif
 
 #ifdef _WIN32
 //windows specific. open posix file from win32 io handle
-	template<typename T>
-	basic_filebuf_file(basic_win32_io_handle<char_type>&& win32_handle,T&& t):
-		basic_filebuf_file(basic_posix_file<char_type>(std::move(win32_handle),std::forward<T>(t)),std::forward<T>(t))
+	basic_filebuf_file(basic_win32_io_handle<char_type>&& win32_handle,open_mode mode):
+		basic_filebuf_file(basic_posix_file<char_type>(std::move(win32_handle),mode),mode)
 	{
 	}
-#endif
-
-	template<open_mode om,typename... Args>
-	basic_filebuf_file(cstring_view file,open_interface_t<om>,Args&& ...args):
-		basic_filebuf_file(basic_posix_file<char_type>(file,open_interface<om>,std::forward<Args>(args)...),
-			open_interface<om>)
+	template<nt_family family>
+	basic_filebuf_file(basic_nt_family_io_handle<family,char_type>&& nt_handle,open_mode mode):
+		basic_filebuf_file(basic_posix_file<char_type>(std::move(nt_handle),mode),mode)
+	{
+	}
+	basic_filebuf_file(wcstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_filebuf_file(basic_posix_file<char_type>(file,om,pm),om)
 	{}
-	template<typename... Args>
-	basic_filebuf_file(cstring_view file,open_mode om,Args&& ...args):
-		basic_filebuf_file(basic_posix_file<char_type>(file,om,std::forward<Args>(args)...),om)
-	{}
-
-	template<open_mode om,typename... Args>
-	basic_filebuf_file(io_at_t,native_io_observer niob,cstring_view file,open_interface_t<om>,Args&& ...args):
-		basic_filebuf_file(basic_posix_file<char_type>(io_at,niob,file,open_interface<om>,std::forward<Args>(args)...),
-			open_interface<om>)
-	{}
-	template<typename... Args>
-	basic_filebuf_file(io_at_t,native_io_observer niob,cstring_view file,open_mode om,Args&& ...args):
-		basic_filebuf_file(basic_posix_file<char_type>(io_at,niob,file,om,std::forward<Args>(args)...),om)
-	{}
-
-#if defined (__linux__) || defined(_WIN32)
-	template<open_mode om,typename... Args>
-	basic_filebuf_file(io_async_t,io_async_observer ioa,cstring_view file,open_interface_t<om>,Args&& ...args):
-		basic_filebuf_file(basic_posix_file<char_type>(io_async,ioa,file,open_interface<om>,std::forward<Args>(args)...),
-			open_interface<om>)
-	{}
-	template<typename... Args>
-	basic_filebuf_file(io_async_t,io_async_observer ioa,cstring_view file,open_mode om,Args&& ...args):
-		basic_filebuf_file(basic_posix_file<char_type>(io_async,ioa,file,om,std::forward<Args>(args)...),om)
-	{}
-
-	template<open_mode om,typename... Args>
-	basic_filebuf_file(io_async_t,io_async_observer ioa,io_at_t,native_io_observer niob,cstring_view file,open_interface_t<om>,Args&& ...args):
-		basic_filebuf_file(basic_posix_file<char_type>(io_async,ioa,io_at,niob,file,open_interface<om>,std::forward<Args>(args)...),
-			open_interface<om>)
-	{}
-	template<typename... Args>
-	basic_filebuf_file(io_async_t,io_async_observer ioa,io_at_t,native_io_observer niob,cstring_view file,open_mode om,Args&& ...args):
-		basic_filebuf_file(basic_posix_file<char_type>(io_async,ioa,io_at,niob,file,om,std::forward<Args>(args)...),om)
+	basic_filebuf_file(native_at_entry nate,wcstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_filebuf_file(basic_posix_file<char_type>(nate,file,om,pm),om)
 	{}
 #endif
+	basic_filebuf_file(cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_filebuf_file(basic_posix_file<char_type>(file,om,pm),om)
+	{}
+	basic_filebuf_file(native_at_entry nate,cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_filebuf_file(basic_posix_file<char_type>(nate,file,om,pm),om)
+	{}
+
 
 	basic_filebuf_file& operator=(basic_filebuf_file const&)=delete;
 	basic_filebuf_file(basic_filebuf_file const&)=delete;
@@ -199,10 +153,10 @@ public:
 			this->native_handle()=nullptr;
 		}
 	}
-	void reset(native_handle_type rdb=nullptr) noexcept
+	void reset(native_handle_type fb=nullptr) noexcept
 	{
 		close_impl();
-		this->native_handle()=rdb;
+		this->native_handle()=fb;
 	}
 	~basic_filebuf_file()
 	{
@@ -211,9 +165,11 @@ public:
 };
 
 using filebuf_file=basic_filebuf_file<char>;
-using wfilebuf_file=basic_filebuf_file<wchar_t>;
 using u8filebuf_file=basic_filebuf_file<char8_t>;
 
+#ifndef __MSDOS__
+using wfilebuf_file=basic_filebuf_file<wchar_t>;
+#endif
 static_assert(std::is_standard_layout_v<filebuf_file>);
 
 }

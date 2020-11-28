@@ -11,16 +11,99 @@
 namespace fast_io
 {
 
-namespace details
+inline constexpr open_mode native_c_supported(open_mode m) noexcept
 {
-template<open_mode om>
-struct c_open_mode
-{
-inline static constexpr char const* value=to_c_mode(om);
-};
-
+#ifdef _WIN32
+using utype = typename std::underlying_type<open_mode>::type;
+constexpr auto c_supported_values{static_cast<utype>(open_mode::binary)|
+	static_cast<utype>(open_mode::out)|
+	static_cast<utype>(open_mode::app)|
+	static_cast<utype>(open_mode::in)|
+	static_cast<utype>(open_mode::trunc)};
+return static_cast<open_mode>(static_cast<utype>(m)&c_supported_values);
+#else
+return c_supported(m);
+#endif
 }
-#if defined(_GNU_SOURCE) || defined(__MUSL__)
+inline constexpr char const* to_native_c_mode(open_mode m) noexcept
+{
+#ifdef _WIN32
+/*
+https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/fdopen-wfdopen?view=vs-2019
+From microsoft's document. _fdopen only supports
+
+"r"	Opens for reading. If the file does not exist or cannot be found, the fopen call fails.
+"w"	Opens an empty file for writing. If the given file exists, its contents are destroyed.
+"a"	Opens for writing at the end of the file (appending). Creates the file if it does not exist.
+"r+"	Opens for both reading and writing. The file must exist.
+"w+"	Opens an empty file for both reading and writing. If the file exists, its contents are destroyed.
+"a+"	Opens for reading and appending. Creates the file if it does not exist.
+
+"x" will throw EINVAL which is does not satisfy POSIX, C11 and C++17 standard.
+*/
+	using utype = typename std::underlying_type<open_mode>::type;
+	switch(static_cast<utype>(native_c_supported(m)))
+	{
+//Action if file already exists;	Action if file does not exist;	c-style mode;	Explanation
+//Read from start;	Failure to open;	"r";	Open a file for reading
+	case static_cast<utype>(open_mode::in):
+		return "\x72";
+//Destroy contents;	Create new;	"w";	Create a file for writing
+	case static_cast<utype>(open_mode::out):
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::trunc):
+		return "\x77";
+//Append to file;	Create new;	"a";	Append to a file
+	case static_cast<utype>(open_mode::app):
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::app):
+		return "\x61";
+//Read from start;	Error;	"r+";		Open a file for read/write
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::in):
+		return "\x72\x2b";
+//Destroy contents;	Create new;	"w+";	Create a file for read/write
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::trunc):
+		return "\x77\x2b";
+//Write to end;	Create new;	"a+";	Open a file for read/write
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::app):
+	case static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::app):
+		return "\x77\x2b";
+
+//binary support
+
+//Action if file already exists;	Action if file does not exist;	c-style mode;	Explanation
+//Read from start;	Failure to open;	"rb";	Open a file for reading
+	case static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::binary):
+		return "\x72\x62";
+//Destroy contents;	Create new;	"wb";	Create a file for writing
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::binary):
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::trunc)|static_cast<utype>(open_mode::binary):
+		return "\x77\x62";
+//Append to file;	Create new;	"ab";	Append to a file
+	case static_cast<utype>(open_mode::app)|static_cast<utype>(open_mode::binary):
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::app)|static_cast<utype>(open_mode::binary):
+		return "\x61\x62";
+//Read from start;	Error;	"r+b";		Open a file for read/write
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::binary):
+		return "\x72\x2b\x62";
+//Destroy contents;	Create new;	"w+b";	Create a file for read/write
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::trunc)|static_cast<utype>(open_mode::binary):
+		return "\x77\x2b\x62";
+//Write to end;	Create new;	"a+b";	Open a file for read/write
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::app)|static_cast<utype>(open_mode::binary):
+	case static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::app)|static_cast<utype>(open_mode::binary):
+		return "\x61\x2b\x62";
+	case 0:
+		if((m&open_mode::directory)!=open_mode::none)
+			return "\x72";
+		[[fallthrough]];
+	default:
+		return "";
+	}
+#else
+	return to_c_mode(m);
+#endif
+}
+
+#if defined(_GNU_SOURCE) || defined(__MUSL__) || defined(__NEED___isoc_va_list)
 template<typename stm>
 requires stream<std::remove_reference_t<stm>>
 class c_io_cookie_functions_t
@@ -129,7 +212,7 @@ public:
 
 template<typename stm>
 inline constexpr c_io_cookie_functions_t<stm> c_io_cookie_functions{};
-#elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__)) || defined(__BIONIC__) || defined(__NEWLIB__)
+#elif (defined(__APPLE__) && defined(__MACH__)) || defined(__BIONIC__) || defined(__NEWLIB__)
 namespace details
 {
 #ifdef __NEWLIB__
@@ -252,6 +335,56 @@ cookie,readfn,writefn,seekfn,closefn)};
 }
 #endif
 
+namespace details
+{
+
+#ifdef __MSDOS__
+extern "C" int fileno(FILE*) noexcept;
+extern "C" std::FILE* fdopen(int,char const*) noexcept;
+#endif
+
+inline int fp_unlocked_to_fd(FILE* fp) noexcept
+{
+	if(fp==nullptr)
+	{
+		errno=EBADF;
+		return {-1};
+	}
+	return 
+#if defined(__WINNT__) || defined(_MSC_VER)
+		_fileno(fp)
+#elif defined(__NEWLIB__)
+		fp->_file
+#elif defined(__MSDOS__)
+		fileno(fp)
+#else
+		::fileno_unlocked(fp)
+#endif
+	;
+}
+
+inline int fp_to_fd(FILE* fp) noexcept
+{
+	if(fp==nullptr)
+	{
+		errno=EBADF;
+		return {-1};
+	}
+	return 
+#if defined(__WINNT__) || defined(_MSC_VER)
+		_fileno(fp)
+#elif defined(__NEWLIB__)
+		fp->_file
+#elif defined(__MSDOS__)
+		fileno(fp)
+#else
+		::fileno(fp)
+#endif
+	;
+}
+
+}
+
 template<std::integral ch_type>
 class basic_c_io_observer_unlocked
 {
@@ -273,20 +406,7 @@ public:
 	}
 	explicit operator basic_posix_io_observer<char_type>() const noexcept
 	{
-		if(fp==nullptr)
-		{
-			errno=EBADF;
-			return {-1};
-		}
-		return basic_posix_io_observer<char_type>{
-#if defined(__WINNT__) || defined(_MSC_VER)
-			_fileno(fp)
-#elif defined(__NEWLIB__)
-			fp->_file
-#else
-			::fileno_unlocked(fp)
-#endif
-		};
+		return basic_posix_io_observer<char_type>{details::fp_unlocked_to_fd(fp)};
 	}
 #if defined(__WINNT__) || defined(_MSC_VER)
 	explicit operator basic_win32_io_observer<char_type>() const noexcept
@@ -301,6 +421,12 @@ public:
 		return temp;
 	}
 };
+
+template<std::integral ch_type>
+inline constexpr posix_at_entry at(basic_c_io_observer_unlocked<ch_type> other) noexcept
+{
+	return posix_at_entry{details::fp_unlocked_to_fd(other.fp)};
+}
 
 template<std::integral ch_type>
 inline auto redirect_handle(basic_c_io_observer_unlocked<ch_type> h)
@@ -341,7 +467,7 @@ inline void flush(basic_c_io_observer_unlocked<T> cfhd)
 namespace details
 {
 
-inline std::common_type_t<std::size_t,std::uint64_t> c_io_seek_impl(std::FILE* fp,std::common_type_t<std::ptrdiff_t,std::int64_t> offset,seekdir s)
+inline std::uintmax_t c_io_seek_impl(std::FILE* fp,std::intmax_t offset,seekdir s)
 {
 /*
 We avoid standard C functions since they cannot deal with large file on 32 bits platforms
@@ -356,6 +482,8 @@ https://www.gnu.org/software/libc/manual/html_node/File-Positioning.html
 	if(
 #if defined(_WIN32)
 		_fseeki64
+#elif defined(__NEWLIB__) || defined(__MSDOS__)
+		fseek
 #else
 		fseeko64
 #endif
@@ -364,6 +492,8 @@ https://www.gnu.org/software/libc/manual/html_node/File-Positioning.html
 	auto val{
 #if defined(_WIN32)
 		_ftelli64
+#elif defined(__NEWLIB__) || defined(__MSDOS__)
+		ftell
 #else
 		ftello64 
 #endif
@@ -373,7 +503,7 @@ https://www.gnu.org/software/libc/manual/html_node/File-Positioning.html
 	return val;
 }
 #if defined(_WIN32)
-inline std::common_type_t<std::size_t,std::uint64_t> c_io_seek_no_lock_impl(std::FILE* fp,std::common_type_t<std::ptrdiff_t,std::int64_t> offset,seekdir s)
+inline std::uintmax_t c_io_seek_no_lock_impl(std::FILE* fp,std::intmax_t offset,seekdir s)
 {
 	if(_fseeki64_nolock(fp,offset,static_cast<int>(s)))
 		throw_posix_error();
@@ -383,10 +513,10 @@ inline std::common_type_t<std::size_t,std::uint64_t> c_io_seek_no_lock_impl(std:
 	return val;
 }
 #endif
-
 }
+
 template<std::integral ch_type,std::integral U>
-inline std::common_type_t<std::size_t,std::uint64_t> seek(basic_c_io_observer_unlocked<ch_type> cfhd,std::common_type_t<std::ptrdiff_t,std::int64_t> offset=0,seekdir s=seekdir::cur)
+inline std::uintmax_t seek(basic_c_io_observer_unlocked<ch_type> cfhd,std::intmax_t offset=0,seekdir s=seekdir::cur)
 {
 #if defined(_WIN32)
 	return details::c_io_seek_no_lock_impl(cfhd.fp,offset,s);
@@ -423,20 +553,7 @@ public:
 	}
 	explicit operator basic_posix_io_observer<char_type>() const noexcept
 	{
-		if(fp==nullptr)
-		{
-			errno=EBADF;
-			return {-1};
-		}
-		return basic_posix_io_observer<char_type>{
-#if defined(__WINNT__) || defined(_MSC_VER)
-			_fileno(fp)
-#elif defined(__NEWLIB__)
-			fp->_file
-#else
-			::fileno(fp)
-#endif
-		};
+		return {details::fp_to_fd(fp)};
 	}
 #if defined(__WINNT__) || defined(_MSC_VER)
 	explicit operator basic_win32_io_observer<char_type>() const noexcept
@@ -464,6 +581,7 @@ public:
 #ifndef __SINGLE_THREAD__
 //	flockfile(fp);	//TO FIX
 #endif
+#elif defined(__MSDOS__)
 #else
 	flockfile(fp);
 #endif
@@ -478,6 +596,7 @@ public:
 #ifndef __SINGLE_THREAD__
 //		_funlockfile(fp); //TO FIX
 #endif
+#elif defined(__MSDOS__)
 #else
 	funlockfile(fp);
 #endif
@@ -487,6 +606,12 @@ public:
 		return {fp};
 	}
 };
+
+template<std::integral T>
+inline constexpr posix_at_entry at(basic_c_io_observer<T> other) noexcept
+{
+	return posix_at_entry{details::fp_to_fd(other.fp)};
+}
 
 template<std::integral T>
 inline constexpr basic_c_io_observer<T> io_value_handle(basic_c_io_observer<T> other)
@@ -501,7 +626,7 @@ inline constexpr basic_c_io_observer_unlocked<T> io_value_handle(basic_c_io_obse
 }
 
 template<std::integral T,std::contiguous_iterator Iter>
-inline Iter read(basic_c_io_observer<T> cfhd,Iter begin,Iter end)
+[[nodiscard]] inline Iter read(basic_c_io_observer<T> cfhd,Iter begin,Iter end)
 {
 	details::lock_guard lg{cfhd};
 	basic_c_io_observer_unlocked<T> cfhd_unlocked{cfhd.fp};
@@ -524,10 +649,37 @@ inline void flush(basic_c_io_observer<T> cfhd)
 }
 
 template<std::integral ch_type,std::integral U>
-inline std::common_type_t<std::size_t,std::uint64_t> seek(basic_c_io_observer<ch_type> cfhd,std::common_type_t<std::ptrdiff_t,std::int64_t> offset=0,seekdir s=seekdir::cur)
+inline std::uintmax_t seek(basic_c_io_observer<ch_type> cfhd,std::intmax_t offset=0,seekdir s=seekdir::cur)
 {
 	return details::c_io_seek_impl(cfhd.fp,offset,s);
 }
+
+#if __cpp_lib_three_way_comparison >= 201907L
+
+template<std::integral ch_type>
+inline constexpr bool operator==(basic_c_io_observer<ch_type> a,basic_c_io_observer<ch_type> b)
+{
+	return a.fp==b.fp;
+}
+
+template<std::integral ch_type>
+inline constexpr bool operator==(basic_c_io_observer_unlocked<ch_type> a,basic_c_io_observer_unlocked<ch_type> b)
+{
+	return a.fp==b.fp;
+}
+
+template<std::integral ch_type>
+inline constexpr auto operator<=>(basic_c_io_observer<ch_type> a,basic_c_io_observer<ch_type> b)
+{
+	return a.fp<=>b.fp;
+}
+
+template<std::integral ch_type>
+inline constexpr auto operator<=>(basic_c_io_observer_unlocked<ch_type> a,basic_c_io_observer_unlocked<ch_type> b)
+{
+	return a.fp<=>b.fp;
+}
+#endif
 
 namespace details
 {
@@ -585,23 +737,14 @@ public:
 	template<typename native_hd>
 	requires std::same_as<native_handle_type,std::remove_cvref_t<native_hd>>
 	explicit constexpr basic_c_file_impl(native_hd hd):T(hd){}
-/*
-	basic_c_file_impl(cstring_view name,cstring_view mode):T(std::fopen(name.data(),mode.data()))
-	{
-		if(native_handle()==nullptr)
-			throw_posix_error();
-	}
-	basic_c_file_impl(cstring_view file,open_mode const& m):basic_c_file_impl(file,c_style(m))
-	{
-		if(with_ate(m))
-			seek(*this,0,seekdir::end);
-	}*/
 //fdopen interface
 	basic_c_file_impl(native_interface_t,int fd,char const* mode):T(
 #if defined(__WINNT__) || defined(_MSC_VER)
 			::_fdopen(
 #elif defined(__NEWLIB__)
 			::_fdopen_r(_REENT,
+#elif defined(__MSDOS__)
+			details::fdopen(
 #else
 			::fdopen(
 #endif
@@ -613,77 +756,42 @@ public:
 	}
 
 	basic_c_file_impl(basic_posix_io_handle<char_type>&& posix_handle,open_mode om):
-		basic_c_file_impl(native_interface,posix_handle.fd,to_c_mode(om))
-	{
-		posix_handle.release();
-	}
-	template<open_mode om>
-	basic_c_file_impl(basic_posix_io_handle<char_type>&& posix_handle,open_interface_t<om>):
-		basic_c_file_impl(native_interface,posix_handle.fd,details::c_open_mode<om>::value)
+		basic_c_file_impl(native_interface,posix_handle.fd,to_native_c_mode(om))
 	{
 		posix_handle.release();
 	}
 #if defined(_WIN32)
 //windows specific. open posix file from win32 io handle
 	basic_c_file_impl(basic_win32_io_handle<char_type>&& win32_handle,open_mode om):
-		basic_c_file_impl(basic_posix_file<char_type>(std::move(win32_handle),om),to_c_mode(om))
+		basic_c_file_impl(basic_posix_file<char_type>(std::move(win32_handle),om),to_native_c_mode(om))
 	{
 	}
-	template<open_mode om>
-	basic_c_file_impl(basic_win32_io_handle<char_type>&& win32_handle,open_interface_t<om>):
-		basic_c_file_impl(basic_posix_file<char_type>(std::move(win32_handle),open_interface<om>),
-			details::c_open_mode<om>::value)//open::c_style_interface_t<om>::mode)
+	template<nt_family family>
+	basic_c_file_impl(basic_nt_family_io_handle<family,char_type>&& nt_handle,open_mode om):
+		basic_c_file_impl(basic_posix_file<char_type>(std::move(nt_handle),om),to_native_c_mode(om))
 	{
 	}
 #endif
 
-	template<open_mode om,typename... Args>
-	basic_c_file_impl(cstring_view file,open_interface_t<om>,Args&& ...args):
-		basic_c_file_impl(basic_posix_file<typename T::char_type>(file,open_interface<om>,std::forward<Args>(args)...),
-			open_interface<om>)
+#ifdef _WIN32
+	basic_c_file_impl(wcstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_c_file_impl(basic_posix_file<typename T::char_type>(file,om,pm),om)
 	{}
-	template<typename... Args>
-	basic_c_file_impl(cstring_view file,open_mode om,Args&& ...args):
-		basic_c_file_impl(basic_posix_file<typename T::char_type>(file,om,std::forward<Args>(args)...),om)
-	{}
-
-	template<open_mode om,typename... Args>
-	basic_c_file_impl(io_at_t,native_io_observer niob,cstring_view file,open_interface_t<om>,Args&& ...args):
-		basic_c_file_impl(basic_posix_file<typename T::char_type>(io_at,niob,file,open_interface<om>,std::forward<Args>(args)...),
-			open_interface<om>)
-	{}
-	template<typename... Args>
-	basic_c_file_impl(io_at_t,native_io_observer niob,cstring_view file,open_mode om,Args&& ...args):
-		basic_c_file_impl(basic_posix_file<typename T::char_type>(io_at,niob,file,om,std::forward<Args>(args)...),om)
-	{}
-
-
-#if defined (__linux__) || defined(_WIN32)
-	template<open_mode om,typename... Args>
-	basic_c_file_impl(io_async_t,io_async_observer ioa,cstring_view file,open_interface_t<om>,Args&& ...args):
-		basic_c_file_impl(basic_posix_file<typename T::char_type>(io_async,ioa,file,open_interface<om>,std::forward<Args>(args)...),
-			open_interface<om>)
-	{}
-	template<typename... Args>
-	basic_c_file_impl(io_async_t,io_async_observer ioa,cstring_view file,open_mode om,Args&& ...args):
-		basic_c_file_impl(basic_posix_file<typename T::char_type>(io_async,ioa,file,om,std::forward<Args>(args)...),om)
-	{}
-
-	template<open_mode om,typename... Args>
-	basic_c_file_impl(io_async_t,io_async_observer ioa,io_at_t,native_io_observer niob,cstring_view file,open_interface_t<om>,Args&& ...args):
-		basic_c_file_impl(basic_posix_file<typename T::char_type>(io_async,ioa,io_at,niob,file,open_interface<om>,std::forward<Args>(args)...),
-			open_interface<om>)
-	{}
-	template<typename... Args>
-	basic_c_file_impl(io_async_t,io_async_observer ioa,io_at_t,native_io_observer niob,cstring_view file,open_mode om,Args&& ...args):
-		basic_c_file_impl(basic_posix_file<typename T::char_type>(io_async,ioa,io_at,niob,file,om,std::forward<Args>(args)...),om)
+	basic_c_file_impl(native_at_entry nate,wcstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_c_file_impl(basic_posix_file<typename T::char_type>(nate,file,om,pm),om)
 	{}
 #endif
+	basic_c_file_impl(cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_c_file_impl(basic_posix_file<typename T::char_type>(file,om,pm),om)
+	{}
+	basic_c_file_impl(native_at_entry nate,cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_c_file_impl(basic_posix_file<typename T::char_type>(nate,file,om,pm),om)
+	{}
 
 	template<stream stm,typename... Args>
 	basic_c_file_impl(io_cookie_t,cstring_view mode,std::in_place_type_t<stm>,Args&& ...args)
 	{
-#if defined(_GNU_SOURCE) || defined(__MUSL__)
+#if defined(_GNU_SOURCE) || defined(__MUSL__) || defined(__NEED___isoc_va_list)
 		std::unique_ptr<stm> up{std::make_unique<std::remove_cvref_t<stm>>(std::forward<std::remove_cvref_t<stm>>(args)...)};
 		if(!(this->native_handle()=fopencookie(up.get(),mode.c_str(),c_io_cookie_functions<std::remove_cvref_t<stm>>.native_functions)))[[unlikely]]
                			throw_posix_error();
@@ -700,7 +808,7 @@ public:
 	template<stream stm>
 	basic_c_file_impl(io_cookie_t,cstring_view mode,stm& reff)
 	{
-#if defined(_GNU_SOURCE) || defined(__MUSL__)
+#if defined(_GNU_SOURCE) || defined(__MUSL__) || defined(__NEED___isoc_va_list)
 		if(!(this->native_handle()=fopencookie(std::addressof(reff),mode.c_str(),c_io_cookie_functions<stm&>.native_functions)))[[unlikely]]
                			throw_posix_error();
 #elif defined(__BSD_VISIBLE) || defined(__BIONIC__) || defined(__NEWLIB__)
@@ -741,42 +849,23 @@ using basic_c_file_unlocked=details::basic_c_file_impl<basic_c_io_handle_unlocke
 template<std::integral ch_type>
 requires requires(basic_posix_io_observer<ch_type> piob)
 {
-	size(piob);
+	status(piob);
 }
-inline constexpr auto size(basic_c_io_observer<ch_type> ciob)
+inline constexpr auto status(basic_c_io_observer<ch_type> ciob)
 {
-	return size(static_cast<basic_posix_io_observer<ch_type>>(ciob));
+	return status(static_cast<basic_posix_io_observer<ch_type>>(ciob));
 }
 
 template<std::integral ch_type>
 requires requires(basic_posix_io_observer<ch_type> piob)
 {
-	type(piob);
+	status(piob);
 }
-inline constexpr auto type(basic_c_io_observer<ch_type> ciob)
+inline constexpr auto status(basic_c_io_observer_unlocked<ch_type> ciob)
 {
-	return type(static_cast<basic_posix_io_observer<ch_type>>(ciob));
+	return status(static_cast<basic_posix_io_observer<ch_type>>(ciob));
 }
 
-template<std::integral ch_type>
-requires requires(basic_posix_io_observer<ch_type> piob)
-{
-	size(piob);
-}
-inline constexpr auto size(basic_c_io_observer_unlocked<ch_type> ciob)
-{
-	return size(static_cast<basic_posix_io_observer<ch_type>>(ciob));
-}
-
-template<std::integral ch_type>
-requires requires(basic_posix_io_observer<ch_type> piob)
-{
-	type(piob);
-}
-inline constexpr auto type(basic_c_io_observer_unlocked<ch_type> ciob)
-{
-	return type(static_cast<basic_posix_io_observer<ch_type>>(ciob));
-}
 
 template<std::integral ch_type>
 inline auto redirect_handle(basic_c_io_observer<ch_type> h)
@@ -815,7 +904,7 @@ inline constexpr io_async_overlapped_t<basic_posix_io_observer<char_type>> async
 {
 	return {};
 }
-
+#if defined(_WIN32) || defined(__linux__)
 template<std::integral char_type,typename... Args>
 requires async_output_stream<basic_posix_io_observer<char_type>>
 inline void async_write_callback(io_async_observer ioa,basic_c_io_observer<char_type> h,Args&& ...args)
@@ -843,21 +932,21 @@ inline void async_read_callback(io_async_observer ioa,basic_c_io_observer_unlock
 {
 	async_read_callback(ioa,static_cast<basic_posix_io_observer<char_type>>(h),std::forward<Args>(args)...);
 }
-
+#endif
 using c_io_observer_unlocked=basic_c_io_observer_unlocked<char>;
 using c_io_observer=basic_c_io_observer<char>;
 using c_io_handle_unlocked = basic_c_io_handle_unlocked<char>;
 using c_io_handle = basic_c_io_handle<char>;
 using c_file = basic_c_file<char>;
 using c_file_unlocked = basic_c_file_unlocked<char>;
-
+#ifndef __MSDOS__
 using wc_io_observer_unlocked=basic_c_io_observer_unlocked<wchar_t>;
 using wc_io_observer=basic_c_io_observer<wchar_t>;
 using wc_io_handle_unlocked = basic_c_io_handle_unlocked<wchar_t>;
 using wc_io_handle = basic_c_io_handle<wchar_t>;
 using wc_file = basic_c_file<wchar_t>;
 using wc_file_unlocked = basic_c_file_unlocked<wchar_t>;
-
+#endif
 template<std::integral ch_type>
 requires zero_copy_input_stream<basic_posix_io_observer<ch_type>>
 inline decltype(auto) zero_copy_in_handle(basic_c_io_observer_unlocked<ch_type> h)
@@ -872,37 +961,30 @@ inline decltype(auto) zero_copy_out_handle(basic_c_io_observer_unlocked<ch_type>
 	return zero_copy_out_handle(static_cast<basic_posix_io_observer<ch_type>>(h));
 }
 
-
-template<std::integral char_type>
-inline constexpr void const* print_alias_define(io_alias_t,basic_c_io_observer_unlocked<char_type> v)
-{
-	return v.fp;
 }
 
-template<std::integral char_type>
-inline constexpr void const* print_alias_define(io_alias_t,basic_c_io_observer<char_type> v)
-{
-	return v.fp;
-}
-
-}
 #if defined(_MSC_VER)||defined(_UCRT)
 #include"universal_crt.h"
 #elif defined(__WINNT__)
 #include"msvcrt.h"
 #elif defined(__GLIBC__)
 #include"glibc.h"
-#elif defined(__MUSL__)
+#elif defined(__MUSL__) || defined(__NEED___isoc_va_list)
 #include"musl.h"
 #elif defined(__BSD_VISIBLE)
 #if defined(__NEWLIB__)
-#ifndef (__CUSTOM_FILE_IO__)
+#ifndef __CUSTOM_FILE_IO__
 #include"newlib.h"
 #endif
 #else
 #include"bsd.h"
 #endif
+#elif defined(__MSDOS__)
+#include"msdos.h"
 #endif
 
+#ifndef __MSDOS__
 #include"general.h"
+#endif
+
 #include"done.h"

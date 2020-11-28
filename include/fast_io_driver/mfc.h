@@ -115,20 +115,16 @@ public:
 	basic_mfc_file()=default;
 	basic_mfc_file(native_handle_type hd):basic_mfc_io_handle<T>(hd){}
 	basic_mfc_file(native_interface_t,native_handle_type val):basic_mfc_io_handle<T>(val){}
-	template<typename... Args>
-	requires(sizeof...(Args)!=0)
-	basic_mfc_file(basic_win32_io_handle<char_type>&& hd,Args&& ...):
+	basic_mfc_file(basic_win32_io_handle<char_type>&& hd,open_mode om):
 		basic_mfc_io_handle<T>(new CFile(hd.native_handle()))
 	{
 		hd.release();
 	}
-	template<open_mode om,typename... Args>
-	basic_mfc_file(cstring_view file,open_interface_t<om>,Args&& ...args):
-		basic_mfc_file(basic_win32_file<char_type>(file,open_interface<om>,std::forward<Args>(args)...),open_interface<om>)
+	basic_mfc_file(cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_mfc_file(basic_win32_file<char_type>(file,om,pm),om)
 	{}
-	template<typename... Args>
-	basic_mfc_file(cstring_view file,open_mode om,Args&& ...args):
-		basic_mfc_file(basic_win32_file<char_type>(file,om,std::forward<Args>(args)...),om)
+	basic_mfc_file(native_at_entry nate,cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_mfc_file(basic_win32_file<char_type>(nate,file,om,pm),om)
 	{}
 	basic_mfc_file(basic_mfc_file const&)=default;
 	basic_mfc_file& operator=(basic_mfc_file const&)=default;

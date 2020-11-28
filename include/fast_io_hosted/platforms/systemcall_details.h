@@ -3,17 +3,17 @@
 namespace fast_io::details
 {
 
+#ifdef __MSDOS__
+extern "C" int dup(int) noexcept;
+extern "C" int dup2(int,int) noexcept;
+extern "C" int _close(int) noexcept;
+#endif
+
 inline int sys_dup(int old_fd)
 {
 	auto fd{
-#if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
-		system_call<
-#if defined(__x86_64__)
-		32
-#elif defined(__arm64__) || defined(__aarch64__) 
-		23
-#endif
-		,int>
+#if defined(__linux__)
+		system_call<__NR_dup,int>
 #elif _WIN32
 		_dup
 #else
@@ -24,39 +24,28 @@ inline int sys_dup(int old_fd)
 	return fd;
 }
 
+template<bool always_terminate=false>
 inline int sys_dup2(int old_fd,int new_fd)
 {
 	auto fd{
-#if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
-		system_call<
-#if defined(__x86_64__)
-		33
-#elif defined(__arm64__) || defined(__aarch64__) 
-		1041
-#endif
-		,int>
+#if defined(__linux__)
+		system_call<__NR_dup2,int>
 #elif _WIN32
 		_dup2
 #else
 		dup2
 #endif
 	(old_fd,new_fd)};
-	system_call_throw_error(fd);
+	system_call_throw_error<always_terminate>(fd);
 	return fd;
 }
 
 inline int sys_close(int fd) noexcept
 {
 	return 
-#if defined(__linux__)&&(defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) )
-	system_call<
-#if defined(__x86_64__)
-		3
-#elif defined(__arm64__) || defined(__aarch64__) 
-		57
-#endif
-		,int>
-#elif _WIN32
+#if defined(__linux__)
+	system_call<__NR_close,int>
+#elif _WIN32 || __MSDOS__
 		_close
 #else
 		close

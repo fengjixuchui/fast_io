@@ -52,11 +52,7 @@ inline constexpr posix_file_map_attribute to_posix_file_map_attribute(file_map_a
 	case file_map_attribute::read_write:return posix_file_map_attribute::read|posix_file_map_attribute::write;
 	case file_map_attribute::write_copy:return posix_file_map_attribute::write;
 	default:
-#ifdef __cpp_exceptions
-		throw fast_io_text_error("unknown file_mapping_attribute");
-#else
-		fast_terminate();
-#endif
+		throw_posix_error(EINVAL);
 	};
 }
 
@@ -71,6 +67,11 @@ public:
 	}
 };
 
+inline constexpr std::span<std::byte> to_span(posix_memory_map_io_observer pmiop) noexcept
+{
+	return std::span<std::byte>(pmiop.address_begin,pmiop.address_end);
+}
+
 class posix_memory_map_file:public posix_memory_map_io_observer
 {
 public:
@@ -79,7 +80,7 @@ public:
 	constexpr posix_memory_map_file(std::byte* addbg,std::byte* added):posix_memory_map_io_observer{addbg,added}
 	{}
 	template<std::integral char_type>
-	posix_memory_map_file(basic_posix_io_observer<char_type> bf,file_map_attribute attr,std::size_t bytes,std::common_type_t<std::size_t,std::uint64_t> start_address=0)
+	posix_memory_map_file(basic_posix_io_observer<char_type> bf,file_map_attribute attr,std::size_t bytes,std::uintmax_t start_address=0)
 		:posix_memory_map_io_observer{reinterpret_cast<std::byte*>(mmap64(nullptr,bytes,static_cast<int>(to_posix_file_map_attribute(attr)),MAP_SHARED,bf.native_handle(),start_address))}
 	{
 		if(this->address_begin==MAP_FAILED)[[unlikely]]

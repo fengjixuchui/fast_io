@@ -3,19 +3,19 @@ struct bio_method_st
 {
     int type;
     char const *name;
-    int (*bwrite) (BIO *, const char *, size_t, size_t *);
-    int (*bwrite_old) (BIO *, const char *, int);
-    int (*bread) (BIO *, char *, size_t, size_t *);
-    int (*bread_old) (BIO *, char *, int);
-    int (*bputs) (BIO *, const char *);
-    int (*bgets) (BIO *, char *, int);
-    long (*ctrl) (BIO *, int, long, void *);
-    int (*create) (BIO *);
-    int (*destroy) (BIO *);
-    long (*callback_ctrl) (BIO *, int, BIO_info_cb *);
+    int (*bwrite) (BIO *, const char *, size_t, size_t *) noexcept;
+    int (*bwrite_old) (BIO *, const char *, int) noexcept;
+    int (*bread) (BIO *, char *, size_t, size_t *) noexcept;
+    int (*bread_old) (BIO *, char *, int) noexcept;
+    int (*bputs) (BIO *, const char *) noexcept;
+    int (*bgets) (BIO *, char *, int) noexcept;
+    long (*ctrl) (BIO *, int, long, void *) noexcept;
+    int (*create) (BIO *) noexcept;
+    int (*destroy) (BIO *) noexcept;
+    long (*callback_ctrl) (BIO *, int, BIO_info_cb *) noexcept;
 };
 
-namespace fast_io::openssl
+namespace fast_io
 {
 
 namespace details
@@ -36,6 +36,27 @@ struct bio_new_fp_flags
 {
 	inline static constexpr int value=calculate_bio_new_fp_flags<detach>(om);
 };
+
+
+inline std::FILE* bio_to_fp(BIO* bio) noexcept
+{
+	std::FILE* fp{};
+	BIO_get_fp(bio,std::addressof(fp));
+	return fp;
+}
+
+inline int bio_to_fd(BIO* bio) noexcept
+{
+	auto fp{bio_to_fp(bio)};
+	if(fp==nullptr)
+	{
+		int fd{-1};
+		BIO_get_fd(bio,std::addressof(fd));
+		return fd;
+	}
+	return ::fast_io::details::fp_to_fd(fp);
+}
+
 }
 
 template<typename stm>
@@ -134,18 +155,11 @@ public:
 	}
 	explicit operator basic_c_io_observer<char_type>() const noexcept
 	{
-		std::FILE* fp{};
-		BIO_get_fp(bio,std::addressof(fp));
-		return {fp};
+		return {details::bio_to_fp(bio)};
 	}
 	explicit operator basic_posix_io_observer<char_type>() const noexcept
 	{
-		auto c_iob{static_cast<basic_c_io_observer<char_type>>(*this)};
-		if(c_iob)
-			return static_cast<basic_posix_io_observer<char_type>>(c_iob);
-		int fd{-1};
-		BIO_get_fd(bio,std::addressof(fd));
-		return {fd};
+		return {details::bio_to_fd(bio)};
 	}
 #if defined(_WIN32)
 	explicit operator basic_win32_io_observer<char_type>() const noexcept
@@ -193,24 +207,8 @@ public:
 	basic_bio_file(io_cookie_t,stm&& sm):basic_bio_file<char_type>(io_cookie,std::in_place_type<stm>,std::move(sm)){}
 
 
-	template<fast_io::open_mode om>
-	basic_bio_file(basic_c_io_handle<char_type>&& bmv,open_interface_t<om>):
-		basic_bio_io_observer<char_type>(BIO_new_fp(bmv.native_handle(),details::bio_new_fp_flags<om,true>::value))
-	{
-		detect_open_failure();
-		bmv.release();
-	}
-
 	basic_bio_file(basic_c_io_handle<char_type>&& bmv,fast_io::open_mode om):
 		basic_bio_io_observer<char_type>(BIO_new_fp(bmv.native_handle(),details::calculate_bio_new_fp_flags<true>(om)))
-	{
-		detect_open_failure();
-		bmv.release();
-	}
-
-	template<fast_io::open_mode om>
-	basic_bio_file(basic_posix_io_handle<char_type>&& bmv,open_interface_t<om>):
-		basic_bio_io_observer<char_type>(BIO_new_fd(bmv.native_handle(),details::bio_new_fp_flags<om,true>::value))
 	{
 		detect_open_failure();
 		bmv.release();
@@ -226,29 +224,29 @@ public:
 
 #if defined(_WIN32)
 	template<typename... Args>
-	basic_bio_file(basic_win32_io_handle<char_type>&& bmv,Args&& ...args):
-		basic_bio_file(basic_posix_file(std::move(bmv),std::forward<Args>(args)...),std::forward<Args>(args)...)
+	basic_bio_file(basic_win32_io_handle<char_type>&& bmv,fast_io::open_mode om):
+		basic_bio_file(basic_posix_file(std::move(bmv),om),om)
 	{
 	}
+
+	template<typename... Args>
+	basic_bio_file(wcstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_bio_file(basic_c_file<char_type>(file,om,pm),om)
+	{}
+
+	basic_bio_file(native_at_entry nate,wcstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_bio_file(basic_c_file<char_type>(nate,file,om,pm),om)
+	{}
+
 #endif
-	template<open_mode om,typename... Args>
-	basic_bio_file(cstring_view file,open_interface_t<om>,Args&& ...args):
-		basic_bio_file(basic_c_file<char_type>(file,open_interface<om>,std::forward<Args>(args)...),open_interface<om>)
-	{}
 	template<typename... Args>
-	basic_bio_file(cstring_view file,open_mode om,Args&& ...args):
-		basic_bio_file(basic_c_file<char_type>(file,om,std::forward<Args>(args)...),om)
+	basic_bio_file(cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_bio_file(basic_c_file<char_type>(file,om,pm),om)
 	{}
 
-	template<open_mode om,typename... Args>
-	basic_bio_file(io_at_t,native_io_observer niob,cstring_view file,open_interface_t<om>,Args&& ...args):
-		basic_bio_file(basic_c_file<char_type>(at,niob,file,open_interface<om>,std::forward<Args>(args)...),open_interface<om>)
+	basic_bio_file(native_at_entry nate,cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_bio_file(basic_c_file<char_type>(nate,file,om,pm),om)
 	{}
-	template<typename... Args>
-	basic_bio_file(io_at_t,native_io_observer niob,cstring_view file,open_mode om,Args&& ...args):
-		basic_bio_file(basic_c_file<char_type>(at,niob,file,om,std::forward<Args>(args)...),om)
-	{}
-
 
 	inline constexpr void reset(native_handle_type newhandle=nullptr) noexcept
 	{
@@ -310,14 +308,14 @@ inline constexpr basic_bio_io_observer<ch_type> io_value_handle(basic_bio_io_obs
 	return other;
 }
 
+template<std::integral ch_type>
+inline constexpr posix_at_entry at(basic_bio_io_observer<ch_type> bio) noexcept
+{
+	return posix_at_entry{details::bio_to_fd(bio.bio)};
+}
+
 static_assert(input_stream<bio_file>);
 static_assert(output_stream<bio_file>);
-
-template<output_stream output,std::integral ch_type>
-constexpr void print_define(output& out,basic_bio_io_observer<ch_type> bio)
-{
-	print_freestanding(out,bio.native_handle());
-}
 
 template<output_stream output,std::integral ch_type>
 inline void print_define(output& out,openssl_error const& err)

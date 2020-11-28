@@ -45,7 +45,7 @@ struct io_aligned_allocator
 	}
 };
 
-template<std::integral CharT,bool need_secure_clear=false,std::size_t buffer_size = details::cal_buffer_size<CharT,true>(),typename Allocator = io_aligned_allocator<CharT>>
+template<std::integral CharT,bool need_secure_clear=false,std::size_t buffer_size = details::cal_buffer_size<CharT,true>(),typename Allocator = noexcept_allocator<CharT>>
 requires (buffer_size!=0)
 class basic_buf_handler
 {
@@ -125,7 +125,7 @@ public:
 	template<typename... Args>
 	requires std::constructible_from<Ihandler,Args...>
 	constexpr basic_ibuf(Args&&... args):ih(std::forward<Args>(args)...){}
-	inline constexpr auto& native_handle()
+	inline constexpr auto& native_handle() noexcept
 	{
 		return ih;
 	}
@@ -221,6 +221,16 @@ template<stream Ihandler,typename Buf>
 requires secure_clear_requirement_stream<Ihandler>
 inline constexpr void require_secure_clear(basic_ibuf<Ihandler,Buf>&){}
 
+template<input_stream Ihandler,typename Buf>
+requires requires(Ihandler h)
+{
+	status(h);
+}
+inline constexpr auto status(basic_ibuf<Ihandler,Buf>& ib)
+{
+	return status(ib.native_handle());
+}
+
 template<typename T,typename Iter>
 concept write_read_punned_constraints = (std::contiguous_iterator<Iter>&&sizeof(typename T::char_type)==1) ||
 	(std::random_access_iterator<Iter>&&std::same_as<typename T::char_type,typename std::iterator_traits<Iter>::value_type>);
@@ -267,7 +277,7 @@ inline constexpr Iter ibuf_read_cold(T& ib,Iter begin,Iter end)
 
 template<input_stream Ihandler,typename Buf,std::contiguous_iterator Iter>
 requires (std::same_as<std::iter_value_t<Iter>,typename Ihandler::char_type>||std::same_as<typename Ihandler::char_type,char>)
-inline constexpr Iter read(basic_ibuf<Ihandler,Buf>& ib,Iter begin,Iter end)
+[[nodiscard]] inline constexpr Iter read(basic_ibuf<Ihandler,Buf>& ib,Iter begin,Iter end)
 {
 	using char_type = typename basic_ibuf<Ihandler,Buf>::char_type;
 	if constexpr(std::same_as<char_type,std::iter_value_t<Iter>>)
@@ -288,9 +298,9 @@ inline constexpr Iter read(basic_ibuf<Ihandler,Buf>& ib,Iter begin,Iter end)
 
 template<input_stream Ihandler,std::integral ch_type,typename Buf>
 requires random_access_stream<Ihandler>
-inline constexpr auto seek(basic_ibuf<Ihandler,Buf>& ib,seek_type_t<ch_type>,std::common_type_t<std::ptrdiff_t,std::int64_t> u=0,seekdir s=seekdir::cur)
+inline constexpr auto seek(basic_ibuf<Ihandler,Buf>& ib,seek_type_t<ch_type>,std::intmax_t u=0,seekdir s=seekdir::cur)
 {
-	std::common_type_t<std::ptrdiff_t,std::int64_t> val(u-(ib.end-ib.curr));
+	std::intmax_t val(u-(ib.end-ib.curr));
 	ib.ibuffer.curr=ib.ibuffer.end;
 	return seek(ib.native_handle(),seek_type<ch_type>,val,s);
 }
@@ -374,7 +384,7 @@ public:
 	}
 	constexpr basic_obuf& operator=(basic_obuf&&) noexcept =delete;
 	constexpr basic_obuf(basic_obuf&&) noexcept=delete;
-	inline constexpr auto& native_handle()
+	inline constexpr auto& native_handle() noexcept
 	{
 		return oh;
 	}
@@ -621,6 +631,16 @@ inline constexpr decltype(auto) seek(basic_obuf<Ohandler,forcecopy,Buf>& ob,Args
 		ob.obuffer.curr=ob.obuffer.beg;
 	}
 	return seek(ob.oh,std::forward<Args>(args)...);
+}
+
+template<output_stream Ohandler,bool forcecopy,typename Buf>
+requires requires(Ohandler h)
+{
+	status(h);
+}
+inline constexpr auto status(basic_obuf<Ohandler,forcecopy,Buf>& ob)
+{
+	return status(ob.native_handle());
 }
 
 

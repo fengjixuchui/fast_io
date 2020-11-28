@@ -1,9 +1,6 @@
 #pragma once
 
-namespace fast_io
-{
-
-namespace manip
+namespace fast_io::manip
 {
 
 template<typename T,char32_t sep,std::size_t N>
@@ -41,7 +38,5 @@ struct three_two_two_sep
 {
 	T value;
 };
-
-}
 
 }

@@ -3,7 +3,9 @@
 namespace fast_io
 {
 struct null_terminated_t
-{};
+{
+explicit inline constexpr null_terminated_t() noexcept = default;
+};
 inline constexpr null_terminated_t null_terminated{};
 
 template<typename ch_type,typename tr_type = std::char_traits<ch_type>>
@@ -24,7 +26,23 @@ public:
 	using typename std::basic_string_view<ch_type,tr_type>::size_type;
 	using typename std::basic_string_view<ch_type,tr_type>::difference_type;
 	constexpr basic_cstring_view() noexcept=default;
-	constexpr basic_cstring_view(const_pointer cstr) noexcept:string_view_type(cstr){}
+	template<std::size_t len>
+	requires (len!=0)
+	constexpr basic_cstring_view(ch_type const (&cstr)[len]) noexcept:string_view_type(cstr,len-1)
+	{
+	}
+
+	template<std::size_t len>
+	requires (len!=0)
+	basic_cstring_view(char8_t const (&cstr)[len]) noexcept requires(std::same_as<ch_type,char>):string_view_type(reinterpret_cast<char const*>(cstr),len-1)
+	{
+	}
+
+	template<typename T>
+	requires (std::convertible_to<T,const_pointer>&&!std::is_array_v<T>)
+	constexpr basic_cstring_view(T const& cstr) noexcept:string_view_type(cstr)
+	{
+	}
 	constexpr basic_cstring_view(null_terminated_t, const_pointer c, size_type len) noexcept:string_view_type(c,len){}
 	constexpr basic_cstring_view(null_terminated_t, string_view_type sv) noexcept:string_view_type(sv){}
 
@@ -35,14 +53,19 @@ public:
 	})
 	constexpr basic_cstring_view(crg const& cont):string_view_type(std::ranges::data(cont),std::ranges::size(cont)){}
 
-#if __cplusplus > 201703L && __cpp_lib_concepts
+#if __cplusplus >= 201703L && __cpp_lib_concepts >= 202002L
       template<std::contiguous_iterator It, std::sized_sentinel_for<It> End>
 	requires std::same_as<std::iter_value_t<It>, ch_type>
 	  && (!std::convertible_to<End, size_type>)
 	constexpr basic_cstring_view(null_terminated_t, It first, End last): string_view_type(first,last){}
 #endif
 
-	constexpr string_view_type substr(size_type pos=0, size_type n=std::basic_string_view<ch_type,tr_type>::npos) const = delete;
+	constexpr string_view_type substr(size_type pos, size_type n=std::basic_string_view<ch_type,tr_type>::npos) const = delete;
+	constexpr basic_cstring_view substr(size_type pos=0) const = delete;
+#if __cpp_lib_filesystem >= 201703L
+	basic_cstring_view(std::filesystem::path const& pth) noexcept requires(std::same_as<std::filesystem::path::value_type,ch_type>):
+		string_view_type(pth.native()){}
+#endif
 
 	constexpr void remove_suffix(size_type n)=delete;
 
@@ -54,5 +77,11 @@ public:
 
 using cstring_view = basic_cstring_view<char>;
 using wcstring_view = basic_cstring_view<wchar_t>;
+
+#ifdef _WIN32
+using native_char_type = wchar_t;
+#else
+using native_char_type = char;
+#endif
 
 }

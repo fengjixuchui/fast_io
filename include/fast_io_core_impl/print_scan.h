@@ -10,16 +10,16 @@ template<bool space,buffer_output_stream output,character_input_stream input,typ
 inline constexpr bool scan_with_space_temporary_buffer_impl(output& buffer,input& in,T&& t)
 {
 	using no_cvref = std::remove_cvref_t<T>;
-	if(!scan_reserve_transmit(io_reserve_type<no_cvref>,buffer,in))
+	if(!scan_reserve_transmit(io_reserve_type<typename std::remove_cvref_t<input>::char_type,no_cvref>,buffer,in))
 		return false;
 	if constexpr(space)
 	{
-		space_scan_reserve_define(io_reserve_type<no_cvref>,obuffer_begin(buffer),obuffer_curr(buffer),std::forward<T>(t));
+		space_scan_reserve_define(io_reserve_type<typename std::remove_cvref_t<input>::char_type,no_cvref>,obuffer_begin(buffer),obuffer_curr(buffer),std::forward<T>(t));
 		return true;
 	}
 	else
 	{
-		scan_reserve_define(io_reserve_type<no_cvref>,obuffer_begin(buffer),obuffer_curr(buffer),std::forward<T>(t));
+		scan_reserve_define(io_reserve_type<typename std::remove_cvref_t<input>::char_type,no_cvref>,obuffer_begin(buffer),obuffer_curr(buffer),std::forward<T>(t));
 		return true;
 	}
 }
@@ -38,10 +38,10 @@ inline constexpr bool scan_with_space_temporary_buffer(input& in,T&& t)
 	{
 		return scan_define(in,std::forward<T>(t));
 	}
-	else if constexpr(reserve_size_scanable<no_cvref>)
+	else if constexpr(reserve_size_scanable<typename no_cvref_input::char_type,no_cvref>)
 	{
 		using char_type = typename std::remove_cvref_t<input>::char_type;
-		constexpr std::size_t reserve_size{scan_reserve_size(io_reserve_type<std::remove_cvref_t<T>>)};
+		constexpr std::size_t reserve_size{scan_reserve_size(io_reserve_type<char_type,std::remove_cvref_t<T>>)};
 		std::array<char_type,reserve_size> array;
 		fast_io::ospan<char_type,reserve_size,true> osp(array);
 		return scan_with_space_temporary_buffer_impl<space>(osp,in,std::forward<T>(t));
@@ -74,7 +74,7 @@ inline constexpr auto scan_with_space(input &in,T&& t)
 				{
 					auto curr{ibuffer_curr(in)};
 					auto ed{ibuffer_end(in)};
-					auto res{space_scan_reserve_define(io_reserve_type<no_cvref,not_contiguous>,curr,ed,std::forward<T>(t))};
+					auto res{space_scan_reserve_define(io_reserve_type<typename std::remove_cvref_t<input>::char_type,no_cvref,not_contiguous>,curr,ed,std::forward<T>(t))};
 					if constexpr(not_contiguous)
 					{
 						if(res==ed)[[unlikely]]
@@ -156,15 +156,17 @@ inline constexpr auto normal_scan(input &ip,Args&& ...args)
 
 }
 
-template<reserve_printable T>
-inline constexpr std::size_t print_reserve_size(io_reserve_type_t<manip::line<T>>)
+template<std::integral char_type,typename T>
+requires reserve_printable<char_type,T>
+inline constexpr std::size_t print_reserve_size(io_reserve_type_t<char_type,manip::line<T>>)
 {
 	constexpr std::size_t sz{print_reserve_size(io_reserve_type<std::remove_cvref_t<T>>)+1};
 	return sz;
 }
 
-template<std::random_access_iterator raiter,reserve_printable T,typename U>
-inline constexpr raiter print_reserve_define(io_reserve_type_t<manip::line<T>>,raiter start,U a)
+template<std::integral char_type,std::random_access_iterator raiter,typename T,typename U>
+requires reserve_printable<char_type,T>
+inline constexpr raiter print_reserve_define(io_reserve_type_t<char_type,manip::line<T>>,raiter start,U a)
 {
 	auto it{print_reserve_define(io_reserve_type<std::remove_cvref_t<T>>,start,a.reference)};
 	*it=u8'\n';
@@ -187,8 +189,10 @@ inline constexpr auto scan(input &&in,Args&& ...args)
 		details::lock_guard lg{in};
 		return scan<report_eof>(in.unlocked_handle(),std::forward<Args>(args)...);
 	}
+#if 0
 	else if constexpr(status_input_stream<input>)
 		return scan_status_define<report_eof>(in,std::forward<Args>(args)...);
+#endif
 	else if constexpr(!character_input_stream<input>)
 	{
 		single_character_input_buffer<std::remove_cvref_t<input>> scib{in};
