@@ -298,12 +298,12 @@ public:
 #ifdef _WIN32
 	explicit operator basic_win32_io_observer<char_type>() const noexcept
 	{
-		return {reinterpret_cast<void*>(details::_get_osfhandle(fd))};
+		return {reinterpret_cast<void*>(_get_osfhandle(fd))};
 	}
 	template<nt_family family>
 	explicit operator basic_nt_family_io_observer<family,char_type>() const noexcept
 	{
-		return {reinterpret_cast<void*>(details::_get_osfhandle(fd))};
+		return {reinterpret_cast<void*>(_get_osfhandle(fd))};
 	}
 #endif
 	constexpr native_handle_type release() noexcept
@@ -426,7 +426,7 @@ inline io_scatter_status_t posix_scatter_read_impl(int fd,std::span<io_scatter_t
 		if(pos_in_span<sp[i].len)[[unlikely]]
 			return {total_size,i,pos_in_span};
 	}
-	return {total_size,sp.size()};
+	return {total_size,sp.size(),0};
 }
 
 inline std::uint32_t posix_write_simple_impl(int fd,void const* address,std::uint32_t bytes_to_write)
@@ -490,7 +490,7 @@ inline io_scatter_status_t posix_scatter_write_impl(int fd,std::span<io_scatter_
 		if(sp[i].len<written)[[unlikely]]
 			return {total_size,i,written};
 	}
-	return {total_size,sp.size()};
+	return {total_size,sp.size(),0};
 }
 #endif
 
@@ -782,6 +782,10 @@ namespace details
 {
 
 #ifdef _WIN32
+inline std::intptr_t my_get_osfhandle(int fd) noexcept
+{
+	return _get_osfhandle(fd);
+}
 
 inline int open_fd_from_handle(void* handle,open_mode md)
 {
@@ -1287,7 +1291,7 @@ inline constexpr io_scatter_status_t scatter_size_to_status(std::size_t sz,std::
 			return {sz,i,total};
 		total-=sp[i].len;
 	}
-	return {sz,sp.size()};
+	return {sz,sp.size(),0};
 }
 
 inline io_scatter_status_t posix_scatter_write_impl(int fd,std::span<io_scatter_t const> sp)
