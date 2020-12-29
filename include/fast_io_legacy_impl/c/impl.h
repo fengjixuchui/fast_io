@@ -15,7 +15,7 @@ inline constexpr open_mode native_c_supported(open_mode m) noexcept
 {
 #ifdef _WIN32
 using utype = typename std::underlying_type<open_mode>::type;
-constexpr auto c_supported_values{static_cast<utype>(open_mode::binary)|
+constexpr auto c_supported_values{static_cast<utype>(open_mode::text)|
 	static_cast<utype>(open_mode::out)|
 	static_cast<utype>(open_mode::app)|
 	static_cast<utype>(open_mode::in)|
@@ -46,50 +46,50 @@ From microsoft's document. _fdopen only supports
 	{
 //Action if file already exists;	Action if file does not exist;	c-style mode;	Explanation
 //Read from start;	Failure to open;	"r";	Open a file for reading
-	case static_cast<utype>(open_mode::in):
+	case static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::text):
 		return "\x72";
 //Destroy contents;	Create new;	"w";	Create a file for writing
-	case static_cast<utype>(open_mode::out):
-	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::trunc):
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::text):
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::trunc)|static_cast<utype>(open_mode::text):
 		return "\x77";
 //Append to file;	Create new;	"a";	Append to a file
-	case static_cast<utype>(open_mode::app):
-	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::app):
+	case static_cast<utype>(open_mode::app)|static_cast<utype>(open_mode::text):
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::app)|static_cast<utype>(open_mode::text):
 		return "\x61";
 //Read from start;	Error;	"r+";		Open a file for read/write
-	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::in):
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::text):
 		return "\x72\x2b";
 //Destroy contents;	Create new;	"w+";	Create a file for read/write
-	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::trunc):
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::trunc)|static_cast<utype>(open_mode::text):
 		return "\x77\x2b";
 //Write to end;	Create new;	"a+";	Open a file for read/write
-	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::app):
-	case static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::app):
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::app)|static_cast<utype>(open_mode::text):
+	case static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::app)|static_cast<utype>(open_mode::text):
 		return "\x77\x2b";
 
 //binary support
 
 //Action if file already exists;	Action if file does not exist;	c-style mode;	Explanation
 //Read from start;	Failure to open;	"rb";	Open a file for reading
-	case static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::binary):
+	case static_cast<utype>(open_mode::in):
 		return "\x72\x62";
 //Destroy contents;	Create new;	"wb";	Create a file for writing
-	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::binary):
-	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::trunc)|static_cast<utype>(open_mode::binary):
+	case static_cast<utype>(open_mode::out):
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::trunc):
 		return "\x77\x62";
 //Append to file;	Create new;	"ab";	Append to a file
-	case static_cast<utype>(open_mode::app)|static_cast<utype>(open_mode::binary):
-	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::app)|static_cast<utype>(open_mode::binary):
+	case static_cast<utype>(open_mode::app):
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::app):
 		return "\x61\x62";
 //Read from start;	Error;	"r+b";		Open a file for read/write
-	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::binary):
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::in):
 		return "\x72\x2b\x62";
 //Destroy contents;	Create new;	"w+b";	Create a file for read/write
-	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::trunc)|static_cast<utype>(open_mode::binary):
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::trunc):
 		return "\x77\x2b\x62";
 //Write to end;	Create new;	"a+b";	Open a file for read/write
-	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::app)|static_cast<utype>(open_mode::binary):
-	case static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::app)|static_cast<utype>(open_mode::binary):
+	case static_cast<utype>(open_mode::out)|static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::app):
+	case static_cast<utype>(open_mode::in)|static_cast<utype>(open_mode::app):
 		return "\x61\x2b\x62";
 	case 0:
 		if((m&open_mode::directory)!=open_mode::none)
@@ -408,10 +408,15 @@ public:
 	{
 		return basic_posix_io_observer<char_type>{details::fp_unlocked_to_fd(fp)};
 	}
-#if defined(__WINNT__) || defined(_MSC_VER)
+#ifdef _WIN32
 	explicit operator basic_win32_io_observer<char_type>() const noexcept
 	{
 		return static_cast<basic_win32_io_observer<char_type>>(static_cast<basic_posix_io_observer<char_type>>(*this));
+	}
+	template<nt_family fam>
+	explicit operator basic_nt_family_io_observer<fam,char_type>() const noexcept
+	{
+		return static_cast<basic_nt_family_io_observer<fam,char_type>>(static_cast<basic_posix_io_observer<char_type>>(*this));
 	}
 #endif
 	constexpr native_handle_type release() noexcept
@@ -555,14 +560,15 @@ public:
 	{
 		return {details::fp_to_fd(fp)};
 	}
-#if defined(__WINNT__) || defined(_MSC_VER)
+#ifdef _WIN32
 	explicit operator basic_win32_io_observer<char_type>() const noexcept
 	{
 		return static_cast<basic_win32_io_observer<char_type>>(static_cast<basic_posix_io_observer<char_type>>(*this));
 	}
-	explicit operator basic_nt_io_observer<char_type>() const noexcept
+	template<nt_family fam>
+	explicit operator basic_nt_family_io_observer<fam,char_type>() const noexcept
 	{
-		return static_cast<basic_nt_io_observer<char_type>>(static_cast<basic_posix_io_observer<char_type>>(*this));
+		return static_cast<basic_nt_family_io_observer<fam,char_type>>(static_cast<basic_posix_io_observer<char_type>>(*this));
 	}
 #endif
 	constexpr native_handle_type release() noexcept
@@ -657,25 +663,25 @@ inline std::uintmax_t seek(basic_c_io_observer<ch_type> cfhd,std::intmax_t offse
 #if __cpp_lib_three_way_comparison >= 201907L
 
 template<std::integral ch_type>
-inline constexpr bool operator==(basic_c_io_observer<ch_type> a,basic_c_io_observer<ch_type> b)
+inline constexpr bool operator==(basic_c_io_observer<ch_type> a,basic_c_io_observer<ch_type> b) noexcept
 {
 	return a.fp==b.fp;
 }
 
 template<std::integral ch_type>
-inline constexpr bool operator==(basic_c_io_observer_unlocked<ch_type> a,basic_c_io_observer_unlocked<ch_type> b)
+inline constexpr bool operator==(basic_c_io_observer_unlocked<ch_type> a,basic_c_io_observer_unlocked<ch_type> b) noexcept
 {
 	return a.fp==b.fp;
 }
 
 template<std::integral ch_type>
-inline constexpr auto operator<=>(basic_c_io_observer<ch_type> a,basic_c_io_observer<ch_type> b)
+inline constexpr auto operator<=>(basic_c_io_observer<ch_type> a,basic_c_io_observer<ch_type> b) noexcept
 {
 	return a.fp<=>b.fp;
 }
 
 template<std::integral ch_type>
-inline constexpr auto operator<=>(basic_c_io_observer_unlocked<ch_type> a,basic_c_io_observer_unlocked<ch_type> b)
+inline constexpr auto operator<=>(basic_c_io_observer_unlocked<ch_type> a,basic_c_io_observer_unlocked<ch_type> b) noexcept
 {
 	return a.fp<=>b.fp;
 }
@@ -760,7 +766,7 @@ public:
 	{
 		posix_handle.release();
 	}
-#if defined(_WIN32)
+#ifdef _WIN32
 //windows specific. open posix file from win32 io handle
 	basic_c_file_impl(basic_win32_io_handle<char_type>&& win32_handle,open_mode om):
 		basic_c_file_impl(basic_posix_file<char_type>(std::move(win32_handle),om),to_native_c_mode(om))
@@ -771,9 +777,7 @@ public:
 		basic_c_file_impl(basic_posix_file<char_type>(std::move(nt_handle),om),to_native_c_mode(om))
 	{
 	}
-#endif
 
-#ifdef _WIN32
 	basic_c_file_impl(wcstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
 		basic_c_file_impl(basic_posix_file<typename T::char_type>(file,om,pm),om)
 	{}
@@ -947,6 +951,28 @@ using wc_io_handle = basic_c_io_handle<wchar_t>;
 using wc_file = basic_c_file<wchar_t>;
 using wc_file_unlocked = basic_c_file_unlocked<wchar_t>;
 #endif
+
+using u8c_io_observer_unlocked=basic_c_io_observer_unlocked<char8_t>;
+using u8c_io_observer=basic_c_io_observer<char8_t>;
+using u8c_io_handle_unlocked = basic_c_io_handle_unlocked<char8_t>;
+using u8c_io_handle = basic_c_io_handle<char8_t>;
+using u8c_file = basic_c_file<char8_t>;
+using u8c_file_unlocked = basic_c_file_unlocked<char8_t>;
+
+using u16c_io_observer_unlocked=basic_c_io_observer_unlocked<char16_t>;
+using u16c_io_observer=basic_c_io_observer<char16_t>;
+using u16c_io_handle_unlocked = basic_c_io_handle_unlocked<char16_t>;
+using u16c_io_handle = basic_c_io_handle<char16_t>;
+using u16c_file = basic_c_file<char16_t>;
+using u16c_file_unlocked = basic_c_file_unlocked<char16_t>;
+
+using u32c_io_observer_unlocked=basic_c_io_observer_unlocked<char32_t>;
+using u32c_io_observer=basic_c_io_observer<char32_t>;
+using u32c_io_handle_unlocked = basic_c_io_handle_unlocked<char32_t>;
+using u32c_io_handle = basic_c_io_handle<char32_t>;
+using u32c_file = basic_c_file<char32_t>;
+using u32c_file_unlocked = basic_c_file_unlocked<char32_t>;
+
 template<std::integral ch_type>
 requires zero_copy_input_stream<basic_posix_io_observer<ch_type>>
 inline decltype(auto) zero_copy_in_handle(basic_c_io_observer_unlocked<ch_type> h)

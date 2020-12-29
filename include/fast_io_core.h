@@ -24,8 +24,11 @@
 #include<cstring>		//for memcpy
 #include<bit>			//for std::endian, std::rotl and std::bit_cast etc
 
+#include<system_error>		//for std::errc
+
 
 #include"fast_io_core_impl/ebcdic.h"
+#include"fast_io_core_impl/char_category.h"
 //fast_io core
 #include"fast_io_core_impl/utils.h"
 
@@ -56,6 +59,7 @@
 
 
 #include"fast_io_core_impl/scan_freestanding.h"
+#include"fast_io_core_impl/intrinsics.h"
 
 // This should provide an option macro to disable any generation for table in freestanding environments.
 #include"fast_io_core_impl/integers/integer.h"
@@ -87,3 +91,5 @@
 #include<source_location>
 #include"fast_io_core_impl/source_location.h"
 #endif
+
+#include"fast_io_core_impl/posix_error_scatter.h"

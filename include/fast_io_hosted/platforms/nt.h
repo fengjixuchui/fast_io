@@ -64,7 +64,7 @@ std::uint32_t ObjAttributes{};
 https://docs.microsoft.com/en-us/windows/win32/secauthz/access-mask-format
 */
 
-inline constexpr nt_open_mode calculate_nt_open_mode(open_mode value,perms pm)
+inline constexpr nt_open_mode calculate_nt_open_mode(open_mode value,perms pm) noexcept
 {
 	nt_open_mode mode;
 	bool generic_write{};
@@ -450,13 +450,13 @@ public:
 #if __cpp_lib_three_way_comparison >= 201907L
 
 template<nt_family family,std::integral ch_type>
-inline constexpr bool operator==(basic_nt_family_io_observer<family,ch_type> a,basic_nt_family_io_observer<family,ch_type> b)
+inline constexpr bool operator==(basic_nt_family_io_observer<family,ch_type> a,basic_nt_family_io_observer<family,ch_type> b) noexcept
 {
 	return a.handle==b.handle;
 }
 
 template<nt_family family,std::integral ch_type>
-inline constexpr auto operator<=>(basic_nt_family_io_observer<family,ch_type> a,basic_nt_family_io_observer<family,ch_type> b)
+inline constexpr auto operator<=>(basic_nt_family_io_observer<family,ch_type> a,basic_nt_family_io_observer<family,ch_type> b) noexcept
 {
 	return a.handle<=>b.handle;
 }
