@@ -19,23 +19,31 @@ inline constexpr bool compile_time_compare(char_type1 const (&a)[n1],char_type2 
 
 extern "C" void
 #ifdef _WIN32
-__stdcall __declspec(dllexport)
+__declspec(dllexport) __stdcall
 #endif
 export_locale_data(lc_locale* lc_ptr) noexcept
 {
-	using lc_all_ptr [[gnu::may_alias]] = lc_all const*;
+	using lc_all_ptr
+#ifndef _MSC_VER
+	[[gnu::may_alias]]
+#endif
+	= lc_all const*;
 	lc_all_ptr ptr;
-	if constexpr(compile_time_compare("😀",u8"😀"))
+	if constexpr(compile_time_compare("我",u8"我"))
 		ptr=reinterpret_cast<lc_all_ptr>(&u8lc_all_global);
 	else
 		ptr=&lc_all_global;
-	using wlc_all_ptr [[gnu::may_alias]] = wlc_all const*;
+	using wlc_all_ptr
+#ifndef _MSC_VER
+	[[gnu::may_alias]]
+#endif
+	= wlc_all const*;
 	wlc_all_ptr wptr;
-	if constexpr(compile_time_compare(u8"😀",L"😀"))
+	if constexpr(compile_time_compare(u8"我",L"我"))
 		wptr=reinterpret_cast<wlc_all_ptr>(&u8lc_all_global);
-	else if constexpr(compile_time_compare(u"😀",L"😀"))
+	else if constexpr(compile_time_compare(u"我",L"我"))
 		wptr=reinterpret_cast<wlc_all_ptr>(&u16lc_all_global);
-	else if constexpr(compile_time_compare(U"😀",L"😀"))
+	else if constexpr(compile_time_compare(U"我",L"我"))
 		wptr=reinterpret_cast<wlc_all_ptr>(&u32lc_all_global);
 	else
 		wptr=&wlc_all_global;

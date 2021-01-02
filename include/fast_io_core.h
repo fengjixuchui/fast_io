@@ -93,3 +93,4 @@
 #endif
 
 #include"fast_io_core_impl/posix_error_scatter.h"
+#include"fast_io_core_impl/iso/isos.h"

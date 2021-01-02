@@ -27,10 +27,10 @@ struct scan_skip_type_t
 template<typename T>
 inline constexpr scan_skip_type_t<T> scan_skip_type{};
 
-template<typename T>
-concept scanable_skipping = requires(scan_skip_type_t<T> t, char8_t const* begin, char8_t const* end)
+template<typename char_type,typename T>
+concept scanable_skipping = requires(scan_skip_type_t<T> t, char_type const* begin, char_type const* end)
 {
-	{ scan_skip_define(scan_skip_type<T>, begin, end) }->std::convertible_to<char8_t const*>;
+	{ scan_skip_define(scan_skip_type<T>, begin, end) }->std::convertible_to<char_type const*>;
 };
 
 
@@ -62,9 +62,45 @@ struct unget_temp_buffer
 	constexpr unget_temp_buffer(T in):input(in){}
 	unget_temp_buffer(unget_temp_buffer const&)=delete;
 	unget_temp_buffer& operator=(unget_temp_buffer const&)=delete;
-	constexpr ~unget_temp_buffer() requires requires(typename T::char_type ch)
+#ifdef __clang__
+	constexpr ~unget_temp_buffer()
 	{
-		try_unget(input,ch);
+		if constexpr(requires()
+		{
+			try_unget(input,buffer);
+		})
+		{
+#ifdef __cpp_exceptions
+		if constexpr(noexcept(try_unget(input,buffer)))
+		{
+			if(pos!=pos_end)
+				try_unget(input,buffer);
+		}
+		else
+		{
+			try
+			{
+				if(pos!=pos_end)
+					try_unget(input,buffer);
+			}
+			catch(...)
+			{
+			}
+		}
+#else
+		if(pos!=pos_end)
+			try_unget(input,buffer);
+#endif
+		}
+	}
+#else
+
+#if __cpp_constexpr_dynamic_alloc >= 201907L
+	constexpr
+#endif
+	~unget_temp_buffer() requires requires()
+	{
+		try_unget(input,buffer);
 	}
 	{
 #ifdef __cpp_exceptions
@@ -89,7 +125,11 @@ struct unget_temp_buffer
 			try_unget(input,buffer);
 #endif
 	}
-	constexpr ~unget_temp_buffer() = default;
+#if __cpp_constexpr_dynamic_alloc >= 201907L
+	constexpr
+#endif
+	~unget_temp_buffer() = default;
+#endif
 };
 
 template<input_stream T,std::input_or_output_iterator Iter>
@@ -132,13 +172,19 @@ inline constexpr auto ibuffer_set_curr(unget_temp_buffer<T>& in,typename T::char
 	in.pos=ptr-std::addressof(in.buffer);
 }
 
+namespace details
+{
+template<typename T>
+concept try_get_input_stream=requires(T in)
+{
+	{try_get(in)}->std::convertible_to<std::pair<typename T::char_type,bool>>;
+};
+}
+
 template<typename T>
 inline constexpr bool underflow(unget_temp_buffer<T>& in)
 {
-	if constexpr(requires()
-	{
-		{try_get(in.input)}->std::convertible_to<std::pair<typename T::char_type,bool>>;
-	})
+	if constexpr(details::try_get_input_stream<T>)
 	{
 		auto ret{try_get(in.input)};
 		in.buffer=ret.first;
@@ -190,7 +236,7 @@ requires (scanable<input,T>||context_scanable<typename input::char_type,T,false>
 		auto end{ibuffer_end(in)};
 		if constexpr(contiguous_input_stream<input>)
 		{
-			if constexpr(scanable_skipping<T>)
+			if constexpr(scanable_skipping<char_type,T>)
 			{
 				curr=scan_skip_define(scan_skip_type<T>,curr,end);
 				if(curr==end)
@@ -200,7 +246,7 @@ requires (scanable<input,T>||context_scanable<typename input::char_type,T,false>
 			{
 				auto state_machine{scan_context_define(scan_context<context_scanable<char_type,T,true>>,curr,end,arg)};
 				ibuffer_set_curr(in, state_machine.iter);
-				if(state_machine!=std::errc{})
+				if(state_machine.code!=std::errc{})
 				{
 					if(state_machine.code==std::errc::resource_unavailable_try_again)
 						return false;
@@ -213,7 +259,7 @@ requires (scanable<input,T>||context_scanable<typename input::char_type,T,false>
 		}
 		else
 		{
-			if constexpr(scanable_skipping<T>)
+			if constexpr(scanable_skipping<char_type,T>)
 			{
 				for(;(curr=scan_skip_define(scan_skip_type<T>,curr,end))==end;)
 				{
@@ -257,7 +303,8 @@ requires (status_input_stream<input>||input_stream<input>)
 	else if constexpr(mutex_stream<input>)
 	{
 		details::lock_guard lg{in};
-		return scan_freestanding_decay(in.unlocked_handle(),args...);
+		decltype(auto) unlocked_in{in.unlocked_handle()};
+		return scan_freestanding_decay(io_ref(unlocked_in),args...);
 	}
 	else if constexpr(buffer_input_stream<input>)
 		return (details::scan_single_impl(in,args)&&...);
