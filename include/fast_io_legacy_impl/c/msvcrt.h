@@ -79,12 +79,35 @@ inline void overflow(c_io_observer_unlocked cio,char ch)
 		throw_posix_error();
 }
 
-inline constexpr bool obuffer_is_active(c_io_observer_unlocked cio) noexcept
+[[gnu::may_alias]] inline wchar_t* ibuffer_begin(wc_io_observer_unlocked cio) noexcept
 {
-	return cio.fp->_base;
+	return bit_cast<wchar_t*>(cio.fp->_base);
 }
 
+[[gnu::may_alias]] inline wchar_t* ibuffer_curr(wc_io_observer_unlocked cio) noexcept
+{
+	return bit_cast<wchar_t*>(cio.fp->_ptr);
+}
 
+[[gnu::may_alias]] inline wchar_t* ibuffer_end(wc_io_observer_unlocked cio) noexcept
+{
+	return bit_cast<wchar_t*>(cio.fp->_ptr+cio.fp->_cnt);
+}
+
+inline void ibuffer_set_curr(wc_io_observer_unlocked cio, [[gnu::may_alias]] wchar_t* ptr) noexcept
+{
+	cio.fp->_cnt-=reinterpret_cast<char*>(ptr)-cio.fp->_ptr;
+	cio.fp->_ptr=reinterpret_cast<char*>(ptr);
+}
+
+inline bool underflow(wc_io_observer_unlocked cio) noexcept
+{
+	if(_filbuf(cio.fp)==WEOF)[[unlikely]]
+		return false;
+	++cio.fp->_cnt;
+	--cio.fp->_ptr;
+	return true;
+}
 
 [[gnu::may_alias]] inline char8_t* ibuffer_begin(u8c_io_observer_unlocked cio) noexcept
 {
@@ -103,8 +126,8 @@ inline constexpr bool obuffer_is_active(c_io_observer_unlocked cio) noexcept
 
 inline void ibuffer_set_curr(u8c_io_observer_unlocked cio,[[gnu::may_alias]] char8_t* ptr) noexcept
 {
-	cio.fp->_cnt-=reinterpret_cast<char*>(ptr)-cio.fp->_ptr;
-	cio.fp->_ptr=reinterpret_cast<char*>(ptr);
+	cio.fp->_cnt-=bit_cast<char*>(ptr)-cio.fp->_ptr;
+	cio.fp->_ptr=bit_cast<char*>(ptr);
 }
 
 inline bool underflow(u8c_io_observer_unlocked cio) noexcept
@@ -141,45 +164,8 @@ inline void obuffer_set_curr(u8c_io_observer_unlocked cio,[[gnu::may_alias]] cha
 inline void overflow(u8c_io_observer_unlocked cio,char8_t ch)
 {
 	cio.fp->_flag|=0x010000;
-	if(_flsbuf(static_cast<int>(ch),cio.fp)==EOF)[[unlikely]]
+	if(_flsbuf(static_cast<int>(static_cast<unsigned char>(ch)),cio.fp)==EOF)[[unlikely]]
 		throw_posix_error();
-}
-
-inline constexpr bool obuffer_is_active(u8c_io_observer_unlocked cio) noexcept
-{
-	return cio.fp->_base;
-}
-
-
-
-[[gnu::may_alias]] inline wchar_t* ibuffer_begin(wc_io_observer_unlocked cio) noexcept
-{
-	return bit_cast<wchar_t*>(cio.fp->_base);
-}
-
-[[gnu::may_alias]] inline wchar_t* ibuffer_curr(wc_io_observer_unlocked cio) noexcept
-{
-	return bit_cast<wchar_t*>(cio.fp->_ptr);
-}
-
-[[gnu::may_alias]] inline wchar_t* ibuffer_end(wc_io_observer_unlocked cio) noexcept
-{
-	return bit_cast<wchar_t*>(cio.fp->_ptr+cio.fp->_cnt);
-}
-
-inline void ibuffer_set_curr(wc_io_observer_unlocked cio, [[gnu::may_alias]] wchar_t* ptr) noexcept
-{
-	cio.fp->_cnt-=reinterpret_cast<char*>(ptr)-cio.fp->_ptr;
-	cio.fp->_ptr=reinterpret_cast<char*>(ptr);
-}
-
-inline bool underflow(wc_io_observer_unlocked cio) noexcept
-{
-	if(_filbuf(cio.fp)==WEOF)[[unlikely]]
-		return false;
-	++cio.fp->_cnt;
-	--cio.fp->_ptr;
-	return true;
 }
 
 [[gnu::may_alias]] inline wchar_t* obuffer_begin(wc_io_observer_unlocked cio) noexcept
@@ -211,13 +197,68 @@ inline void overflow(wc_io_observer_unlocked cio,wchar_t ch)
 		throw_posix_error();
 }
 
-inline constexpr bool obuffer_is_active(wc_io_observer_unlocked cio) noexcept
+
+[[gnu::may_alias]] inline char16_t* obuffer_begin(u16c_io_observer_unlocked cio) noexcept
 {
-	return cio.fp->_base;
+	return bit_cast<char16_t*>(cio.fp->_base);
+}
+
+[[gnu::may_alias]] inline char16_t* obuffer_curr(u16c_io_observer_unlocked cio) noexcept
+{
+	return bit_cast<char16_t*>(cio.fp->_ptr);
+}
+
+[[gnu::may_alias]] inline char16_t* obuffer_end(u16c_io_observer_unlocked cio) noexcept
+{
+	return bit_cast<char16_t*>(cio.fp->_base+cio.fp->_bufsiz);
+}
+
+inline void obuffer_set_curr(u16c_io_observer_unlocked cio,[[gnu::may_alias]] char16_t* ptr) noexcept
+{
+	cio.fp->_flag|=0x010000;
+	cio.fp->_cnt-=bit_cast<char*>(ptr)-cio.fp->_ptr;
+	cio.fp->_ptr=bit_cast<char*>(ptr);
+}
+
+inline void overflow(u16c_io_observer_unlocked cio,char16_t ch)
+{
+	obuffer_set_curr(cio,obuffer_end(cio));
+	if(fputwc(static_cast<wint_t>(static_cast<std::make_unsigned_t<char16_t>>(ch)),cio.fp)==WEOF)[[unlikely]]
+		throw_posix_error();
+}
+
+[[gnu::may_alias]] inline char16_t* ibuffer_begin(u16c_io_observer_unlocked cio) noexcept
+{
+	return bit_cast<char16_t*>(cio.fp->_base);
+}
+
+[[gnu::may_alias]] inline char16_t* ibuffer_curr(u16c_io_observer_unlocked cio) noexcept
+{
+	return bit_cast<char16_t*>(cio.fp->_ptr);
+}
+
+[[gnu::may_alias]] inline char16_t* ibuffer_end(u16c_io_observer_unlocked cio) noexcept
+{
+	return bit_cast<char16_t*>(cio.fp->_ptr+cio.fp->_cnt);
+}
+
+inline void ibuffer_set_curr(u16c_io_observer_unlocked cio, [[gnu::may_alias]] char16_t* ptr) noexcept
+{
+	cio.fp->_cnt-=reinterpret_cast<char*>(ptr)-cio.fp->_ptr;
+	cio.fp->_ptr=reinterpret_cast<char*>(ptr);
+}
+
+inline bool underflow(u16c_io_observer_unlocked cio) noexcept
+{
+	if(_filbuf(cio.fp)==WEOF)[[unlikely]]
+		return false;
+	++cio.fp->_cnt;
+	--cio.fp->_ptr;
+	return true;
 }
 
 static_assert(buffer_io_stream<c_io_observer_unlocked>);
-static_assert(maybe_buffer_output_stream<c_io_observer_unlocked>);
 static_assert(buffer_io_stream<wc_io_observer_unlocked>);
-static_assert(maybe_buffer_output_stream<wc_io_observer_unlocked>);
+static_assert(buffer_io_stream<u8c_io_observer_unlocked>);
+static_assert(buffer_io_stream<u16c_io_observer_unlocked>);
 }

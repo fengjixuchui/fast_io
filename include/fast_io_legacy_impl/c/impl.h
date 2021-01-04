@@ -639,8 +639,19 @@ template<std::integral T,std::contiguous_iterator Iter>
 	return read(cfhd_unlocked,begin,end);
 }
 
+namespace details
+{
+inline void c_write_impl(void const* __restrict ptr,std::size_t size,std::size_t count,std::FILE* __restrict fp)
+{
+	if(fwrite(ptr,size,count,fp)<count)
+		throw_posix_error();
+	return;	
+}
+}
+
 template<std::integral T,std::contiguous_iterator Iter>
-inline decltype(auto) write(basic_c_io_observer<T> cfhd,Iter begin,Iter end)
+requires (std::same_as<T,char>||std::same_as<std::iter_value_t<Iter>,T>)
+inline Iter write(basic_c_io_observer<T> cfhd,Iter begin,Iter end)
 {
 	details::lock_guard lg{cfhd};
 	basic_c_io_observer_unlocked<T> cfhd_unlocked{cfhd.fp};
@@ -759,6 +770,8 @@ public:
 	{
 		if(native_handle()==nullptr)
 			throw_posix_error();
+		if constexpr(sizeof(wchar_t)!=sizeof(char)&&sizeof(wchar_t)==sizeof(char_type))
+			std::fwide(this->fp,1);
 	}
 
 	basic_c_file_impl(basic_posix_io_handle<char_type>&& posix_handle,open_mode om):
@@ -793,7 +806,7 @@ public:
 	{}
 
 	template<stream stm,typename... Args>
-	basic_c_file_impl(io_cookie_t,cstring_view mode,std::in_place_type_t<stm>,Args&& ...args)
+	basic_c_file_impl(io_cookie_t,[[maybe_unused]] cstring_view mode,std::in_place_type_t<stm>,[[maybe_unused]] Args&& ...args)
 	{
 #if defined(_GNU_SOURCE) || defined(__MUSL__) || defined(__NEED___isoc_va_list)
 		std::unique_ptr<stm> up{std::make_unique<std::remove_cvref_t<stm>>(std::forward<std::remove_cvref_t<stm>>(args)...)};
@@ -810,7 +823,7 @@ public:
 	}
 
 	template<stream stm>
-	basic_c_file_impl(io_cookie_t,cstring_view mode,stm& reff)
+	basic_c_file_impl(io_cookie_t,[[maybe_unused]] cstring_view mode,[[maybe_unused]] stm& reff)
 	{
 #if defined(_GNU_SOURCE) || defined(__MUSL__) || defined(__NEED___isoc_va_list)
 		if(!(this->native_handle()=fopencookie(std::addressof(reff),mode.c_str(),c_io_cookie_functions<stm&>.native_functions)))[[unlikely]]
@@ -1008,7 +1021,6 @@ inline decltype(auto) zero_copy_out_handle(basic_c_io_observer_unlocked<ch_type>
 #elif defined(__MSDOS__)
 #include"msdos.h"
 #endif
-
 #ifndef __MSDOS__
 #include"general.h"
 #endif
