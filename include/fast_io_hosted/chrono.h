@@ -240,7 +240,7 @@ constexpr Iter print_reserve_define(io_reserve_type_t<char_type,std::chrono::dur
 
 
 
-#if __cpp_lib_chrono >= 201907L || __GNUC__>= 11
+#if __cpp_lib_chrono >= 201907L || __GLIBCXX__ >= 20201001
 
 template<std::integral char_type>
 inline constexpr std::size_t print_reserve_size(io_reserve_type_t<char_type,std::chrono::year>) noexcept
@@ -309,6 +309,7 @@ inline constexpr Iter print_reserve_define_ymd_impl(Iter it,T ymd) noexcept
 			*it=L'-';
 		else
 			*it=u8'-';
+		++it;
 	}
 	else
 	{
@@ -323,7 +324,6 @@ inline constexpr Iter print_reserve_define_ymd_impl(Iter it,T ymd) noexcept
 		else
 			it=details::copy_string_literal(u8"--",it);
 	}
-	++it;
 	it=chrono_two_digits_impl(it,static_cast<unsigned>(ymd.month()));
 	if constexpr(requires()
 	{

@@ -177,6 +177,29 @@ inline constexpr caiter print_reserve_define(io_reserve_type_t<char_type,file_ty
 
 enum class shut{in,out,io};
 
+/*
+https://www.unix.com/man-page/FreeBSD/2/clock_gettime/
+https://linux.die.net/man/3/clock_gettime
+*/
+
+enum class posix_clock_id
+{
+realtime,
+realtime_alarm,
+realtime_coarse,
+tai,
+monotonic,
+monotonic_coarse,
+monotonic_raw,
+monotonic_raw_approx,
+boottime,
+boottime_alarm,
+uptime_raw,
+uptime_raw_approx,
+process_cputime_id,
+thread_cputime_id
+};
+
 enum class open_mode:std::uint32_t
 {
 none=0,
@@ -503,7 +526,7 @@ struct native_interface_t
 {
 explicit constexpr native_interface_t() noexcept=default;
 };
-inline constexpr native_interface_t native_interface;
+inline constexpr native_interface_t native_interface{};
 
 struct io_cookie_t
 {

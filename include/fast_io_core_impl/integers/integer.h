@@ -112,7 +112,6 @@ constexpr Iter process_integer_output(Iter iter,int_type i) noexcept
 	}
 }
 
-
 }
 
 template<std::integral char_type,details::my_integral int_type>
@@ -181,6 +180,62 @@ template<std::integral char_type,std::random_access_iterator caiter,char8_t base
 constexpr caiter print_reserve_define(io_reserve_type_t<char_type,manipulators::base_t<base,uppercase,std::byte>>,caiter iter,P ref) noexcept
 {
 	return details::process_integer_output<base,uppercase>(iter,std::to_integer<std::uint8_t>(ref.reference));
+}
+
+template<std::integral char_type>
+inline constexpr std::size_t print_reserve_size(io_reserve_type_t<char_type,manipulators::blvw_t<bool>>) noexcept
+{
+	return 5;
+}
+
+namespace details
+{
+template<std::random_access_iterator caiter>
+inline constexpr caiter print_reserve_bool_view_define_impl(caiter iter,bool v) noexcept
+{
+	using char_type = std::iter_value_t<caiter>;
+	if constexpr(std::same_as<char_type,char>)
+	{
+		if(v)
+			return copy_string_literal("true",iter);
+		else
+			return copy_string_literal("false",iter);
+	}
+	else if constexpr(std::same_as<char_type,wchar_t>)
+	{
+		if(v)
+			return copy_string_literal(L"true",iter);
+		else
+			return copy_string_literal(L"false",iter);
+	}
+	else if constexpr(std::same_as<char_type,char16_t>)
+	{
+		if(v)
+			return copy_string_literal(u"true",iter);
+		else
+			return copy_string_literal(u"false",iter);
+	}
+	else if constexpr(std::same_as<char_type,char32_t>)
+	{
+		if(v)
+			return copy_string_literal(U"true",iter);
+		else
+			return copy_string_literal(U"false",iter);
+	}
+	else
+	{
+		if(v)
+			return copy_string_literal(u8"true",iter);
+		else
+			return copy_string_literal(u8"false",iter);
+	}
+}
+}
+
+template<std::integral char_type,std::random_access_iterator caiter>
+inline constexpr caiter print_reserve_define(io_reserve_type_t<char_type,manipulators::blvw_t<bool>>,caiter iter,manipulators::blvw_t<bool> ref) noexcept
+{
+	return details::print_reserve_bool_view_define_impl(iter,ref.reference);
 }
 
 namespace details
