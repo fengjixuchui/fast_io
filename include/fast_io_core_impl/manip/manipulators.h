@@ -24,6 +24,88 @@ struct blvw_t
 	T reference;
 };
 
+template<typename T>
+struct comma_t
+{
+	using manip_tag = manip_tag_t;
+	T reference;
+};
+
+enum class floating_representation
+{
+scientific,fixed,general
+};
+
+/*
+Referenced from dragonbox paper
+https://github.com/jk-jeon/dragonbox/blob/master/other_files/Dragonbox.pdf
+*/
+
+/*
+https://github.com/jk-jeon/dragonbox
+jkj::dragonbox::policy::rounding_mode::nearest_to_even: This is the default policy. Use round-to-nearest, tie-to-even rounding mode.
+
+jkj::dragonbox::policy::rounding_mode::nearest_to_odd: Use round-to-nearest, tie-to-odd rounding mode.
+
+jkj::dragonbox::policy::rounding_mode::nearest_toward_plus_infinity: Use round-to-nearest, tie-toward-plus-infinity rounding mode.
+
+jkj::dragonbox::policy::rounding_mode::nearest_toward_minus_infinity: Use round-to-nearest, tie-toward-minus-infinity rounding mode.
+
+jkj::dragonbox::policy::rounding_mode::nearest_toward_zero: Use round-to-nearest, tie-toward-zero rounding mode. This will produce the fastest code among all round-to-nearest rounding modes.
+
+jkj::dragonbox::policy::rounding_mode::nearest_away_from_zero: Use round-to-nearest, tie-away-from-zero rounding mode.
+
+jkj::dragonbox::policy::rounding_mode::nearest_to_even_static_boundary: Use round-to-nearest, tie-to-even rounding mode, but there will be completely independent code paths for even inputs and odd inputs. This will produce a bigger binary, but might run faster than jkj::dragonbox::policy::rounding_mode::nearest_to_even for some situation.
+
+jkj::dragonbox::policy::rounding_mode::nearest_to_odd_static_boundary: Use round-to-nearest, tie-to-odd rounding mode, but there will be completely independent code paths for even inputs and odd inputs. This will produce a bigger binary, but might run faster than jkj::dragonbox::policy::rounding_mode::nearest_to_odd for some situation.
+
+jkj::dragonbox::policy::rounding_mode::nearest_toward_plus_infinity_static_boundary: Use round-to-nearest, tie-toward-plus-infinity rounding mode, but there will be completely independent code paths for positive inputs and negative inputs. This will produce a bigger binary, but might run faster than jkj::dragonbox::policy::rounding_mode::nearest_toward_plus_infinity for some situation.
+
+jkj::dragonbox::policy::rounding_mode::nearest_toward_minus_infinity_static_boundary: Use round-to-nearest, tie-toward-plus-infinity rounding mode, but there will be completely independent code paths for positive inputs and negative inputs. This will produce a bigger binary, but might run faster than jkj::dragonbox::policy::rounding_mode::nearest_toward_minus_infinity for some situation.
+
+jkj::dragonbox::policy::rounding_mode::toward_plus_infinity: Use round-toward-plus-infinity rounding mode.
+
+jkj::dragonbox::policy::rounding_mode::toward_minus_infinity: Use round-toward-minus-infinity rounding mode.
+
+jkj::dragonbox::policy::rounding_mode::toward_zero: Use round-toward-zero rounding mode.
+
+jkj::dragonbox::policy::rounding_mode::away_from_zero: Use away-from-zero rounding mode.
+
+*/
+
+enum class rounding_mode
+{
+nearest_to_even,
+nearest_to_odd,
+nearest_toward_plus_infinity,
+nearest_toward_minus_infinity,
+nearest_toward_zero,
+nearest_away_from_zero,
+nearest_to_even_static_boundary,
+nearest_to_odd_static_boundary,
+nearest_toward_plus_infinity_static_boundary,
+nearest_toward_minus_infinity_static_boundary,
+toward_plus_infinity,
+toward_minus_infinity,
+toward_zero,
+away_from_zero,
+};
+
+template<typename T,floating_representation format,rounding_mode mode=rounding_mode::nearest_to_even,std::size_t base=10>
+struct floating_format_t
+{
+	using manip_tag = manip_tag_t;
+	T reference;
+};
+
+template<typename T,floating_representation format,rounding_mode mode=rounding_mode::nearest_to_even,std::size_t base=10>
+struct floating_format_precision_t
+{
+	using manip_tag = manip_tag_t;
+	T reference;
+	std::size_t precision;
+};
+
 template<std::size_t bs,::fast_io::details::my_integral T>
 requires (2<=bs&&bs<=36)
 inline constexpr std::conditional_t<bs==10,parameter<T&>,base_t<bs,false,T&>> base_get(T& reference) noexcept
@@ -246,6 +328,144 @@ inline constexpr auto purify(T&& ref) noexcept
 inline constexpr blvw_t<bool> blvw(bool value) noexcept
 {
 	return {value};
+}
+
+
+template<typename T1,typename T2>
+requires requires(T1&& t1,T2&& t2)
+{
+	std::same_as<decltype(print_alias_define(io_alias,std::forward<T1>(t1))),
+	decltype(print_alias_define(io_alias,std::forward<T2>(t2)))>;
+}
+inline constexpr auto cond(bool con,T1&& t1,T2&& t2)
+{
+	if(con)
+		return print_alias_define(io_alias,std::forward<T1>(t1));
+	return print_alias_define(io_alias,std::forward<T2>(t2));
+}
+
+enum class width_mode
+{
+left,middle,right,internal
+};
+
+template<width_mode wm,typename T>
+requires (static_cast<std::size_t>(wm)<4)
+struct width_t
+{
+	using manip_tag = manip_tag_t;
+	T reference;
+	std::size_t width;
+};
+
+template<width_mode wm,typename T,std::integral char_type>
+requires (static_cast<std::size_t>(wm)<4)
+struct width_ch_t
+{
+	using manip_tag = manip_tag_t;
+	T reference;
+	std::size_t width;
+	char_type ch;
+};
+
+template<typename T>
+inline constexpr auto left_width(T&& t,std::size_t w) noexcept
+{
+	using value_type = std::remove_cvref_t<T>;
+	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
+		return width_t<width_mode::left,value_type>{t,w};
+	else
+		return width_t<width_mode::left,std::remove_reference_t<T> const&>{t,w};
+}
+
+template<typename T>
+inline constexpr auto middle_width(T&& t,std::size_t w) noexcept
+{
+	using value_type = std::remove_cvref_t<T>;
+	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
+		return width_t<width_mode::middle,value_type>{t,w};
+	else
+		return width_t<width_mode::middle,std::remove_reference_t<T> const&>{t,w};
+}
+
+template<typename T>
+inline constexpr auto right_width(T&& t,std::size_t w) noexcept
+{
+	using value_type = std::remove_cvref_t<T>;
+	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
+		return width_t<width_mode::right,value_type>{t,w};
+	else
+		return width_t<width_mode::right,std::remove_reference_t<T> const&>{t,w};
+}
+
+template<typename T>
+inline constexpr auto internal_width(T&& t,std::size_t w) noexcept
+{
+	using value_type = std::remove_cvref_t<T>;
+	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
+		return width_t<width_mode::internal,value_type>{t,w};
+	else
+		return width_t<width_mode::internal,std::remove_reference_t<T> const&>{t,w};
+}
+
+template<width_mode mode,typename T>
+inline constexpr auto width(T&& t,std::size_t w) noexcept
+{
+	using value_type = std::remove_cvref_t<T>;
+	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
+		return width_t<mode,value_type>{t,w};
+	else
+		return width_t<mode,std::remove_reference_t<T> const&>{t,w};
+}
+
+template<typename T,std::integral char_type>
+inline constexpr auto left_width(T&& t,std::size_t w,char_type ch) noexcept
+{
+	using value_type = std::remove_cvref_t<T>;
+	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
+		return width_ch_t<width_mode::left,value_type,std::remove_cvref_t<char_type>>{t,w,ch};
+	else
+		return width_ch_t<width_mode::left,std::remove_reference_t<T> const,std::remove_cvref_t<char_type>>{t,w,ch};
+}
+
+template<typename T,std::integral char_type>
+inline constexpr auto right_width(T&& t,std::size_t w,char_type ch) noexcept
+{
+	using value_type = std::remove_cvref_t<T>;
+	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
+		return width_ch_t<width_mode::right,value_type,std::remove_cvref_t<char_type>>{t,w,ch};
+	else
+		return width_ch_t<width_mode::right,std::remove_reference_t<T> const&,std::remove_cvref_t<char_type>>{t,w,ch};
+}
+
+template<typename T,std::integral char_type>
+inline constexpr auto middle_width(T&& t,std::size_t w,char_type ch) noexcept
+{
+	using value_type = std::remove_cvref_t<T>;
+	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
+		return width_ch_t<width_mode::middle,value_type,std::remove_cvref_t<char_type>>{t,w,ch};
+	else
+		return width_ch_t<width_mode::middle,std::remove_reference_t<T> const&,std::remove_cvref_t<char_type>>{t,w,ch};
+}
+
+template<typename T,std::integral char_type>
+inline constexpr auto internal_width(T&& t,std::size_t w,char_type ch) noexcept
+{
+	using value_type = std::remove_cvref_t<T>;
+	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
+		return width_ch_t<width_mode::internal,value_type,std::remove_cvref_t<char_type>>{t,w,ch};
+	else
+		return width_ch_t<width_mode::internal,std::remove_reference_t<T> const&,std::remove_cvref_t<char_type>>{t,w,ch};
+}
+
+template<width_mode mode,typename T,std::integral char_type>
+inline constexpr auto width(T&& t,std::size_t w,char_type ch) noexcept
+{
+	using value_type = std::remove_cvref_t<T>;
+	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
+		return width_ch_t<mode,value_type,std::remove_cvref_t<char_type>>{t,w,ch};
+	else
+		return width_ch_t<mode,std::remove_reference_t<T> const&,std::remove_cvref_t<char_type>>{t,w,ch};
 }
 
 }

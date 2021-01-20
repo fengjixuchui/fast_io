@@ -895,7 +895,7 @@ inline posix_file_status win32_status_impl(void* __restrict handle)
 	if(ft==file_type::fifo||ft==file_type::character)
 		return posix_file_status{0,0,static_cast<perms>(436),ft,1,0,0,
 			static_cast<std::uintmax_t>(reinterpret_cast<std::uintptr_t>(handle)),
-			0,65536,0,{},{},{},0,0};
+			0,131072,0,{},{},{},0,0};
 	by_handle_file_information bhdi;
 	if(!GetFileInformationByHandle(handle,std::addressof(bhdi)))
 		throw_win32_error();
@@ -914,7 +914,7 @@ inline posix_file_status win32_status_impl(void* __restrict handle)
 	static_cast<std::uintmax_t>(bhdi.nNumberOfLinks),
 	0,0,0,
 	file_size,
-	65536,file_size>>9,
+	131072,file_size>>9,
 	to_struct_timespec(bhdi.ftLastAccessTime),
 	to_struct_timespec(bhdi.ftLastWriteTime),
 	to_struct_timespec(bhdi.ftCreationTime),
@@ -1020,39 +1020,39 @@ using u32win32_pipe=basic_win32_pipe<char32_t>;
 using io_async_observer=win32_io_observer;
 using io_async_scheduler=win32_file;
 
-inline constexpr std::uint32_t win32_stdin_number(-10);
-inline constexpr std::uint32_t win32_stdout_number(-11);
-inline constexpr std::uint32_t win32_stderr_number(-12);
+inline constexpr std::uint32_t win32_stdin_number(static_cast<std::uint32_t>(-10));
+inline constexpr std::uint32_t win32_stdout_number(static_cast<std::uint32_t>(-11));
+inline constexpr std::uint32_t win32_stderr_number(static_cast<std::uint32_t>(-12));
 
 template<std::integral char_type=char>
 inline basic_win32_io_observer<char_type> win32_stdin() noexcept
 {
-	return {fast_io::win32::GetStdHandle(-10)};
+	return {fast_io::win32::GetStdHandle(win32_stdin_number)};
 }
 template<std::integral char_type=char>
 inline basic_win32_io_observer<char_type> win32_stdout() noexcept
 {
-	return basic_win32_io_observer<char_type>{fast_io::win32::GetStdHandle(-11)};
+	return basic_win32_io_observer<char_type>{fast_io::win32::GetStdHandle(win32_stdout_number)};
 }
 template<std::integral char_type=char>
 inline basic_win32_io_observer<char_type> win32_stderr() noexcept
 {
-	return basic_win32_io_observer<char_type>{fast_io::win32::GetStdHandle(-12)};
+	return basic_win32_io_observer<char_type>{fast_io::win32::GetStdHandle(win32_stderr_number)};
 }
 template<std::integral char_type=char>
 inline basic_win32_io_observer<char_type> native_stdin() noexcept
 {
-	return {fast_io::win32::GetStdHandle(-10)};
+	return {fast_io::win32::GetStdHandle(win32_stdin_number)};
 }
 template<std::integral char_type=char>
 inline basic_win32_io_observer<char_type> native_stdout() noexcept
 {
-	return {fast_io::win32::GetStdHandle(-11)};
+	return {fast_io::win32::GetStdHandle(win32_stdout_number)};
 }
 template<std::integral char_type=char>
 inline basic_win32_io_observer<char_type> native_stderr() noexcept
 {
-	return {fast_io::win32::GetStdHandle(-12)};
+	return {fast_io::win32::GetStdHandle(win32_stderr_number)};
 }
 
 }

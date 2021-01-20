@@ -4,10 +4,11 @@ namespace fast_io
 {
 
 template<typename T>
-inline constexpr auto io_forward(T const& t) noexcept
+inline constexpr auto io_forward(T&& t) noexcept
 {
-	if constexpr(std::is_trivially_copyable_v<T>&&sizeof(t)<=alignof(std::max_align_t))		//predict the cost of passing by value
-		return std::remove_cvref_t<T>(t);
+	using no_cvref_t=std::remove_cvref_t<T>;
+	if constexpr(std::is_trivially_copyable_v<no_cvref_t>&&sizeof(no_cvref_t)<=sizeof(std::max_align_t))		//predict the cost of passing by value
+		return static_cast<no_cvref_t>(t);
 	else
 		return parameter<std::remove_reference_t<T> const&>{t};
 }
@@ -80,6 +81,18 @@ template<zero_copy_output_stream output>
 constexpr decltype(auto) zero_copy_out_handle(io_reference_wrapper<output> out)
 {
 	return zero_copy_out_handle(*out.ptr);
+}
+
+template<decorated_output_stream output>
+constexpr decltype(auto) get_odecorator(io_reference_wrapper<output> out)
+{
+	return get_odecorator(*out.ptr);
+}
+
+template<decorated_input_stream input>
+constexpr decltype(auto) get_idecorator(io_reference_wrapper<input> in)
+{
+	return get_idecorator(*in.ptr);
 }
 
 template<buffer_output_stream output,typename... Args>

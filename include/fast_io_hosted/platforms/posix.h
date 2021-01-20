@@ -93,7 +93,7 @@ inline constexpr int calculate_posix_open_mode_for_win32_handle(open_mode value)
 #endif
 
 
-inline constexpr int calculate_posix_open_mode(open_mode value)
+inline constexpr int calculate_posix_open_mode(open_mode value) noexcept
 {
 	int mode
 	{
@@ -147,16 +147,19 @@ inline constexpr int calculate_posix_open_mode(open_mode value)
 #ifdef O_NONBLOCK
 		mode |= O_NONBLOCK;
 #else
-		throw_posix_error(ENOTSUP);
+		return {};
 #endif
-#ifdef _O_TEMPORARY
+
 	if((value&open_mode::temporary)!=open_mode::none)
-		mode |= _O_TEMPORARY;
-#endif
-#ifdef O_TMPFILE
-	if((value&open_mode::temporary)!=open_mode::none)
+	{
+#if defined(O_TMPFILE)
 		mode |= O_TMPFILE;
+#elif defined(_O_TEMPORARY)
+		mode |= _O_TEMPORARY;
+#else
+		return {};
 #endif
+	}
 #ifdef _O_SEQUENTIAL
 	if((value&open_mode::random_access)!=open_mode::none)
 		mode |= _O_SEQUENTIAL;
@@ -171,7 +174,7 @@ inline constexpr int calculate_posix_open_mode(open_mode value)
 #ifdef O_DIRECTORY
 		mode |= O_DIRECTORY;
 #else
-		throw_posix_error(ENOTSUP);
+		return {};
 #endif
 
 	using utype = typename std::underlying_type<open_mode>::type;
@@ -424,7 +427,13 @@ inline std::size_t posix_read_impl(int fd,void* address,std::size_t bytes_to_rea
 #else
 		::read
 #endif
-	(fd,address,bytes_to_read));
+	(fd,address,
+#ifdef _WIN32
+	static_cast<std::uint32_t>(bytes_to_read)
+#else
+	bytes_to_read
+#endif
+	));
 	system_call_throw_error(read_bytes);
 	return read_bytes;
 }
@@ -444,7 +453,7 @@ inline io_scatter_status_t posix_scatter_read_impl(int fd,std::span<io_scatter_t
 	return {total_size,sp.size(),0};
 }
 
-inline std::uint32_t posix_write_simple_impl(int fd,void const* address,std::uint32_t bytes_to_write)
+inline std::uint32_t posix_write_simple_impl(int fd,void const* address,std::size_t bytes_to_write)
 {
 	auto ret{_write(fd,address,static_cast<std::uint32_t>(bytes_to_write))};
 	if(ret==-1)
@@ -691,7 +700,6 @@ fstat64
 #endif
 (fd,std::addressof(st))<0)
 		throw_posix_error();
-
 	return {static_cast<std::uintmax_t>(st.st_dev),
 	static_cast<std::uintmax_t>(st.st_ino),
 	st_mode_to_perms(st.st_mode),
@@ -702,7 +710,7 @@ fstat64
 	static_cast<std::uintmax_t>(st.st_rdev),
 	static_cast<std::uintmax_t>(st.st_size),
 #if defined(_WIN32)||defined(__MSDOS__)
-	65536,
+	131072,
 	static_cast<std::uintmax_t>(st.st_size/512),
 	{st.st_atime,{}},{st.st_mtime,{}},{st.st_ctime,{}},
 #else
@@ -947,16 +955,23 @@ public:
 	{
 	}
 
-#ifdef __linux__
+#endif
+
+
 /*
 To verify whether O_TMPFILE is a thing on FreeBSD. https://github.com/FreeRDP/FreeRDP/pull/6268
 */
+#if defined(O_TMPFILE)&&defined(__linux__)
 	basic_posix_file(io_temp_t):basic_posix_file(
 		system_call<__NR_openat,int>(AT_FDCWD,"/tmp",O_EXCL|O_RDWR|O_TMPFILE|O_APPEND|O_NOATIME,S_IRUSR | S_IWUSR))
 	{
 		system_call_throw_error(native_handle());
 	}
-#endif
+#else
+	basic_posix_file(io_temp_t)
+	{
+		throw_posix_error(EINVAL);
+	}
 #endif
 
 	constexpr basic_posix_file(basic_posix_file const&)=default;

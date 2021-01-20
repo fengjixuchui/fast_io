@@ -131,6 +131,38 @@ inline constexpr output_iter non_overlapped_copy_n(input_iter first,count_type c
 	}
 }
 
+template<std::input_iterator input_iter,std::input_or_output_iterator output_iter>
+inline constexpr output_iter non_overlapped_copy(input_iter first,input_iter last,output_iter result)
+{
+#if __cpp_lib_is_constant_evaluated>=201811L
+	if (std::is_constant_evaluated())
+		return std::copy(first,last,result);
+	else
+#endif
+	{
+	using input_value_type = typename std::iterator_traits<input_iter>::value_type;
+	using output_value_type = typename std::iterator_traits<output_iter>::value_type;
+	if constexpr
+	(std::contiguous_iterator<input_iter>&&
+	std::contiguous_iterator<output_iter>&&
+	std::is_trivially_copyable_v<input_value_type>&&
+	std::is_trivially_copyable_v<output_value_type>&&
+	(std::same_as<input_value_type,output_value_type>||
+	(std::integral<input_value_type>&&std::integral<output_value_type>&&
+	sizeof(input_value_type)==sizeof(output_value_type))))
+	{
+		std::size_t count(last-first);
+		if(count)	//to avoid nullptr UB
+			std::memcpy(std::to_address(result),
+				std::to_address(first),
+				sizeof(typename std::iterator_traits<input_iter>::value_type)*count);
+		return result+=count;
+	}
+	else
+		return std::copy(first,last,result);
+	}
+}
+
 // I think the standard libraries haven't applied these optimization
 
 template<std::input_iterator input_iter,std::integral count_type,std::input_or_output_iterator output_iter>
@@ -161,6 +193,38 @@ inline constexpr output_iter my_copy_n(input_iter first,count_type count,output_
 		return std::copy_n(first,count,result);
 	}
 }
+
+template<std::bidirectional_iterator input_iter,std::bidirectional_iterator output_iter>
+inline constexpr output_iter my_copy_backward(input_iter first,input_iter last,output_iter d_last)
+{
+#if __cpp_lib_is_constant_evaluated>=201811L
+	if (std::is_constant_evaluated())
+		return std::copy_backward(first,last,d_last);
+	else
+#endif
+	{
+	using input_value_type = typename std::iterator_traits<input_iter>::value_type;
+	using output_value_type = typename std::iterator_traits<output_iter>::value_type;
+	if constexpr
+	(std::contiguous_iterator<input_iter>&&
+	std::contiguous_iterator<output_iter>&&
+	std::is_trivially_copyable_v<input_value_type>&&
+	std::is_trivially_copyable_v<output_value_type>&&
+	(std::same_as<input_value_type,output_value_type>||
+	(std::integral<input_value_type>&&std::integral<output_value_type>&&
+	sizeof(input_value_type)==sizeof(output_value_type))))
+	{
+		std::size_t const count(last-first);
+		d_last-=count;
+		if(count)	//to avoid nullptr UB
+			std::memmove(std::to_address(d_last),std::to_address(first),sizeof(input_value_type)*count);
+		return d_last;
+	}
+	else
+		return std::copy_backward(first,last,d_last);
+	}
+}
+
 template<std::input_iterator input_iter,std::input_or_output_iterator output_iter>
 inline constexpr output_iter my_copy(input_iter first,input_iter second,output_iter result)
 {
@@ -261,6 +325,12 @@ inline constexpr output_iter copy_string_literal(char_type const(&s)[n],output_i
 {
 	details::non_overlapped_copy_n(s,n-1,result);
 	return result+(n-1);
+}
+
+template<std::input_or_output_iterator output_iter>
+inline constexpr output_iter copy_scatter(basic_io_scatter_t<std::iter_value_t<output_iter>> scatter,output_iter result)
+{
+	return details::non_overlapped_copy_n(scatter.base,scatter.len,result);
 }
 
 /*
@@ -482,7 +552,7 @@ inline constexpr std::uint32_t chars_len(U value) noexcept
 		constexpr std::uint32_t base2(base  * base);
 		constexpr std::uint32_t base3(base2 * base);
 		constexpr std::uint32_t base4(base3 * base);
-		for (std::size_t n(1);;n+=4)
+		for (std::uint32_t n(1);;n+=4)
 		{
 			if (value < base)
 				return n;
