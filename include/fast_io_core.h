@@ -86,7 +86,6 @@
 #include"fast_io_core_impl/flush.h"
 #include"fast_io_core_impl/read_write_all.h"
 #include"fast_io_core_impl/crtp/crtp.h"
-#include"fast_io_core_impl/malformed_input.h"
 
 
 #if __cpp_lib_source_location >= 201907L
@@ -96,3 +95,4 @@
 
 #include"fast_io_core_impl/posix_error_scatter.h"
 #include"fast_io_core_impl/iso/isos.h"
+#include"fast_io_core_impl/unsafe_rt_fprint.h"

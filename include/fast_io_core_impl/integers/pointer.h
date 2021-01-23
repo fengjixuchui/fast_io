@@ -45,7 +45,7 @@ inline constexpr caiter print_reserve_address_impl(caiter iter,std::uintptr_t va
 	details::optimize_size::output_unsigned_dummy<uisz,16>(iter,value);
 	return iter+=uisz;
 #else
-	constexpr auto table(details::shared_static_base_table<char_type,16,false,false>::table.data());
+	constexpr auto table(details::get_shared_inline_constexpr_base_table<char_type,16,false,false>().data());
 	auto bg{iter};
 	for(auto ptr{iter+=uisz};ptr!=bg;)
 	{
@@ -153,7 +153,12 @@ requires (std::contiguous_iterator<Iter>||std::is_pointer_v<Iter>)
 inline constexpr void const* print_alias_define(io_alias_t,Iter it) noexcept
 {
 	if constexpr(std::is_pointer_v<std::remove_cvref_t<Iter>>)
-		return it;
+	{
+		if constexpr(std::convertible_to<std::remove_cvref_t<Iter>,void const*>)
+			return it;
+		else
+			return bit_cast<void const*>(it);
+	}
 	else
 		return std::to_address(it);
 }

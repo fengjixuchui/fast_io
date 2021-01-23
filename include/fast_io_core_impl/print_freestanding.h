@@ -141,7 +141,7 @@ inline constexpr std::size_t calculate_scatter_reserve_size()
 
 
 template<std::integral char_type,typename T,typename... Args>
-inline constexpr std::size_t calculate_scatter_dynamic_reserve_size(T t,Args... args)
+inline constexpr std::size_t calculate_scatter_dynamic_reserve_size([[maybe_unused]] T t,Args... args)
 {
 	if constexpr(!reserve_printable<char_type,T>&&
 		dynamic_reserve_printable<char_type,T>)
@@ -205,8 +205,8 @@ inline constexpr void scatter_print_with_reserve_recursive(char_type* ptr,
 
 template<std::integral char_type,typename T,typename... Args>
 inline constexpr void scatter_print_with_dynamic_reserve_recursive(io_scatter_t* __restrict arr,
-	char_type* __restrict ptr,
-	char_type* __restrict dynamic_buffer_ptr,T t, Args ...args)
+	[[maybe_unused]] char_type* __restrict ptr,
+	[[maybe_unused]] char_type* __restrict dynamic_buffer_ptr,[[maybe_unused]] T t, Args ...args)
 {
 	if constexpr(reserve_printable<char_type,T>)
 	{
@@ -273,7 +273,6 @@ inline constexpr void print_control_reserve_bad_path(output out,value_type t)
 	}
 	else
 		write(out,array.data(),print_reserve_control_define_impl<pci,char_type,value_type>(array.data(),t));
-
 }
 
 template<bool line,print_control_impl pci,typename value_type,output_stream output>
