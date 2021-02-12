@@ -5,6 +5,7 @@ namespace fast_io
 
 namespace details
 {
+#if 0
 inline constexpr void report_posix_error_impl(error_reporter& report,int ec)
 {
 #if __cpp_lib_is_constant_evaluated >= 201811L
@@ -22,7 +23,15 @@ If execution charset is none-ASCII based charset. Use our own implementation. Th
 		}
 		else
 		{
-#ifdef _GNU_SOURCE
+/*
+#if (_POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600) && ! _GNU_SOURCE
+			constexpr std::size_t buffer_size{1024};
+			char buffer[buffer_size];
+			if(::strerror_r(ec,buffer,buffer_size))
+				buffer[0]=0;
+			print_freestanding(report,fast_io::manipulators::chvw(buffer));
+*/
+#if defined(_GNU_SOURCE)
 /*
 Based on man. glibc provides a special function strerrordesc_np() which will not get affected by locale. good! No locale garbage please.
 https://man7.org/linux/man-pages/man3/strerrordesc_np.3.html
@@ -61,9 +70,10 @@ https://github.com/freebsd/freebsd/blob/e8142e44905fa62147ba10703e7ce2c5464fb2b7
 	}
 #endif
 }
+#endif
 }
 
-class posix_error:public fast_io_error
+class posix_error:public std::exception
 {
 public:
 	int ec{};
@@ -72,19 +82,16 @@ public:
 	{
 		return ec;
 	}
-#if __cpp_constexpr >= 201907L
-	constexpr
-#endif
-	void report(error_reporter& report) const override
-	{
-		details::report_posix_error_impl(report,ec);
-	}
 };
 
 [[noreturn]] inline void throw_posix_error()
 {
 #ifdef __cpp_exceptions
+#if defined(_MSC_VER) && (!defined(_HAS_EXCEPTIONS) || _HAS_EXCEPTIONS == 0)
+	fast_terminate();
+#else
 	throw posix_error();
+#endif
 #else
 	fast_terminate();
 #endif
@@ -92,7 +99,11 @@ public:
 [[noreturn]] inline void throw_posix_error([[maybe_unused]] int err)
 {
 #ifdef __cpp_exceptions
+#if defined(_MSC_VER) && (!defined(_HAS_EXCEPTIONS) || _HAS_EXCEPTIONS == 0)
+	fast_terminate();
+#else
 	throw posix_error(err);
+#endif
 #else
 	fast_terminate();
 #endif
@@ -104,7 +115,7 @@ inline constexpr basic_io_scatter_t<char_type> print_alias_define(io_alias_type_
 	return get_posix_errno_scatter<char_type>(perr.ec);
 }
 
-class scan_error:public fast_io_error
+class scan_error:public std::exception
 {
 public:
 	std::errc ec{};
@@ -113,19 +124,16 @@ public:
 	{
 		return ec;
 	}
-#if __cpp_constexpr >= 201907L
-	constexpr
-#endif
-	void report(error_reporter& report) const override
-	{
-		details::report_posix_error_impl(report,static_cast<int>(ec));
-	}
 };
 
 [[noreturn]] inline void throw_scan_error([[maybe_unused]] std::errc ec)
 {
 #ifdef __cpp_exceptions
+#if defined(_MSC_VER) && (!defined(_HAS_EXCEPTIONS) || _HAS_EXCEPTIONS == 0)
+	fast_terminate();
+#else
 	throw scan_error(ec);
+#endif
 #else
 	fast_terminate();
 #endif

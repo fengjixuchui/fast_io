@@ -38,6 +38,13 @@ struct cdcvt_t
 	T reference;
 };
 
+template<typename T>
+struct pos_sign_t
+{
+	using manip_tag = manip_tag_t;
+	T reference;
+};
+
 enum class floating_representation
 {
 scientific,fixed,general
@@ -380,9 +387,9 @@ inline constexpr auto left_width(T&& t,std::size_t w) noexcept
 {
 	using value_type = std::remove_cvref_t<T>;
 	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
-		return width_t<width_mode::left,value_type>{t,w};
+		return width_t<width_mode::left,value_type>{t,truncate_size(w)};
 	else
-		return width_t<width_mode::left,std::remove_reference_t<T> const&>{t,w};
+		return width_t<width_mode::left,std::remove_reference_t<T> const&>{t,truncate_size(w)};
 }
 
 template<typename T>
@@ -390,9 +397,9 @@ inline constexpr auto middle_width(T&& t,std::size_t w) noexcept
 {
 	using value_type = std::remove_cvref_t<T>;
 	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
-		return width_t<width_mode::middle,value_type>{t,w};
+		return width_t<width_mode::middle,value_type>{t,truncate_size(w)};
 	else
-		return width_t<width_mode::middle,std::remove_reference_t<T> const&>{t,w};
+		return width_t<width_mode::middle,std::remove_reference_t<T> const&>{t,truncate_size(w)};
 }
 
 template<typename T>
@@ -400,9 +407,9 @@ inline constexpr auto right_width(T&& t,std::size_t w) noexcept
 {
 	using value_type = std::remove_cvref_t<T>;
 	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
-		return width_t<width_mode::right,value_type>{t,w};
+		return width_t<width_mode::right,value_type>{t,truncate_size(w)};
 	else
-		return width_t<width_mode::right,std::remove_reference_t<T> const&>{t,w};
+		return width_t<width_mode::right,std::remove_reference_t<T> const&>{t,truncate_size(w)};
 }
 
 template<typename T>
@@ -410,9 +417,9 @@ inline constexpr auto internal_width(T&& t,std::size_t w) noexcept
 {
 	using value_type = std::remove_cvref_t<T>;
 	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
-		return width_t<width_mode::internal,value_type>{t,w};
+		return width_t<width_mode::internal,value_type>{t,truncate_size(w)};
 	else
-		return width_t<width_mode::internal,std::remove_reference_t<T> const&>{t,w};
+		return width_t<width_mode::internal,std::remove_reference_t<T> const&>{t,truncate_size(w)};
 }
 
 template<width_mode mode,typename T>
@@ -420,9 +427,9 @@ inline constexpr auto width(T&& t,std::size_t w) noexcept
 {
 	using value_type = std::remove_cvref_t<T>;
 	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
-		return width_t<mode,value_type>{t,w};
+		return width_t<mode,value_type>{t,truncate_size(w)};
 	else
-		return width_t<mode,std::remove_reference_t<T> const&>{t,w};
+		return width_t<mode,std::remove_reference_t<T> const&>{t,truncate_size(w)};
 }
 
 template<typename T,std::integral char_type>
@@ -430,9 +437,9 @@ inline constexpr auto left_width(T&& t,std::size_t w,char_type ch) noexcept
 {
 	using value_type = std::remove_cvref_t<T>;
 	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
-		return width_ch_t<width_mode::left,value_type,std::remove_cvref_t<char_type>>{t,w,ch};
+		return width_ch_t<width_mode::left,value_type,std::remove_cvref_t<char_type>>{t,truncate_size(w),ch};
 	else
-		return width_ch_t<width_mode::left,std::remove_reference_t<T> const,std::remove_cvref_t<char_type>>{t,w,ch};
+		return width_ch_t<width_mode::left,std::remove_reference_t<T> const,std::remove_cvref_t<char_type>>{t,truncate_size(w),ch};
 }
 
 template<typename T,std::integral char_type>
@@ -440,9 +447,9 @@ inline constexpr auto right_width(T&& t,std::size_t w,char_type ch) noexcept
 {
 	using value_type = std::remove_cvref_t<T>;
 	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
-		return width_ch_t<width_mode::right,value_type,std::remove_cvref_t<char_type>>{t,w,ch};
+		return width_ch_t<width_mode::right,value_type,std::remove_cvref_t<char_type>>{t,truncate_size(w),ch};
 	else
-		return width_ch_t<width_mode::right,std::remove_reference_t<T> const&,std::remove_cvref_t<char_type>>{t,w,ch};
+		return width_ch_t<width_mode::right,std::remove_reference_t<T> const&,std::remove_cvref_t<char_type>>{t,truncate_size(w),ch};
 }
 
 template<typename T,std::integral char_type>
@@ -450,9 +457,9 @@ inline constexpr auto middle_width(T&& t,std::size_t w,char_type ch) noexcept
 {
 	using value_type = std::remove_cvref_t<T>;
 	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
-		return width_ch_t<width_mode::middle,value_type,std::remove_cvref_t<char_type>>{t,w,ch};
+		return width_ch_t<width_mode::middle,value_type,std::remove_cvref_t<char_type>>{t,truncate_size(w),ch};
 	else
-		return width_ch_t<width_mode::middle,std::remove_reference_t<T> const&,std::remove_cvref_t<char_type>>{t,w,ch};
+		return width_ch_t<width_mode::middle,std::remove_reference_t<T> const&,std::remove_cvref_t<char_type>>{t,truncate_size(w),ch};
 }
 
 template<typename T,std::integral char_type>
@@ -460,9 +467,9 @@ inline constexpr auto internal_width(T&& t,std::size_t w,char_type ch) noexcept
 {
 	using value_type = std::remove_cvref_t<T>;
 	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
-		return width_ch_t<width_mode::internal,value_type,std::remove_cvref_t<char_type>>{t,w,ch};
+		return width_ch_t<width_mode::internal,value_type,std::remove_cvref_t<char_type>>{t,truncate_size(w),ch};
 	else
-		return width_ch_t<width_mode::internal,std::remove_reference_t<T> const&,std::remove_cvref_t<char_type>>{t,w,ch};
+		return width_ch_t<width_mode::internal,std::remove_reference_t<T> const&,std::remove_cvref_t<char_type>>{t,truncate_size(w),ch};
 }
 
 template<width_mode mode,typename T,std::integral char_type>
@@ -470,9 +477,9 @@ inline constexpr auto width(T&& t,std::size_t w,char_type ch) noexcept
 {
 	using value_type = std::remove_cvref_t<T>;
 	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
-		return width_ch_t<mode,value_type,std::remove_cvref_t<char_type>>{t,w,ch};
+		return width_ch_t<mode,value_type,std::remove_cvref_t<char_type>>{t,truncate_size(w),ch};
 	else
-		return width_ch_t<mode,std::remove_reference_t<T> const&,std::remove_cvref_t<char_type>>{t,w,ch};
+		return width_ch_t<mode,std::remove_reference_t<T> const&,std::remove_cvref_t<char_type>>{t,truncate_size(w),ch};
 }
 
 }

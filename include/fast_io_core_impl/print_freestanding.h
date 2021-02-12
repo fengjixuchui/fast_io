@@ -304,6 +304,7 @@ inline constexpr void print_control(output out,T t)
 	if constexpr(reserve_printable<char_type,value_type>)
 	{
 		constexpr std::size_t size{print_reserve_control_size_impl<pci,char_type,value_type>()+static_cast<std::size_t>(line)};
+		static_assert(size!=0);
 #ifndef __SANITIZE_ADDRESS__
 
 #if 0	
@@ -493,11 +494,11 @@ inline constexpr void print_control(output out,T t)
 					}
 					curr=details::non_overlapped_copy_n(scatter.base,len,curr);
 					if constexpr(std::same_as<char,char_type>)
-						put(out,'\n');
+						*curr='\n';
 					else if constexpr(std::same_as<wchar_t,char_type>)
-						put(out,L'\n');
+						*curr=L'\n';
 					else
-						put(out,u8'\n');
+						*curr=u8'\n';
 					++curr;
 					obuffer_set_curr(out,curr);
 				}
