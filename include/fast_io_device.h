@@ -46,19 +46,6 @@ template<std::integral char_type>
 using basic_iobuf_file_mutex = basic_iomutex<basic_iobuf_file<char_type>>;
 
 /*
-Text stream region. Highly likely change definition in the future due to bad API.
-*/
-
-template<output_stream output>
-using basic_obuf_text = basic_obuf<basic_indirect_obuffer_constructor_source_type<typename output::char_type,output,transforms::binary_to_text<>>,true>;
-
-template<input_stream input>
-using basic_ibuf_text = basic_indirect_ibuffer_constructor_source_type<basic_ibuf<input>,vector_buffer<typename input::char_type>,transforms::text_to_binary<>>;
-
-using ibuf_text_file = basic_ibuf_text<basic_inative_file<char>>;
-using obuf_text_file = basic_obuf_text<basic_onative_file<char>>;
-
-/*
 char region
 */
 using ibuf_pipe = basic_ibuf_pipe<char>;
@@ -176,28 +163,104 @@ using u32iobuf_file_mutex = basic_iobuf_file_mutex<char32_t>;
 
 
 /*
-utf encoding stream region. Highly likely change in the future due to bad API.
+code_cvt file template region
 */
 
-template<std::integral new_code_type,output_stream output>
-using basic_obuf_utf = basic_obuf<basic_indirect_obuffer_constructor_source_type<new_code_type,output,transforms::utf>,true>;
+template<std::integral internal_char_type,
+	std::integral external_char_type,
+	encoding_scheme internal_scheme=encoding_scheme::execution_charset,
+	encoding_scheme external_scheme=encoding_scheme::execution_charset>
+using basic_icode_cvt_file = basic_ibuf_code_cvt<internal_char_type,basic_inative_file<external_char_type>,internal_scheme,external_scheme>;
+template<std::integral internal_char_type,
+	std::integral external_char_type,
+	encoding_scheme internal_scheme=encoding_scheme::execution_charset,
+	encoding_scheme external_scheme=encoding_scheme::execution_charset>
+using basic_ocode_cvt_file = basic_obuf_code_cvt<internal_char_type,basic_onative_file<external_char_type>,internal_scheme,external_scheme>;
+template<std::integral internal_char_type,
+	std::integral external_char_type,
+	encoding_scheme internal_scheme=encoding_scheme::execution_charset,
+	encoding_scheme external_scheme=encoding_scheme::execution_charset>
+using basic_code_cvt_file = basic_iobuf_code_cvt<internal_char_type,basic_native_file<external_char_type>,internal_scheme,external_scheme>;
 
-template<std::integral new_code_type,input_stream input>
-using basic_ibuf_utf = basic_indirect_ibuffer_constructor_source_type<basic_ibuf<input>,vector_buffer<new_code_type>,transforms::utf>;
 
-template<std::integral new_code_type,std::integral source_code_type>
-using basic_obuf_utf_file = basic_obuf_utf<new_code_type,basic_onative_file<source_code_type>>;
 
-template<std::integral new_code_type,std::integral source_code_type>
-using basic_ibuf_utf_file = basic_ibuf_utf<new_code_type,basic_inative_file<source_code_type>>;
+/*
+UTF-8 region
+*/
 
-template<std::integral new_code_type>
-requires (1<sizeof(new_code_type))
-using obuf_utf8_file=basic_obuf_utf_file<new_code_type,char8_t>;
+template<std::integral internal_char_type>
+using basic_iutf8_file = std::conditional_t<std::same_as<internal_char_type,char8_t>,basic_ibuf<basic_inative_file<char8_t>>,basic_icode_cvt_file<internal_char_type,char8_t>>;
+using iutf8_file = basic_iutf8_file<char>;
+#ifndef __MSDOS__
+using wiutf8_file = basic_iutf8_file<wchar_t>;
+#endif
+using u8iutf8_file = basic_iutf8_file<char8_t>;
+using u16iutf8_file = basic_iutf8_file<char16_t>;
+using u32iutf8_file = basic_iutf8_file<char32_t>;
 
-template<std::integral new_code_type>
-requires (1<sizeof(new_code_type))
-using ibuf_utf8_file=basic_ibuf_utf_file<new_code_type,char8_t>;
+template<std::integral internal_char_type>
+using basic_outf8_file = std::conditional_t<std::same_as<internal_char_type,char8_t>,basic_obuf<basic_onative_file<char8_t>>,basic_ocode_cvt_file<internal_char_type,char8_t>>;
+using outf8_file = basic_outf8_file<char>;
+#ifndef __MSDOS__
+using woutf8_file = basic_outf8_file<wchar_t>;
+#endif
+using u8outf8_file = basic_outf8_file<char8_t>;
+using u16outf8_file = basic_outf8_file<char16_t>;
+using u32outf8_file = basic_outf8_file<char32_t>;
+
+template<std::integral internal_char_type>
+using basic_utf8_file = std::conditional_t<std::same_as<internal_char_type,char8_t>,basic_iobuf<basic_native_file<char8_t>>,basic_code_cvt_file<internal_char_type,char8_t>>;
+using utf8_file = basic_utf8_file<char>;
+#ifndef __MSDOS__
+using wutf8_file = basic_utf8_file<wchar_t>;
+#endif
+using u8utf8_file = basic_utf8_file<char8_t>;
+using u16utf8_file = basic_utf8_file<char16_t>;
+using u32utf8_file = basic_utf8_file<char32_t>;
+
+
+/*
+GB18030 region
+*/
+
+template<std::integral internal_char_type>
+using basic_igb18030_file = std::conditional_t<std::same_as<char,internal_char_type>
+&&execution_charset_encoding_scheme<char>()==encoding_scheme::gb18030,
+basic_ibuf<basic_inative_file<char>>,
+basic_icode_cvt_file<internal_char_type,char,encoding_scheme::gb18030>>;
+using igb18030_file = basic_igb18030_file<char>;
+#ifndef __MSDOS__
+using wigb18030_file = basic_igb18030_file<wchar_t>;
+#endif
+using u8igb18030_file = basic_igb18030_file<char8_t>;
+using u16igb18030_file = basic_igb18030_file<char16_t>;
+using u32igb18030_file = basic_igb18030_file<char32_t>;
+
+template<std::integral internal_char_type>
+using basic_ogb18030_file = std::conditional_t<std::same_as<char,internal_char_type>
+&&execution_charset_encoding_scheme<char>()==encoding_scheme::gb18030,
+basic_obuf<basic_onative_file<char>>,
+basic_ocode_cvt_file<internal_char_type,char,encoding_scheme::execution_charset,encoding_scheme::gb18030>>;
+using ogb18030_file = basic_ogb18030_file<char>;
+#ifndef __MSDOS__
+using wogb18030_file = basic_ogb18030_file<wchar_t>;
+#endif
+using u8ogb18030_file = basic_ogb18030_file<char8_t>;
+using u16ogb18030_file = basic_ogb18030_file<char16_t>;
+using u32ogb18030_file = basic_ogb18030_file<char32_t>;
+
+template<std::integral internal_char_type>
+using basic_gb18030_file = std::conditional_t<std::same_as<char,internal_char_type>
+&&execution_charset_encoding_scheme<char>()==encoding_scheme::gb18030,
+basic_iobuf<basic_native_file<char>>,
+basic_code_cvt_file<internal_char_type,char,encoding_scheme::execution_charset,encoding_scheme::gb18030>>;
+using gb18030_file = basic_gb18030_file<char>;
+#ifndef __MSDOS__
+using wgb18030_file = basic_gb18030_file<wchar_t>;
+#endif
+using u8gb18030_file = basic_gb18030_file<char8_t>;
+using u16gb18030_file = basic_gb18030_file<char16_t>;
+using u32gb18030_file = basic_gb18030_file<char32_t>;
 
 
 }

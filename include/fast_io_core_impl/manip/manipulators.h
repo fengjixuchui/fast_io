@@ -271,6 +271,131 @@ inline constexpr parameter<
 		return {reference};
 }
 
+
+
+
+template<std::size_t bs,bool upper=false,typename T>
+requires (2<=bs&&bs<=36&&(::fast_io::details::my_integral<T>||
+	(std::is_pointer_v<T>||std::contiguous_iterator<T>)))
+inline constexpr std::conditional_t<bs==10,
+	parameter<std::conditional_t<std::is_pointer_v<T>||std::contiguous_iterator<T>,std::uintptr_t,
+	std::make_unsigned_t<std::remove_cvref_t<T>>>>,
+	base_t<bs,upper&&(10<bs),
+	std::conditional_t<std::is_pointer_v<T>||std::contiguous_iterator<T>,std::uintptr_t,
+	std::make_unsigned_t<std::remove_cvref_t<T>>>
+	>> ubase(T reference) noexcept
+{
+	if constexpr(std::contiguous_iterator<T>)
+		return {bit_cast<std::uintptr_t>(std::to_address(reference))};
+	else if constexpr(std::is_pointer_v<T>)
+		return {bit_cast<std::uintptr_t>(reference)};
+	else
+		return {static_cast<std::make_unsigned_t<std::remove_cvref_t<T>>>(reference)};
+}
+
+
+template<std::size_t bs,typename T>
+requires (2<=bs&&bs<=36&&(::fast_io::details::my_integral<T>||
+	(std::is_pointer_v<T>||std::contiguous_iterator<T>)))
+inline constexpr std::conditional_t<bs==10,
+	parameter<std::conditional_t<std::is_pointer_v<T>||std::contiguous_iterator<T>,std::uintptr_t,
+	std::make_unsigned_t<std::remove_cvref_t<T>>>>,
+	base_t<bs,10<bs,
+	std::conditional_t<std::is_pointer_v<T>||std::contiguous_iterator<T>,std::uintptr_t,
+	std::make_unsigned_t<std::remove_cvref_t<T>>>
+	>> ubase_upper(T reference) noexcept
+{
+	if constexpr(std::contiguous_iterator<T>)
+		return {bit_cast<std::uintptr_t>(std::to_address(reference))};
+	else if constexpr(std::is_pointer_v<T>)
+		return {bit_cast<std::uintptr_t>(reference)};
+	else
+		return {static_cast<std::make_unsigned_t<std::remove_cvref_t<T>>>(reference)};
+}
+
+template<typename T>
+requires (::fast_io::details::my_integral<T>||
+	(std::is_pointer_v<T>||std::contiguous_iterator<T>))
+inline constexpr base_t<16,false,
+	std::conditional_t<std::is_pointer_v<T>||std::contiguous_iterator<T>,std::uintptr_t,
+	std::make_unsigned_t<std::remove_cvref_t<T>>>
+	> uhex(T reference) noexcept
+{
+	if constexpr(std::contiguous_iterator<T>)
+		return {bit_cast<std::uintptr_t>(std::to_address(reference))};
+	else if constexpr(std::is_pointer_v<T>)
+		return {bit_cast<std::uintptr_t>(reference)};
+	else
+		return {static_cast<std::make_unsigned_t<std::remove_cvref_t<T>>>(reference)};
+}
+
+template<typename T>
+requires (::fast_io::details::my_integral<T>||
+	(std::is_pointer_v<T>||std::contiguous_iterator<T>))
+inline constexpr base_t<16,true,
+	std::conditional_t<std::is_pointer_v<T>||std::contiguous_iterator<T>,std::uintptr_t,
+	std::make_unsigned_t<std::remove_cvref_t<T>>>
+	> uhex_upper(T reference) noexcept
+{
+	if constexpr(std::contiguous_iterator<T>)
+		return {bit_cast<std::uintptr_t>(std::to_address(reference))};
+	else if constexpr(std::is_pointer_v<T>)
+		return {bit_cast<std::uintptr_t>(reference)};
+	else
+		return {static_cast<std::make_unsigned_t<std::remove_cvref_t<T>>>(reference)};
+}
+
+
+template<typename T>
+requires (::fast_io::details::my_integral<T>||
+	(std::is_pointer_v<T>||std::contiguous_iterator<T>))
+inline constexpr base_t<2,false,
+	std::conditional_t<std::is_pointer_v<T>||std::contiguous_iterator<T>,std::uintptr_t,
+	std::make_unsigned_t<std::remove_cvref_t<T>>>
+	> ubin(T reference) noexcept
+{
+	if constexpr(std::contiguous_iterator<T>)
+		return {bit_cast<std::uintptr_t>(std::to_address(reference))};
+	else if constexpr(std::is_pointer_v<T>)
+		return {bit_cast<std::uintptr_t>(reference)};
+	else
+		return {static_cast<std::make_unsigned_t<std::remove_cvref_t<T>>>(reference)};
+}
+
+template<typename T>
+requires (::fast_io::details::my_integral<T>||
+	(std::is_pointer_v<T>||std::contiguous_iterator<T>))
+inline constexpr base_t<8,false,
+	std::conditional_t<std::is_pointer_v<T>||std::contiguous_iterator<T>,std::uintptr_t,
+	std::make_unsigned_t<std::remove_cvref_t<T>>>
+	> uoct(T reference) noexcept
+{
+	if constexpr(std::contiguous_iterator<T>)
+		return {bit_cast<std::uintptr_t>(std::to_address(reference))};
+	else if constexpr(std::is_pointer_v<T>)
+		return {bit_cast<std::uintptr_t>(reference)};
+	else
+		return {static_cast<std::make_unsigned_t<std::remove_cvref_t<T>>>(reference)};
+}
+
+template<typename T>
+requires (::fast_io::details::my_integral<T>||
+	(std::is_pointer_v<T>||std::contiguous_iterator<T>))
+inline constexpr parameter<
+	std::conditional_t<std::is_pointer_v<T>||std::contiguous_iterator<T>,std::uintptr_t,
+	std::make_unsigned_t<std::remove_cvref_t<T>>>
+	> udec(T reference) noexcept
+{
+	if constexpr(std::contiguous_iterator<T>)
+		return {bit_cast<std::uintptr_t>(std::to_address(reference))};
+	else if constexpr(std::is_pointer_v<T>)
+		return {bit_cast<std::uintptr_t>(reference)};
+	else
+		return {static_cast<std::make_unsigned_t<std::remove_cvref_t<T>>>(reference)};
+}
+
+
+
 template<std::integral T>
 inline constexpr chvw_t<T> chvw(T ch)
 {
@@ -333,7 +458,9 @@ template<typename T>
 inline constexpr auto purify(T&& ref) noexcept
 {
 	using no_cvref_t = std::remove_cvref_t<T>;
-	if constexpr(std::is_trivially_copyable_v<no_cvref_t>&&sizeof(no_cvref_t)<=sizeof(std::max_align_t))
+	if constexpr(alias_printable<std::remove_cvref_t<T>>)
+		return purify_t<std::remove_cvref_t<decltype(print_alias_define(io_alias,ref))>>{print_alias_define(io_alias,ref)};
+	else if constexpr(std::is_trivially_copyable_v<no_cvref_t>&&sizeof(no_cvref_t)<=sizeof(std::max_align_t))
 		return purify_t<no_cvref_t>{ref};
 	else
 		return purify_t<std::remove_reference_t<T> const&>{ref};
@@ -386,100 +513,120 @@ template<typename T>
 inline constexpr auto left_width(T&& t,std::size_t w) noexcept
 {
 	using value_type = std::remove_cvref_t<T>;
-	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
-		return width_t<width_mode::left,value_type>{t,truncate_size(w)};
+	if constexpr(alias_printable<std::remove_cvref_t<T>>)
+		return width_t<width_mode::left,std::remove_cvref_t<decltype(print_alias_define(io_alias,t))>>{print_alias_define(io_alias,t),w};
+	else if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
+		return width_t<width_mode::left,value_type>{t,w};
 	else
-		return width_t<width_mode::left,std::remove_reference_t<T> const&>{t,truncate_size(w)};
+		return width_t<width_mode::left,std::remove_reference_t<T> const&>{t,w};
 }
 
 template<typename T>
 inline constexpr auto middle_width(T&& t,std::size_t w) noexcept
 {
 	using value_type = std::remove_cvref_t<T>;
-	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
-		return width_t<width_mode::middle,value_type>{t,truncate_size(w)};
+	if constexpr(alias_printable<std::remove_cvref_t<T>>)
+		return width_t<width_mode::middle,std::remove_cvref_t<decltype(print_alias_define(io_alias,t))>>{print_alias_define(io_alias,t),w};
+	else if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
+		return width_t<width_mode::middle,value_type>{t,w};
 	else
-		return width_t<width_mode::middle,std::remove_reference_t<T> const&>{t,truncate_size(w)};
+		return width_t<width_mode::middle,std::remove_reference_t<T> const&>{t,w};
 }
 
 template<typename T>
 inline constexpr auto right_width(T&& t,std::size_t w) noexcept
 {
 	using value_type = std::remove_cvref_t<T>;
-	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
-		return width_t<width_mode::right,value_type>{t,truncate_size(w)};
+	if constexpr(alias_printable<std::remove_cvref_t<T>>)
+		return width_t<width_mode::right,std::remove_cvref_t<decltype(print_alias_define(io_alias,t))>>{print_alias_define(io_alias,t),w};
+	else if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
+		return width_t<width_mode::right,value_type>{t,w};
 	else
-		return width_t<width_mode::right,std::remove_reference_t<T> const&>{t,truncate_size(w)};
+		return width_t<width_mode::right,std::remove_reference_t<T> const&>{t,w};
 }
 
 template<typename T>
 inline constexpr auto internal_width(T&& t,std::size_t w) noexcept
 {
 	using value_type = std::remove_cvref_t<T>;
-	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
-		return width_t<width_mode::internal,value_type>{t,truncate_size(w)};
+	if constexpr(alias_printable<std::remove_cvref_t<T>>)
+		return width_t<width_mode::internal,std::remove_cvref_t<decltype(print_alias_define(io_alias,t))>>{print_alias_define(io_alias,t),w};
+	else if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
+		return width_t<width_mode::internal,value_type>{t,w};
 	else
-		return width_t<width_mode::internal,std::remove_reference_t<T> const&>{t,truncate_size(w)};
+		return width_t<width_mode::internal,std::remove_reference_t<T> const&>{t,w};
 }
 
 template<width_mode mode,typename T>
 inline constexpr auto width(T&& t,std::size_t w) noexcept
 {
 	using value_type = std::remove_cvref_t<T>;
-	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
-		return width_t<mode,value_type>{t,truncate_size(w)};
+	if constexpr(alias_printable<std::remove_cvref_t<T>>)
+		return width_t<mode,std::remove_cvref_t<decltype(print_alias_define(io_alias,t))>>{print_alias_define(io_alias,t),w};
+	else if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
+		return width_t<mode,value_type>{t,w};
 	else
-		return width_t<mode,std::remove_reference_t<T> const&>{t,truncate_size(w)};
+		return width_t<mode,std::remove_reference_t<T> const&>{t,w};
 }
 
 template<typename T,std::integral char_type>
 inline constexpr auto left_width(T&& t,std::size_t w,char_type ch) noexcept
 {
 	using value_type = std::remove_cvref_t<T>;
-	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
-		return width_ch_t<width_mode::left,value_type,std::remove_cvref_t<char_type>>{t,truncate_size(w),ch};
+	if constexpr(alias_printable<std::remove_cvref_t<T>>)
+		return width_ch_t<width_mode::left,std::remove_cvref_t<decltype(print_alias_define(io_alias,t))>,std::remove_cvref_t<char_type>>{print_alias_define(io_alias,t),w,ch};
+	else if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
+		return width_ch_t<width_mode::left,value_type,std::remove_cvref_t<char_type>>{t,w,ch};
 	else
-		return width_ch_t<width_mode::left,std::remove_reference_t<T> const,std::remove_cvref_t<char_type>>{t,truncate_size(w),ch};
+		return width_ch_t<width_mode::left,std::remove_reference_t<T> const,std::remove_cvref_t<char_type>>{t,w,ch};
 }
 
 template<typename T,std::integral char_type>
 inline constexpr auto right_width(T&& t,std::size_t w,char_type ch) noexcept
 {
 	using value_type = std::remove_cvref_t<T>;
-	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
-		return width_ch_t<width_mode::right,value_type,std::remove_cvref_t<char_type>>{t,truncate_size(w),ch};
+	if constexpr(alias_printable<std::remove_cvref_t<T>>)
+		return width_ch_t<width_mode::right,std::remove_cvref_t<decltype(print_alias_define(io_alias,t))>,std::remove_cvref_t<char_type>>{print_alias_define(io_alias,t),w,ch};
+	else if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
+		return width_ch_t<width_mode::right,value_type,std::remove_cvref_t<char_type>>{t,w,ch};
 	else
-		return width_ch_t<width_mode::right,std::remove_reference_t<T> const&,std::remove_cvref_t<char_type>>{t,truncate_size(w),ch};
+		return width_ch_t<width_mode::right,std::remove_reference_t<T> const&,std::remove_cvref_t<char_type>>{t,w,ch};
 }
 
 template<typename T,std::integral char_type>
 inline constexpr auto middle_width(T&& t,std::size_t w,char_type ch) noexcept
 {
 	using value_type = std::remove_cvref_t<T>;
-	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
-		return width_ch_t<width_mode::middle,value_type,std::remove_cvref_t<char_type>>{t,truncate_size(w),ch};
+	if constexpr(alias_printable<std::remove_cvref_t<T>>)
+		return width_ch_t<width_mode::middle,std::remove_cvref_t<decltype(print_alias_define(io_alias,t))>,std::remove_cvref_t<char_type>>{print_alias_define(io_alias,t),w,ch};
+	else if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
+		return width_ch_t<width_mode::middle,value_type,std::remove_cvref_t<char_type>>{t,w,ch};
 	else
-		return width_ch_t<width_mode::middle,std::remove_reference_t<T> const&,std::remove_cvref_t<char_type>>{t,truncate_size(w),ch};
+		return width_ch_t<width_mode::middle,std::remove_reference_t<T> const&,std::remove_cvref_t<char_type>>{t,w,ch};
 }
 
 template<typename T,std::integral char_type>
 inline constexpr auto internal_width(T&& t,std::size_t w,char_type ch) noexcept
 {
 	using value_type = std::remove_cvref_t<T>;
-	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
-		return width_ch_t<width_mode::internal,value_type,std::remove_cvref_t<char_type>>{t,truncate_size(w),ch};
+	if constexpr(alias_printable<std::remove_cvref_t<T>>)
+		return width_ch_t<width_mode::internal,std::remove_cvref_t<decltype(print_alias_define(io_alias,t))>,std::remove_cvref_t<char_type>>{print_alias_define(io_alias,t),w,ch};
+	else if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
+		return width_ch_t<width_mode::internal,value_type,std::remove_cvref_t<char_type>>{t,w,ch};
 	else
-		return width_ch_t<width_mode::internal,std::remove_reference_t<T> const&,std::remove_cvref_t<char_type>>{t,truncate_size(w),ch};
+		return width_ch_t<width_mode::internal,std::remove_reference_t<T> const&,std::remove_cvref_t<char_type>>{t,w,ch};
 }
 
 template<width_mode mode,typename T,std::integral char_type>
 inline constexpr auto width(T&& t,std::size_t w,char_type ch) noexcept
 {
 	using value_type = std::remove_cvref_t<T>;
-	if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
-		return width_ch_t<mode,value_type,std::remove_cvref_t<char_type>>{t,truncate_size(w),ch};
+	if constexpr(alias_printable<std::remove_cvref_t<T>>)
+		return width_ch_t<mode,std::remove_cvref_t<decltype(print_alias_define(io_alias,t))>,std::remove_cvref_t<char_type>>{print_alias_define(io_alias,t),w,ch};
+	else if constexpr(std::is_trivially_copyable_v<value_type>&&sizeof(value_type)<=sizeof(std::max_align_t))
+		return width_ch_t<mode,value_type,std::remove_cvref_t<char_type>>{t,w,ch};
 	else
-		return width_ch_t<mode,std::remove_reference_t<T> const&,std::remove_cvref_t<char_type>>{t,truncate_size(w),ch};
+		return width_ch_t<mode,std::remove_reference_t<T> const&,std::remove_cvref_t<char_type>>{t,w,ch};
 }
 
 }

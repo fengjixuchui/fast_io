@@ -230,7 +230,13 @@ struct posix_file_openmode
 
 }
 
-
+struct posix_fs_dirent
+{
+	int fd{-1};
+	char const* filename{};
+	explicit constexpr posix_fs_dirent() = default;
+	explicit constexpr posix_fs_dirent(int fdd,char const* fnm):fd(fdd),filename(fnm){}
+};
 
 struct posix_io_redirection
 {
@@ -409,6 +415,14 @@ public:
 	}
 };
 
+#if !defined(_WIN32) && defined(AT_FDCWD)
+
+inline constexpr posix_at_entry at_fdcwd() noexcept
+{
+	return posix_at_entry(AT_FDCWD);
+}
+
+#endif
 namespace details
 {
 
@@ -681,25 +695,9 @@ https://github.com/Alexpux/mingw-w64/blob/master/mingw-w64-headers/crt/sys/stat.
 #endif
 }
 
-inline posix_file_status fstat_impl(int fd)
+template<typename stat_model>
+inline constexpr posix_file_status struct_stat_to_posix_file_status(stat_model& st) noexcept
 {
-#ifdef _WIN32
-	struct __stat64 st;
-#elif defined(__MSDOS__)
-	struct stat st;
-#else
-	struct stat64 st;
-#endif
-	if(
-#ifdef _WIN32
-_fstat64
-#elif defined(__MSDOS__)
-fstat
-#else
-fstat64
-#endif
-(fd,std::addressof(st))<0)
-		throw_posix_error();
 	return {static_cast<std::uintmax_t>(st.st_dev),
 	static_cast<std::uintmax_t>(st.st_ino),
 	st_mode_to_perms(st.st_mode),
@@ -723,6 +721,28 @@ fstat64
 	0,0
 #endif
 };
+}
+
+inline posix_file_status fstat_impl(int fd)
+{
+#ifdef _WIN32
+	struct __stat64 st;
+#elif defined(__MSDOS__)
+	struct stat st;
+#else
+	struct stat64 st;
+#endif
+	if(
+#ifdef _WIN32
+_fstat64
+#elif defined(__MSDOS__)
+fstat
+#else
+fstat64
+#endif
+(fd,std::addressof(st))<0)
+		throw_posix_error();
+	return struct_stat_to_posix_file_status(st);
 }
 
 }
@@ -893,7 +913,7 @@ An Example of Multiple Inheritance in C++: A Model of the Iostream Library
 			throw_posix_error();
 	}
 	return fd;
-#elif defined(__NEWLIB__)
+#elif defined(__NEWLIB__) && !defined(AT_FDCWD)
 	int fd{::open(pathname,flags,mode)};
 	system_call_throw_error<always_terminate>(fd);
 	return fd;
@@ -901,7 +921,66 @@ An Example of Multiple Inheritance in C++: A Model of the Iostream Library
 	return my_posix_openat<always_terminate>(AT_FDCWD,pathname,flags,mode);
 #endif
 }
+
+
+inline int my_posix_openat_file_internal_impl(int dirfd,char const* filepath,open_mode om,perms pm)
+{
+	return my_posix_openat(dirfd,filepath,details::calculate_posix_open_mode(om),static_cast<mode_t>(pm));
+}
+
+template<std::integral char_type>
+inline int my_posix_openat_file_impl(int dirfd,basic_cstring_view<char_type> filepath,open_mode om,perms pm)
+{
+	if constexpr(std::same_as<char_type,char>)
+	{
+		return my_posix_openat_file_internal_impl(dirfd,filepath.c_str(),om,pm);
+	}
+	else if constexpr(std::same_as<char_type,char8_t>)
+	{
+		return my_posix_openat_file_internal_impl(dirfd,reinterpret_cast<char const*>(filepath.c_str()),om,pm);
+	}
+	else
+	{
+		::fast_io::details::local_operator_new_array_ptr<char8_t> buffer(
+			::fast_io::details::intrinsics::add_or_overflow_die(
+			::fast_io::details::cal_decorated_reserve_size<sizeof(char_type),sizeof(char8_t)>(filepath.size()),1));
+		*::fast_io::details::codecvt::general_code_cvt_full(filepath.data(),filepath.data()+filepath.size(),buffer.ptr)=0;
+		return my_posix_openat_file_internal_impl(dirfd,reinterpret_cast<char const*>(buffer.ptr),om,pm);
+	}
+}
+
+inline int my_posix_open_file_internal_impl(char const* filepath,open_mode om,perms pm)
+{
+	return my_posix_open(filepath,details::calculate_posix_open_mode(om),static_cast<mode_t>(pm));
+}
+
+template<std::integral char_type>
+inline int my_posix_open_file_impl(basic_cstring_view<char_type> filepath,open_mode om,perms pm)
+{
+#if defined(__MSDOS__) || (defined(__NEWLIB__) && !defined(AT_FDCWD))
+	if constexpr(std::same_as<char_type,char>)
+	{
+		return my_posix_open_file_internal_impl(filepath.c_str(),om,pm);
+	}
+	else if constexpr(std::same_as<char_type,char8_t>)
+	{
+		return my_posix_open_file_internal_impl(reinterpret_cast<char const*>(filepath.c_str()),om,pm);
+	}
+	else
+	{
+		::fast_io::details::local_operator_new_array_ptr<char8_t> buffer(
+			::fast_io::details::intrinsics::add_or_overflow_die(
+			::fast_io::details::cal_decorated_reserve_size<sizeof(char_type),sizeof(char8_t)>(filepath.size()),1));
+		*::fast_io::details::codecvt::general_code_cvt_full(filepath.data(),filepath.data()+filepath.size(),buffer.ptr)=0;
+		return my_posix_open_file_internal_impl(reinterpret_cast<char const*>(buffer.ptr),om,pm);
+	}
+#else
+	return my_posix_openat_file_impl(AT_FDCWD,filepath,om,pm);
 #endif
+}
+
+#endif
+
 }
 
 template<std::integral ch_type>
@@ -934,10 +1013,21 @@ public:
 	{
 		hd.release();
 	}
+	basic_posix_file(nt_fs_dirent fsdirent,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_posix_file(basic_win32_file<char_type>(fsdirent,om,pm),om){}
 	basic_posix_file(cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
 		basic_posix_file(basic_win32_file<char_type>(file,om,pm),om)
 	{}
 	basic_posix_file(wcstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_posix_file(basic_win32_file<char_type>(file,om,pm),om)
+	{}
+	basic_posix_file(u8cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_posix_file(basic_win32_file<char_type>(file,om,pm),om)
+	{}
+	basic_posix_file(u16cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_posix_file(basic_win32_file<char_type>(file,om,pm),om)
+	{}
+	basic_posix_file(u32cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
 		basic_posix_file(basic_win32_file<char_type>(file,om,pm),om)
 	{}
 	basic_posix_file(nt_at_entry nate,cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
@@ -946,15 +1036,29 @@ public:
 	basic_posix_file(nt_at_entry nate,wcstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
 		basic_posix_file(basic_win32_file<char_type>(nate,file,om,pm),om)
 	{}
-#else
-	//potential support modification prv in the future
-	basic_posix_file(cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):basic_posix_file(details::my_posix_open(file.data(),details::calculate_posix_open_mode(om),static_cast<mode_t>(pm)))
-	{
-	}
-	basic_posix_file(posix_at_entry pate,cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):basic_posix_file(details::my_posix_openat(pate.fd,file.data(),details::calculate_posix_open_mode(om),static_cast<mode_t>(pm)))
-	{
-	}
+	basic_posix_file(nt_at_entry nate,u8cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_posix_file(basic_win32_file<char_type>(nate,file,om,pm),om)
+	{}
+	basic_posix_file(nt_at_entry nate,u16cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_posix_file(basic_win32_file<char_type>(nate,file,om,pm),om)
+	{}
+	basic_posix_file(nt_at_entry nate,u32cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_posix_file(basic_win32_file<char_type>(nate,file,om,pm),om)
+	{}
 
+#else
+	basic_posix_file(posix_fs_dirent fsdirent,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_posix_file(details::my_posix_openat_file_internal_impl(fsdirent.fd,fsdirent.filename,om,pm)){}
+	basic_posix_file(cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):basic_posix_file(details::my_posix_open_file_impl(file,om,pm)){}
+	basic_posix_file(posix_at_entry pate,cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):basic_posix_file(details::my_posix_openat_file_impl(pate.fd,file,om,pm)){}
+	basic_posix_file(wcstring_view file,open_mode om,perms pm=static_cast<perms>(436)):basic_posix_file(details::my_posix_open_file_impl(file,om,pm)){}
+	basic_posix_file(posix_at_entry pate,wcstring_view file,open_mode om,perms pm=static_cast<perms>(436)):basic_posix_file(details::my_posix_openat_file_impl(pate.fd,file,om,pm)){}
+	basic_posix_file(u8cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):basic_posix_file(details::my_posix_open_file_impl(file,om,pm)){}
+	basic_posix_file(posix_at_entry pate,u8cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):basic_posix_file(details::my_posix_openat_file_impl(pate.fd,file,om,pm)){}
+	basic_posix_file(u16cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):basic_posix_file(details::my_posix_open_file_impl(file,om,pm)){}
+	basic_posix_file(posix_at_entry pate,u16cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):basic_posix_file(details::my_posix_openat_file_impl(pate.fd,file,om,pm)){}
+	basic_posix_file(u32cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):basic_posix_file(details::my_posix_open_file_impl(file,om,pm)){}
+	basic_posix_file(posix_at_entry pate,u32cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):basic_posix_file(details::my_posix_openat_file_impl(pate.fd,file,om,pm)){}
 #endif
 
 
@@ -963,7 +1067,7 @@ To verify whether O_TMPFILE is a thing on FreeBSD. https://github.com/FreeRDP/Fr
 */
 #if defined(O_TMPFILE)&&defined(__linux__)
 	basic_posix_file(io_temp_t):basic_posix_file(
-		system_call<__NR_openat,int>(AT_FDCWD,"/tmp",O_EXCL|O_RDWR|O_TMPFILE|O_APPEND|O_NOATIME,S_IRUSR | S_IWUSR))
+		system_call<__NR_openat,int>(AT_FDCWD,u8"/tmp",O_EXCL|O_RDWR|O_TMPFILE|O_APPEND|O_NOATIME,S_IRUSR | S_IWUSR))
 	{
 		system_call_throw_error(native_handle());
 	}
@@ -1282,9 +1386,6 @@ inline constexpr basic_posix_io_observer<char_type> native_stderr()
 namespace details
 {
 
-struct __attribute__((__may_alias__)) iovec_may_alias:iovec
-{};
-
 inline std::size_t posix_scatter_read_size_impl(int fd,std::span<io_scatter_t const> sp)
 {
 #if defined(__linux__)
@@ -1296,7 +1397,12 @@ inline std::size_t posix_scatter_read_size_impl(int fd,std::span<io_scatter_t co
 	std::size_t sz{sp.size()};
 	if(static_cast<std::size_t>(std::numeric_limits<int>::max())<sz)
 		sz=static_cast<std::size_t>(std::numeric_limits<int>::max());
-	auto ptr{reinterpret_cast<iovec_may_alias const*>(sp.data())};
+	using iovec_may_alias_const_ptr
+#if __has_cpp_attribute(gnu::may_alias)
+	[[gnu::may_alias]]
+#endif
+	= iovec const*;
+	auto ptr{reinterpret_cast<iovec_may_alias_const_ptr>(sp.data())};
 	std::ptrdiff_t val{::readv(fd,ptr,static_cast<int>(sz))};
 	if(val<0)
 		throw_posix_error();
@@ -1315,7 +1421,12 @@ inline std::size_t posix_scatter_write_size_impl(int fd,std::span<io_scatter_t c
 	std::size_t sz{sp.size()};
 	if(static_cast<std::size_t>(std::numeric_limits<int>::max())<sz)
 		sz=static_cast<std::size_t>(std::numeric_limits<int>::max());
-	auto ptr{reinterpret_cast<iovec_may_alias const*>(sp.data())};
+	using iovec_may_alias_const_ptr
+#if __has_cpp_attribute(gnu::may_alias)
+	[[gnu::may_alias]]
+#endif
+	= iovec const*;
+	auto ptr{reinterpret_cast<iovec_may_alias_const_ptr>(sp.data())};
 	std::ptrdiff_t val{::writev(fd,ptr,static_cast<int>(sz))};
 	if(val<0)
 		throw_posix_error();

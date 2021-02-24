@@ -82,6 +82,9 @@ This function never fails. but what if fdopen fails?
 			throw_posix_error();
 		}
 		chd.release();
+#if _MSVC_STL_UPDATE
+		details::streambuf_hack::msvc_hack_set_close(this->fb);
+#endif
 	}
 	basic_filebuf_file(basic_posix_io_handle<char_type>&& piohd,open_mode mode):
 		basic_filebuf_file(basic_c_file_unlocked<char_type>(std::move(piohd),mode),mode)
@@ -100,44 +103,51 @@ This function never fails. but what if fdopen fails?
 		basic_filebuf_file(basic_posix_file<char_type>(std::move(nt_handle),mode),mode)
 	{
 	}
-	basic_filebuf_file(wcstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
-		basic_filebuf_file(basic_posix_file<char_type>(file,om,pm),om)
-	{}
-	basic_filebuf_file(native_at_entry nate,wcstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
-		basic_filebuf_file(basic_posix_file<char_type>(nate,file,om,pm),om)
-	{}
 #endif
+
+	basic_filebuf_file(native_fs_dirent fsdirent,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_filebuf_file(basic_posix_file<char_type>(fsdirent,om,pm),om)
+	{}
 	basic_filebuf_file(cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
 		basic_filebuf_file(basic_posix_file<char_type>(file,om,pm),om)
 	{}
 	basic_filebuf_file(native_at_entry nate,cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
 		basic_filebuf_file(basic_posix_file<char_type>(nate,file,om,pm),om)
 	{}
-
-
+	basic_filebuf_file(wcstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_filebuf_file(basic_posix_file<char_type>(file,om,pm),om)
+	{}
+	basic_filebuf_file(native_at_entry nate,wcstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_filebuf_file(basic_posix_file<char_type>(nate,file,om,pm),om)
+	{}
+	basic_filebuf_file(u8cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_filebuf_file(basic_posix_file<char_type>(file,om,pm),om)
+	{}
+	basic_filebuf_file(native_at_entry nate,u8cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_filebuf_file(basic_posix_file<char_type>(nate,file,om,pm),om)
+	{}
+	basic_filebuf_file(u16cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_filebuf_file(basic_posix_file<char_type>(file,om,pm),om)
+	{}
+	basic_filebuf_file(native_at_entry nate,u16cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_filebuf_file(basic_posix_file<char_type>(nate,file,om,pm),om)
+	{}
+	basic_filebuf_file(u32cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_filebuf_file(basic_posix_file<char_type>(file,om,pm),om)
+	{}
+	basic_filebuf_file(native_at_entry nate,u32cstring_view file,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_filebuf_file(basic_posix_file<char_type>(nate,file,om,pm),om)
+	{}
 	basic_filebuf_file& operator=(basic_filebuf_file const&)=delete;
 	basic_filebuf_file(basic_filebuf_file const&)=delete;
 	basic_filebuf_file(basic_filebuf_file&& other) noexcept:basic_filebuf_io_observer<CharT,Traits>{other.release()}{}
 
-private:
-	void close_impl() noexcept
-	{
-#if defined(_MSVC_STL_UPDATE)
-		if(this->fb)[[likely]]
-		{
-			this->fb->close();
-			delete this->fb;
-		}
-#else
-		delete this->fb;
-#endif
-	}
 public:
 	basic_filebuf_file& operator=(basic_filebuf_file&& bf) noexcept
 	{
 		if(this->fb==bf.fb)[[unlikely]]
 			return *this;
-		close_impl();
+		delete this->fb;
 		this->fb=bf.release();
 		return *this;
 	}
@@ -155,12 +165,12 @@ public:
 	}
 	void reset(native_handle_type fb=nullptr) noexcept
 	{
-		close_impl();
+		delete this->fb;
 		this->fb=fb;
 	}
 	~basic_filebuf_file()
 	{
-		close_impl();
+		delete this->fb;
 	}
 };
 

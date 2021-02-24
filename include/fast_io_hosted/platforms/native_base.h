@@ -13,7 +13,10 @@
 #include"nt.h"
 #include"win32_iocp_overlapped.h"
 #include"win32.h"
+#include"win32_path_dealer.h"
 //#include"com_error.h"
+#else
+#include"posix_path_dealer.h"
 #endif
 #include"linux/system_call.h"
 #include"posix.h"
@@ -27,6 +30,8 @@ inline constexpr auto native_stdout_number(win32_stdout_number);
 inline constexpr auto native_stderr_number(win32_stderr_number);
 
 using native_at_entry = nt_at_entry;
+using native_fs_dirent = nt_fs_dirent;
+
 template<std::integral ch_type>
 using basic_native_io_observer = basic_win32_io_observer<ch_type>;
 template<std::integral ch_type>
@@ -41,6 +46,7 @@ inline constexpr auto native_stdout_number(posix_stdout_number);
 inline constexpr auto native_stderr_number(posix_stderr_number);
 
 using native_at_entry = posix_at_entry;
+using native_fs_dirent = posix_fs_dirent;
 
 template<std::integral ch_type>
 using basic_native_io_observer = basic_posix_io_observer<ch_type>;

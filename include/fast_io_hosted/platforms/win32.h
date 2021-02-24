@@ -21,10 +21,8 @@ inline void* create_win32_temp_file()
 		fast_io::hash_processor processor(sha);
 		write(processor,buffer1.begin(),buffer1.end());
 		processor.do_final();
-		ospan osp(arr);
-		obuffer_set_curr(osp,arr.data()+temp_path_size);
-		print_freestanding(osp,sha,L".tmp");
-		put(osp,0);
+		auto ptr{print_reserve_define(io_reserve_type<wchar_t,fast_io::sha256>,arr.data()+temp_path_size,sha)};
+		non_overlapped_copy_n(L".tmp",sizeof(L".tmp"),ptr);
 		void* handle = win32::CreateFileW(arr.data(),
 		0x40000000|0x80000000,	//GENERIC_READ|GENERIC_WRITE
 		0,		//Prevents other processes from opening a file or device if they request delete, read, or write access.
@@ -80,20 +78,34 @@ inline void* win32_create_file_a_impld(wchar_t const* lpFileName,win32_open_mode
 }
 
 template<std::integral char_type>
-requires (std::same_as<char_type,char>||std::same_as<char_type,wchar_t>)
 inline void* win32_create_file_impl(basic_cstring_view<char_type> path,win32_open_mode const& mode)
 {
-	if constexpr(std::same_as<char_type,char>)
-	{
-		std::unique_ptr<wchar_t[]> buffer(new wchar_t[path.size()+1]);
-		*utf_code_convert(path.data(),path.data()+path.size(),buffer.get())=0;
-		return win32_create_file_a_impld(buffer.get(),mode);
-	}
-	else
+	static_assert(sizeof(wchar_t)==2);
+	if constexpr(std::same_as<char_type,wchar_t>)
 	{
 		return win32_create_file_a_impld(path.data(),mode);
 	}
+	else
+	{
+		using wchar_t_may_alias_ptr
+#if __has_cpp_attribute(gnu::may_alias)
+		[[gnu::may_alias]]
+#endif
+		= wchar_t const*;
+		if constexpr(std::same_as<char_type,char16_t>)
+			return win32_create_file_a_impld(reinterpret_cast<wchar_t_may_alias_ptr>(path.data()),mode);
+		else
+		{
+			::fast_io::details::local_operator_new_array_ptr<char16_t> buffer(
+				::fast_io::details::intrinsics::add_or_overflow_die(
+				::fast_io::details::cal_decorated_reserve_size<sizeof(char_type),sizeof(char16_t)>(path.size()),1));
+			*::fast_io::details::codecvt::general_code_cvt_full(
+				path.data(),path.data()+path.size(),buffer.ptr)=0;
+			return win32_create_file_a_impld(reinterpret_cast<wchar_t_may_alias_ptr>(buffer.ptr),mode);
+		}
+	}
 }
+
 
 
 inline constexpr win32_open_mode calculate_win32_open_mode(open_mode value,perms pm)
@@ -774,12 +786,15 @@ public:
 #ifndef _MSC_VER
 	explicit basic_win32_file(io_temp_t):basic_win32_io_handle<char_type>(details::create_win32_temp_file()){}
 #endif
+	explicit basic_win32_file(nt_fs_dirent fsdirent,open_mode om,perms pm=static_cast<perms>(436)):
+		basic_win32_io_handle<char_type>(win32::nt::details::nt_create_file_directory_impl<false>(fsdirent.handle,fsdirent.filename,win32::nt::details::calculate_nt_open_mode(om,pm))){}
 	explicit basic_win32_file(nt_at_entry nate,cstring_view filename,open_mode om,perms pm=static_cast<perms>(436)):
 				basic_win32_io_handle<char_type>(win32::nt::details::nt_create_file_directory_impl<false>(nate.handle,filename,win32::nt::details::calculate_nt_open_mode(om,pm)))
 	{}
 
 	explicit basic_win32_file(cstring_view filename,open_mode om,perms pm=static_cast<perms>(436)):
 				basic_win32_io_handle<char_type>(details::win32_create_file_impl(filename,details::calculate_win32_open_mode(om,pm)))
+
 	{}
 	explicit basic_win32_file(nt_at_entry nate,wcstring_view filename,open_mode om,perms pm=static_cast<perms>(436)):
 				basic_win32_io_handle<char_type>(win32::nt::details::nt_create_file_directory_impl<false>(nate.handle,filename,win32::nt::details::calculate_nt_open_mode(om,pm)))
@@ -788,6 +803,33 @@ public:
 	explicit basic_win32_file(wcstring_view filename,open_mode om,perms pm=static_cast<perms>(436)):
 				basic_win32_io_handle<char_type>(details::win32_create_file_impl(filename,details::calculate_win32_open_mode(om,pm)))
 	{}
+
+
+	explicit basic_win32_file(nt_at_entry nate,u8cstring_view filename,open_mode om,perms pm=static_cast<perms>(436)):
+				basic_win32_io_handle<char_type>(win32::nt::details::nt_create_file_directory_impl<false>(nate.handle,filename,win32::nt::details::calculate_nt_open_mode(om,pm)))
+	{}
+
+	explicit basic_win32_file(u8cstring_view filename,open_mode om,perms pm=static_cast<perms>(436)):
+				basic_win32_io_handle<char_type>(details::win32_create_file_impl(filename,details::calculate_win32_open_mode(om,pm)))
+
+	{}
+	explicit basic_win32_file(nt_at_entry nate,u16cstring_view filename,open_mode om,perms pm=static_cast<perms>(436)):
+				basic_win32_io_handle<char_type>(win32::nt::details::nt_create_file_directory_impl<false>(nate.handle,filename,win32::nt::details::calculate_nt_open_mode(om,pm)))
+	{}
+
+	explicit basic_win32_file(u16cstring_view filename,open_mode om,perms pm=static_cast<perms>(436)):
+				basic_win32_io_handle<char_type>(details::win32_create_file_impl(filename,details::calculate_win32_open_mode(om,pm)))
+	{}
+
+
+	explicit basic_win32_file(nt_at_entry nate,u32cstring_view filename,open_mode om,perms pm=static_cast<perms>(436)):
+				basic_win32_io_handle<char_type>(win32::nt::details::nt_create_file_directory_impl<false>(nate.handle,filename,win32::nt::details::calculate_nt_open_mode(om,pm)))
+	{}
+
+	explicit basic_win32_file(u32cstring_view filename,open_mode om,perms pm=static_cast<perms>(436)):
+				basic_win32_io_handle<char_type>(details::win32_create_file_impl(filename,details::calculate_win32_open_mode(om,pm)))
+	{}
+
 
 #if 0
 	explicit basic_win32_file(io_async_t) requires(std::same_as<char_type,char>):
