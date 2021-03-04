@@ -51,6 +51,8 @@ inline constexpr U byte_swap_naive_impl(U a) noexcept
 		return  ((a & 0xff00) >> 8) |
 			((a & 0x00ff) << 8) ;
 	}
+	else
+		return a;
 }
 
 template<std::unsigned_integral U>
@@ -328,7 +330,7 @@ concept my_unsigned_integral = my_integral<T>&&!my_signed_integral<T>;
 
 template<std::integral char_type,std::size_t n>
 requires(n!=0)
-inline constexpr std::size_t string_literal_size(char_type const(&s)[n])
+inline constexpr std::size_t string_literal_size(char_type const(&)[n])
 {
 	return n-1;
 }

@@ -10,7 +10,8 @@ out=1<<1,
 tie=1<<2,
 io=in|out|tie,
 secure_clear=1<<3,
-construct_decorator=1<<4
+construct_decorator=1<<4,
+deco_out_no_internal=(1<<5)|(out)
 };
 
 inline constexpr buffer_mode operator&(buffer_mode x, buffer_mode y) noexcept
@@ -66,6 +67,22 @@ struct basic_io_buffer_pointers_with_cap
 	pointer buffer_begin{},buffer_curr{},buffer_end{},buffer_cap{};
 };
 
+template<typename T>
+struct basic_io_buffer_pointers_only_begin
+{
+	using value_type = T;
+	using pointer = T*;
+	pointer buffer_begin{};
+};
+
+template<typename T>
+struct basic_io_buffer_pointers_no_curr
+{
+	using value_type = T;
+	using pointer = T*;
+	pointer buffer_begin{},buffer_end{};
+};
+
 namespace details
 {
 template<stream handle_type>
@@ -85,52 +102,6 @@ bool constraint_buffer_mode(buffer_mode mode) noexcept
 		if((mode&buffer_mode::secure_clear)!=buffer_mode::secure_clear)
 			return false;
 	return true;
-}
-
-
-template<typename char_type>
-inline constexpr char_type* allocate_iobuf_space(std::size_t buffer_size) noexcept
-{
-#if __cpp_constexpr >=201907L && __cpp_constexpr_dynamic_alloc >= 201907L && __cpp_lib_is_constant_evaluated >=201811L
-	if(std::is_constant_evaluated())
-	{
-		return new char_type[buffer_size];
-	}
-	else
-#endif
-	{
-#if __cpp_exceptions
-	try
-	{
-#endif
-		return static_cast<char_type*>(operator new(intrinsics::cal_allocation_size_or_die<char_type>(buffer_size)));
-#if __cpp_exceptions
-	}
-	catch(...)
-	{
-		fast_terminate();
-	}
-#endif
-	}
-}
-
-template<typename char_type>
-inline constexpr void deallocate_iobuf_space(char_type* ptr,[[maybe_unused]] std::size_t buffer_size) noexcept
-{
-#if __cpp_constexpr >=201907L && __cpp_constexpr_dynamic_alloc >= 201907L && __cpp_lib_is_constant_evaluated >=201811L
-	if(std::is_constant_evaluated())
-	{
-		delete[] ptr;
-	}
-	else
-#endif
-	{
-#if __cpp_sized_deallocation >= 201309L
-		operator delete(ptr,buffer_size*sizeof(char_type));
-#else
-		operator delete(ptr);
-#endif
-	}
 }
 
 }

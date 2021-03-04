@@ -527,7 +527,7 @@ inline constexpr void print_control(output out,T t)
 	{
 		if constexpr(pci==print_control_impl::serialize)
 		{
-			internal_temporary_buffer<char_type> buffer;
+			dynamic_io_buffer<char_type> buffer;
 			print_control(io_ref(buffer),t);
 			auto beg{obuffer_begin(buffer)};
 			auto curr{obuffer_curr(buffer)};
@@ -600,23 +600,23 @@ inline constexpr void print_fallback(output out,Args ...args)
 				{
 					char_type ch('\n');
 					scatters.back()={std::addressof(ch),sizeof(ch)};
-					scatter_write(out,scatters);
+					scatter_write(out,{scatters.data(),scatters.size()});
 				}
 				else if constexpr(std::same_as<char_type,wchar_t>)
 				{
 					char_type ch(L'\n');
 					scatters.back()={std::addressof(ch),sizeof(ch)};
-					scatter_write(out,scatters);
+					scatter_write(out,{scatters.data(),scatters.size()});
 				}
 				else
 				{
 					char_type ch(u8'\n');
 					scatters.back()={std::addressof(ch),sizeof(ch)};
-					scatter_write(out,scatters);
+					scatter_write(out,{scatters.data(),scatters.size()});
 				}
 			}
 			else
-				scatter_write(out,scatters);
+				scatter_write(out,{scatters.data(),scatters.size()});
 		}
 		else if constexpr(((scatter_printable<char_type,Args>||
 			reserve_printable<char_type,Args>)&&...))
@@ -629,23 +629,23 @@ inline constexpr void print_fallback(output out,Args ...args)
 				{
 					char_type ch('\n');
 					scatters.back()={std::addressof(ch),sizeof(ch)};
-					scatter_write(out,scatters);
+					scatter_write(out,{scatters.data(),scatters.size()});
 				}
 				else if constexpr(std::same_as<char_type,wchar_t>)
 				{
 					char_type ch(L'\n');
 					scatters.back()={std::addressof(ch),sizeof(ch)};
-					scatter_write(out,scatters);
+					scatter_write(out,{scatters.data(),scatters.size()});
 				}
 				else
 				{
 					char_type ch(u8'\n');
 					scatters.back()={std::addressof(ch),sizeof(ch)};
-					scatter_write(out,scatters);
+					scatter_write(out,{scatters.data(),scatters.size()});
 				}
 			}
 			else
-				scatter_write(out,scatters);
+				scatter_write(out,{scatters.data(),scatters.size()});
 		}
 		else
 		{
@@ -658,32 +658,31 @@ inline constexpr void print_fallback(output out,Args ...args)
 				{
 					char_type ch('\n');
 					scatters.back()={std::addressof(ch),sizeof(ch)};
-					scatter_write(out,scatters);
+					scatter_write(out,{scatters.data(),scatters.size()});
 				}
 				else if constexpr(std::same_as<char_type,wchar_t>)
 				{
 					char_type ch(L'\n');
 					scatters.back()={std::addressof(ch),sizeof(ch)};
-					scatter_write(out,scatters);
+					scatter_write(out,{scatters.data(),scatters.size()});
 				}
 				else
 				{
 					char_type ch(u8'\n');
 					scatters.back()={std::addressof(ch),sizeof(ch)};
-					scatter_write(out,scatters);
+					scatter_write(out,{scatters.data(),scatters.size()});
 				}
 			}
 			else
-				scatter_write(out,scatters);
+				scatter_write(out,{scatters.data(),scatters.size()});
 		}
 	}
 	else
 	{
-		using internal_buffer_type = internal_temporary_buffer<typename output::char_type>;
-		internal_buffer_type buffer;
+		dynamic_io_buffer<typename output::char_type> buffer;
 		auto ref{io_ref(buffer)};
 		print_controls_line<line,pci>(ref,args...);
-		write(out,buffer.beg_ptr,buffer.end_ptr);
+		write(out,buffer.buffer_begin,buffer.buffer_curr);
 	}
 }
 

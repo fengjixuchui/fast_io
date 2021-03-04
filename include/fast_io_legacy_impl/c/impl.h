@@ -839,7 +839,7 @@ public:
 		this->native_handle()=details::funopen_wrapper<std::remove_cvref_t<stm>>(up.get());
 		up.release();
 #else
-		throw_posix_error(EOPNOTSUPP);
+		throw_posix_error(EINVAL);
 #endif
 	}
 
@@ -852,7 +852,7 @@ public:
 #elif defined(__BSD_VISIBLE) || defined(__BIONIC__) || defined(__NEWLIB__)
 		this->native_handle()=details::funopen_wrapper<stm&>(std::addressof(reff));
 #else
-		throw_posix_error(EOPNOTSUPP);
+		throw_posix_error(EINVAL);
 #endif
 	}
 	template<stream stm>
@@ -913,7 +913,7 @@ inline auto redirect_handle(basic_c_io_observer<ch_type> h)
 	return static_cast<basic_posix_io_observer<ch_type>>(h).native_handle();
 #endif
 }
-
+#if 0
 template<std::integral char_type>
 requires async_stream<basic_posix_io_observer<char_type>>
 inline constexpr io_async_scheduler_t<basic_posix_io_observer<char_type>> async_scheduler_type(basic_c_io_observer<char_type>)
@@ -970,21 +970,20 @@ inline void async_read_callback(io_async_observer ioa,basic_c_io_observer_unlock
 	async_read_callback(ioa,static_cast<basic_posix_io_observer<char_type>>(h),std::forward<Args>(args)...);
 }
 #endif
+#endif
+
 using c_io_observer_unlocked=basic_c_io_observer_unlocked<char>;
 using c_io_observer=basic_c_io_observer<char>;
 using c_io_handle_unlocked = basic_c_io_handle_unlocked<char>;
 using c_io_handle = basic_c_io_handle<char>;
 using c_file = basic_c_file<char>;
 using c_file_unlocked = basic_c_file_unlocked<char>;
-#ifndef __MSDOS__
 using wc_io_observer_unlocked=basic_c_io_observer_unlocked<wchar_t>;
 using wc_io_observer=basic_c_io_observer<wchar_t>;
 using wc_io_handle_unlocked = basic_c_io_handle_unlocked<wchar_t>;
 using wc_io_handle = basic_c_io_handle<wchar_t>;
 using wc_file = basic_c_file<wchar_t>;
 using wc_file_unlocked = basic_c_file_unlocked<wchar_t>;
-#endif
-
 using u8c_io_observer_unlocked=basic_c_io_observer_unlocked<char8_t>;
 using u8c_io_observer=basic_c_io_observer<char8_t>;
 using u8c_io_handle_unlocked = basic_c_io_handle_unlocked<char8_t>;
