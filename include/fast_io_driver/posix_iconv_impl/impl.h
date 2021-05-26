@@ -62,10 +62,10 @@ inline iconv_deco_from_chars_result iconv_do_impl(iconv_t cd,
 		std::size_t inbytes_left{static_cast<std::size_t>(from_last-from_first)};
 		std::size_t outbytes_left{static_cast<std::size_t>(to_last-to_first)};
 		std::size_t ret{iconv(cd,
-		std::addressof(from_first),
-		std::addressof(inbytes_left),
-		std::addressof(to_first),
-		std::addressof(outbytes_left))};
+		__builtin_addressof(from_first),
+		__builtin_addressof(inbytes_left),
+		__builtin_addressof(to_first),
+		__builtin_addressof(outbytes_left))};
 		from_first=from_last-inbytes_left;
 		to_first=to_last-outbytes_left;
 		if(ret!=static_cast<std::size_t>(-1))
@@ -166,21 +166,34 @@ inline constexpr std::size_t deco_reserve_size(io_reserve_type_t<to_char_type,ic
 		details::intrinsics::add_or_overflow_die(size,32),factor);
 }
 
-template<std::contiguous_iterator fromIter,std::contiguous_iterator toIter>
-inline toIter deco_reserve_define(io_reserve_type_t<std::iter_value_t<toIter>,iconv_deco_t>,
+template<::fast_io::freestanding::contiguous_iterator fromIter,::fast_io::freestanding::contiguous_iterator toIter>
+inline toIter deco_reserve_define(io_reserve_type_t<::fast_io::freestanding::iter_value_t<toIter>,iconv_deco_t>,
 	iconv_deco_t& icdt,fromIter first,fromIter last,toIter iter)
 {
-	using to_char_type = std::iter_value_t<toIter>;
-	using from_char_type = std::iter_value_t<fromIter>;
+	using to_char_type = ::fast_io::freestanding::iter_value_t<toIter>;
+	using from_char_type = ::fast_io::freestanding::iter_value_t<fromIter>;
 	constexpr std::size_t factor{8/sizeof(to_char_type)};
 	std::size_t dis{static_cast<std::size_t>(last-first)};
 	std::size_t inbytes{sizeof(from_char_type)*dis};
 	std::size_t const allocated_bytes{(inbytes+32)*8};
 	return iter+details::iconv_deco_reserve_define_impl(icdt,
-		reinterpret_cast<char const*>(std::to_address(first)),
+		reinterpret_cast<char const*>(::fast_io::freestanding::to_address(first)),
 		inbytes,
-		reinterpret_cast<char*>(std::to_address(iter)),
+		reinterpret_cast<char*>(::fast_io::freestanding::to_address(iter)),
 		allocated_bytes)/sizeof(to_char_type);
+}
+
+namespace details
+{
+
+inline iconv_t my_iconv_open(char const* tocode,char const* fromcode)
+{
+	auto cd{iconv_open(tocode,fromcode)};
+	if(cd==std::bit_cast<iconv_t>(static_cast<uintptr_t>(-1)))
+		throw_posix_error();
+	return cd;
+}
+
 }
 
 class posix_iconv_file:public posix_iconv_io_observer
@@ -190,17 +203,20 @@ public:
 	constexpr posix_iconv_file() noexcept = default;
 	constexpr posix_iconv_file(iconv_t icv) noexcept : posix_iconv_io_observer{icv}{}
 
-	posix_iconv_file(char const* tocode,char const* fromcode):posix_iconv_io_observer{iconv_open(tocode,fromcode)}
-	{
-		if(this->cd==std::bit_cast<iconv_t>(static_cast<uintptr_t>(-1)))
-			throw_posix_error();
-	}
+	posix_iconv_file(cstring_view tocode,cstring_view fromcode):
+		posix_iconv_io_observer{details::my_iconv_open(tocode.c_str(),fromcode.c_str())}
+	{}
+	posix_iconv_file(u8cstring_view tocode,u8cstring_view fromcode):
+		posix_iconv_io_observer{
+			details::my_iconv_open(reinterpret_cast<char const*>(tocode.c_str()),
+			reinterpret_cast<char const*>(fromcode.c_str()))}
+	{}
 	posix_iconv_file(posix_iconv_file const&)=delete;
 	posix_iconv_file& operator=(posix_iconv_file const&)=delete;
 	constexpr posix_iconv_file(posix_iconv_file&& other) noexcept:posix_iconv_io_observer{other.release()}{}	
 	posix_iconv_file& operator=(posix_iconv_file&& other) noexcept
 	{
-		if(std::addressof(other)==this)[[unlikely]]
+		if(__builtin_addressof(other)==this)[[unlikely]]
 			return *this;
 		iconv_close(this->cd);
 		this->cd=other.release();
@@ -274,7 +290,7 @@ constexpr iconv_code_cvt_t<io_scatter_t> iconv_code_cvt(posix_iconv_io_observer 
 template<std::integral char_type>
 constexpr iconv_code_cvt_t<io_scatter_t> iconv_code_cvt(posix_iconv_io_observer piiob,chvw_t<char_type const*> t) noexcept
 {
-	std::basic_string_view<char_type> view(t.reference);
+	::fast_io::freestanding::basic_string_view<char_type> view(t.reference);
 	return {piiob.cd,{view.data(),sizeof(char_type)*view.size()}};
 }
 template<std::integral char_type>
@@ -289,14 +305,14 @@ inline std::size_t print_reserve_size(
 	return v.reference.len*8/sizeof(char_type);
 }
 
-template<std::contiguous_iterator Iter>
-inline Iter print_reserve_define(io_reserve_type_t<std::iter_value_t<Iter>,iconv_code_cvt_t<io_scatter_t>>,
+template<::fast_io::freestanding::contiguous_iterator Iter>
+inline Iter print_reserve_define(io_reserve_type_t<::fast_io::freestanding::iter_value_t<Iter>,iconv_code_cvt_t<io_scatter_t>>,
 	Iter iter,iconv_code_cvt_t<io_scatter_t> v) noexcept
 {
-	using char_type = std::iter_value_t<Iter>;
+	using char_type = ::fast_io::freestanding::iter_value_t<Iter>;
 	std::size_t const sz{::fast_io::details::iconv_print_reserve_define_impl(v.cd,
-	reinterpret_cast<char const*>(std::to_address(v.reference.base)),
-	v.reference.len,reinterpret_cast<char*>(std::to_address(iter)))};
+	reinterpret_cast<char const*>(::fast_io::freestanding::to_address(v.reference.base)),
+	v.reference.len,reinterpret_cast<char*>(::fast_io::freestanding::to_address(iter)))};
 	return iter+sz/sizeof(char_type);
 }
 }

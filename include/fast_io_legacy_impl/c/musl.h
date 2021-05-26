@@ -6,6 +6,52 @@ namespace fast_io
 
 namespace details::fp_hack
 {
+
+
+#ifdef __wasi__
+
+struct fp_model {
+	unsigned flags;
+	unsigned char *rpos, *rend;
+	int (*close)(FILE *);
+	unsigned char *wend, *wpos;
+#ifdef __wasilibc_unmodified_upstream // WASI doesn't need backwards-compatibility fields.
+	unsigned char *mustbezero_1;
+#endif
+	unsigned char *wbase;
+	size_t (*read)(FILE *, unsigned char *, size_t);
+	size_t (*write)(FILE *, const unsigned char *, size_t);
+	off_t (*seek)(FILE *, off_t, int);
+	unsigned char *buf;
+	size_t buf_size;
+	FILE *prev, *next;
+	int fd;
+#ifdef __wasilibc_unmodified_upstream // WASI has no popen
+	int pipe_pid;
+#endif
+#if defined(__wasilibc_unmodified_upstream) || defined(_REENTRANT)
+	long lockcount;
+#endif
+	int mode;
+#if defined(__wasilibc_unmodified_upstream) || defined(_REENTRANT)
+	volatile int lock;
+#endif
+	int lbf;
+	void *cookie;
+	off_t off;
+	char *getln_buf;
+#ifdef __wasilibc_unmodified_upstream // WASI doesn't need backwards-compatibility fields.
+	void *mustbezero_2;
+#endif
+	unsigned char *shend;
+	off_t shlim, shcnt;
+#if defined(__wasilibc_unmodified_upstream) || defined(_REENTRANT)
+	FILE *prev_locked, *next_locked;
+#endif
+	void *locale;
+};
+
+#else
 //https://github.com/EOSIO/musl/blob/master/src/internal/stdio_impl.h
 struct fp_model
 {
@@ -38,7 +84,7 @@ struct fp_model
 	FILE *prev_locked, *next_locked;
 	void *locale;
 };
-
+#endif
 
 template<std::size_t position>
 requires (position<6)
@@ -63,7 +109,7 @@ inline char_type* hack_fp_ptr(FILE* fp)
 {
 	constexpr std::size_t offset{get_offset<position>()};
 	char_type* value;
-	memcpy(std::addressof(value),reinterpret_cast<std::byte*>(fp)+offset,sizeof(char_type*));
+	::fast_io::details::my_memcpy(__builtin_addressof(value),reinterpret_cast<std::byte*>(fp)+offset,sizeof(char_type*));
 	return value;	
 }
 
@@ -71,7 +117,7 @@ template<std::size_t position,std::integral char_type>
 inline void hack_fp_set_ptr(FILE* fp,char_type* ptr)
 {
 	constexpr std::size_t offset(get_offset<position>());
-	memcpy(reinterpret_cast<std::byte*>(fp)+offset,std::addressof(ptr),sizeof(char_type*));
+	::fast_io::details::my_memcpy(reinterpret_cast<std::byte*>(fp)+offset,__builtin_addressof(ptr),sizeof(char_type*));
 }
 
 }
@@ -130,15 +176,15 @@ char8_t* ptr) noexcept
 }
 
 
-extern "C" int __uflow (FILE *) noexcept;
-extern "C" int ferror_unlocked(FILE*) noexcept;
+
 
 namespace details::fp_hack
 {
+extern int libc_uflow (FILE *) noexcept asm("__uflow");
 
 inline bool musl_fp_underflow_impl(std::FILE* fp)
 {
-	bool eof{__uflow(fp)!=EOF};
+	bool eof{libc_uflow(fp)!=EOF};
 	if(!eof&&ferror_unlocked(fp))
 		throw_posix_error();
 	hack_fp_set_ptr<1>(fp,hack_fp_ptr<char,0>(fp));
@@ -147,12 +193,12 @@ inline bool musl_fp_underflow_impl(std::FILE* fp)
 
 }
 
-inline bool underflow(c_io_observer_unlocked cio)
+inline bool ibuffer_underflow(c_io_observer_unlocked cio)
 {
 	return details::fp_hack::musl_fp_underflow_impl(cio.fp);
 }
 
-inline bool underflow(u8c_io_observer_unlocked cio)
+inline bool ibuffer_underflow(u8c_io_observer_unlocked cio)
 {
 	return details::fp_hack::musl_fp_underflow_impl(cio.fp);
 }
@@ -210,18 +256,20 @@ char8_t* ptr) noexcept
 	details::fp_hack::hack_fp_set_ptr<4>(cio.fp,ptr);
 }
 
-
-extern "C" int __overflow(_IO_FILE *, int) noexcept;
-
-inline void overflow(c_io_observer_unlocked cio,char ch)
+namespace details
 {
-	if(__overflow(cio.fp,static_cast<int>(static_cast<unsigned char>(ch)))==EOF)[[unlikely]]
+extern int libc_overflow(_IO_FILE *, int) noexcept asm("__overflow");
+}
+
+inline void obuffer_overflow(c_io_observer_unlocked cio,char ch)
+{
+	if(details::libc_overflow(cio.fp,static_cast<int>(static_cast<unsigned char>(ch)))==EOF)[[unlikely]]
 		throw_posix_error();
 }
 
-inline void overflow(u8c_io_observer_unlocked cio,char8_t ch)
+inline void obuffer_overflow(u8c_io_observer_unlocked cio,char8_t ch)
 {
-	if(__overflow(cio.fp,static_cast<int>(static_cast<unsigned char>(ch)))==EOF)[[unlikely]]
+	if(details::libc_overflow(cio.fp,static_cast<int>(static_cast<unsigned char>(ch)))==EOF)[[unlikely]]
 		throw_posix_error();
 }
 

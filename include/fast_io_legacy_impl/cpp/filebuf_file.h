@@ -47,7 +47,7 @@ public:
 	constexpr basic_filebuf_file(native_hd fb):basic_filebuf_io_observer<CharT,Traits>{fb}{}
 #if defined(__GLIBCXX__)
 	basic_filebuf_file(basic_posix_io_handle<char_type>&& piohd,open_mode mode):
-		basic_filebuf_io_observer<CharT,Traits>{new __gnu_cxx::stdio_filebuf<char_type,traits_type>(piohd.native_handle(),details::calculate_fstream_open_value(mode),fast_io::details::cal_buffer_size<CharT,true>())}
+		basic_filebuf_io_observer<CharT,Traits>{new __gnu_cxx::stdio_filebuf<char_type,traits_type>(piohd.fd,details::calculate_fstream_open_value(mode),fast_io::details::cal_buffer_size<CharT,true>())}
 	{
 /*
 https://github.com/gcc-mirror/gcc/blob/41d6b10e96a1de98e90a7c0378437c3255814b16/libstdc%2B%2B-v3/config/io/basic_file_stdio.cc#L216
@@ -61,20 +61,8 @@ This function never fails. but what if fdopen fails?
 		}
 		piohd.release();
 	}
-#elif defined(__LIBCPP_VERSION)
-	basic_filebuf_file(basic_posix_io_handle<char_type>&& piohd,open_mode mode):
-		basic_filebuf_io_observer<CharT,Traits>{new std::basic_filebuf<char_type,traits_type>}
-	{
-		fb.__open(piohd.native_handle(),details::calculate_fstream_open_value(mode));
-		if(!this->fb->is_open())
-		{
-			delete this->fb;
-			throw_posix_error();
-		}
-		piohd.release();
-	}
-#else
-	basic_filebuf_file(basic_c_io_handle_unlocked<char_type>&& chd,open_mode):basic_filebuf_io_observer<CharT,Traits>{new std::basic_filebuf<char_type,traits_type>(chd.native_handle())}
+	basic_filebuf_file(basic_c_io_handle_unlocked<char_type>&& chd,open_mode mode):
+		basic_filebuf_io_observer<CharT,Traits>{new __gnu_cxx::stdio_filebuf<char_type,traits_type>(chd.fp,details::calculate_fstream_open_value(mode),fast_io::details::cal_buffer_size<CharT,true>())}
 	{
 		if(!this->fb->is_open())
 		{
@@ -82,9 +70,56 @@ This function never fails. but what if fdopen fails?
 			throw_posix_error();
 		}
 		chd.release();
-#if _MSVC_STL_UPDATE
+		details::streambuf_hack::hack_set_close(this->fb);
+	}
+	basic_filebuf_file(basic_c_io_handle<char_type>&& chd,open_mode mode):
+		basic_filebuf_io_observer<CharT,Traits>{new __gnu_cxx::stdio_filebuf<char_type,traits_type>(chd.fp,details::calculate_fstream_open_value(mode),fast_io::details::cal_buffer_size<CharT,true>())}
+	{
+		if(!this->fb->is_open())
+		{
+			delete this->fb;
+			throw_posix_error();
+		}
+		chd.release();
+		details::streambuf_hack::hack_set_close(this->fb);
+	}
+#elif defined(_LIBCPP_VERSION)
+	basic_filebuf_file(basic_c_io_handle_unlocked<char_type>&& chd,open_mode mode):
+		basic_filebuf_io_observer<CharT,Traits>{new std::basic_filebuf<char_type,traits_type>}
+	{
+		details::streambuf_hack::fp_hack_open(this->fb,chd.fp,details::calculate_fstream_open_value(mode));
+		chd.fp=nullptr;
+	}
+	basic_filebuf_file(basic_c_io_handle<char_type>&& chd,open_mode mode):
+		basic_filebuf_io_observer<CharT,Traits>{new std::basic_filebuf<char_type,traits_type>}
+	{
+		details::streambuf_hack::fp_hack_open(this->fb,chd.fp,details::calculate_fstream_open_value(mode));
+		chd.fp=nullptr;
+	}
+	basic_filebuf_file(basic_posix_io_handle<char_type>&& piohd,open_mode mode):
+		basic_filebuf_file(basic_c_file_unlocked<char_type>(std::move(piohd),mode),mode)
+	{
+	}
+#elif defined(_MSVC_STL_UPDATE)
+	basic_filebuf_file(basic_c_io_handle_unlocked<char_type>&& chd,open_mode):basic_filebuf_io_observer<CharT,Traits>{new std::basic_filebuf<char_type,traits_type>(chd.fp)}
+	{
+		if(!this->fb->is_open())
+		{
+			delete this->fb;
+			throw_posix_error();
+		}
+		chd.release();
 		details::streambuf_hack::msvc_hack_set_close(this->fb);
-#endif
+	}
+	basic_filebuf_file(basic_c_io_handle<char_type>&& chd,open_mode):basic_filebuf_io_observer<CharT,Traits>{new std::basic_filebuf<char_type,traits_type>(chd.fp)}
+	{
+		if(!this->fb->is_open())
+		{
+			delete this->fb;
+			throw_posix_error();
+		}
+		chd.release();
+		details::streambuf_hack::msvc_hack_set_close(this->fb);
 	}
 	basic_filebuf_file(basic_posix_io_handle<char_type>&& piohd,open_mode mode):
 		basic_filebuf_file(basic_c_file_unlocked<char_type>(std::move(piohd),mode),mode)
@@ -94,7 +129,8 @@ This function never fails. but what if fdopen fails?
 
 #ifdef _WIN32
 //windows specific. open posix file from win32 io handle
-	basic_filebuf_file(basic_win32_io_handle<char_type>&& win32_handle,open_mode mode):
+	template<win32_family family>
+	basic_filebuf_file(basic_win32_family_io_handle<family,char_type>&& win32_handle,open_mode mode):
 		basic_filebuf_file(basic_posix_file<char_type>(std::move(win32_handle),mode),mode)
 	{
 	}
@@ -142,7 +178,6 @@ This function never fails. but what if fdopen fails?
 	basic_filebuf_file(basic_filebuf_file const&)=delete;
 	basic_filebuf_file(basic_filebuf_file&& other) noexcept:basic_filebuf_io_observer<CharT,Traits>{other.release()}{}
 
-public:
 	basic_filebuf_file& operator=(basic_filebuf_file&& bf) noexcept
 	{
 		if(this->fb==bf.fb)[[unlikely]]

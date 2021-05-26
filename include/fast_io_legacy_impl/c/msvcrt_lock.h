@@ -10,11 +10,33 @@ Referenced from MinGW-w64 CRT
 https://github.com/Alexpux/mingw-w64/blob/d0d7f784833bbb0b2d279310ddc6afb52fe47a46/mingw-w64-crt/stdio/mingw_lock.c#L36
 */
 
-extern "C" void __stdcall EnterCriticalSection(void*) noexcept;
-extern "C" void __stdcall LeaveCriticalSection(void*) noexcept;
-extern "C" void __cdecl _lock(int) noexcept;
-extern "C" void __cdecl _unlock(int) noexcept;
+[[gnu::dllimport,gnu::cdecl]] extern void _lock(int) noexcept
+#if defined(__clang__) || defined(__GNUC__)
+#if SIZE_MAX<=UINT32_MAX &&(defined(__x86__) || defined(_M_IX86) || defined(__i386__))
+#if !defined(__clang__)
+asm("_lock")
+#else
+asm("__lock")
+#endif
+#else
+asm("_lock")
+#endif
+#endif
+;
 
+[[gnu::dllimport,gnu::cdecl]] extern void _unlock(int) noexcept
+#if defined(__clang__) || defined(__GNUC__)
+#if SIZE_MAX<=UINT32_MAX &&(defined(__x86__) || defined(_M_IX86) || defined(__i386__))
+#if !defined(__clang__)
+asm("_unlock")
+#else
+asm("__unlock")
+#endif
+#else
+asm("_unlock")
+#endif
+#endif
+;
 
 inline void my_msvcrt_lock_file(std::FILE* fp) noexcept
 {
@@ -51,12 +73,9 @@ inline void my_msvcrt_unlock_file(std::FILE* fp) noexcept
 /*
 Referenced from ReactOS
 https://doxygen.reactos.org/d2/d1b/sdk_2lib_2crt_2stdio_2file_8c_source.html
-
 Line 3075
-
 MSVCRT
 https://github.com/changloong/msvcrt/blob/master/stdio/fwrite.c
 */
 
 }
-

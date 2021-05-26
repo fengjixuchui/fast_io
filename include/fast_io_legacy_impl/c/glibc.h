@@ -23,8 +23,8 @@ inline constexpr void ibuffer_set_curr(c_io_observer_unlocked cio,char* ptr) noe
 	cio.fp->_IO_read_ptr=ptr;
 }
 
-extern "C" int __underflow (std::FILE*) noexcept;
-inline bool underflow(c_io_observer_unlocked cio) noexcept
+extern int __underflow (std::FILE*) noexcept asm("__underflow");
+inline bool ibuffer_underflow(c_io_observer_unlocked cio) noexcept
 {
 	cio.fp->_IO_read_ptr=cio.fp->_IO_read_end;
 	return __underflow(cio.fp)!=EOF;
@@ -52,7 +52,7 @@ inline constexpr void obuffer_set_curr(c_io_observer_unlocked cio,char* ptr) noe
 
 //extern "C" int __overflow (FILE *,int) noexcept;
 
-inline void overflow(c_io_observer_unlocked cio,char ch)
+inline void obuffer_overflow(c_io_observer_unlocked cio,char ch)
 {
 	if(__overflow(cio.fp,static_cast<int>(static_cast<unsigned char>(ch)))==EOF)[[unlikely]]
 		throw_posix_error();
@@ -79,7 +79,7 @@ inline void ibuffer_set_curr(u8c_io_observer_unlocked cio,char8_t* ptr) noexcept
 	cio.fp->_IO_read_ptr=bit_cast<char*>(ptr);
 }
 
-inline bool underflow(u8c_io_observer_unlocked cio) noexcept
+inline bool ibuffer_underflow(u8c_io_observer_unlocked cio) noexcept
 {
 	cio.fp->_IO_read_ptr=cio.fp->_IO_read_end;
 	return __underflow(cio.fp)!=EOF;
@@ -105,7 +105,7 @@ inline void obuffer_set_curr(u8c_io_observer_unlocked cio,[[gnu::may_alias]] cha
 	cio.fp->_IO_write_ptr=bit_cast<char*>(ptr);
 }
 
-inline void overflow(u8c_io_observer_unlocked cio,char8_t ch)
+inline void obuffer_overflow(u8c_io_observer_unlocked cio,char8_t ch)
 {
 	if(__overflow(cio.fp,static_cast<int>(ch))==EOF)[[unlikely]]
 		throw_posix_error();
@@ -120,7 +120,7 @@ inline std::byte* hack_wide_data(FILE* fp) noexcept
 {
 	constexpr std::size_t off{sizeof(__off64_t)+2*sizeof(std::uintptr_t)};
 	std::byte* value;
-	memcpy(std::addressof(value),reinterpret_cast<std::byte*>(std::addressof(fp->_lock))+off,sizeof(std::byte*));
+	::fast_io::details::my_memcpy(__builtin_addressof(value),reinterpret_cast<std::byte*>(__builtin_addressof(fp->_lock))+off,sizeof(std::byte*));
 	return value;
 }
 
@@ -130,7 +130,7 @@ inline char_type* hack_wp(FILE* fp) noexcept
 {
 	constexpr std::size_t off{position*sizeof(uintptr_t)};
 	char_type* value;
-	memcpy(std::addressof(value),hack_wide_data(fp)+off,sizeof(wchar_t*));
+	::fast_io::details::my_memcpy(__builtin_addressof(value),hack_wide_data(fp)+off,sizeof(wchar_t*));
 	return value;
 }
 template<std::size_t position,std::integral char_type>
@@ -138,7 +138,7 @@ requires (sizeof(char_type)==sizeof(wchar_t))
 inline void hack_wpset(FILE* fp,char_type* ptr) noexcept
 {
 	constexpr std::size_t off{position*sizeof(uintptr_t)};
-	memcpy(hack_wide_data(fp)+off,std::addressof(ptr),sizeof(wchar_t*));
+	::fast_io::details::my_memcpy(hack_wide_data(fp)+off,__builtin_addressof(ptr),sizeof(wchar_t*));
 }
 }
 //wchar_t supports
@@ -163,8 +163,8 @@ inline void ibuffer_set_curr(wc_io_observer_unlocked cio,wchar_t* ptr) noexcept
 	details::fp_wide_hack::hack_wpset<0>(cio.fp,ptr);
 }
 
-extern "C" std::wint_t __wunderflow (FILE *) noexcept;
-inline bool underflow(wc_io_observer_unlocked cio) noexcept
+extern std::wint_t __wunderflow (FILE *) noexcept;
+inline bool ibuffer_underflow(wc_io_observer_unlocked cio) noexcept
 {
 	ibuffer_set_curr(cio,ibuffer_end(cio));
 	return __wunderflow(cio.fp)!=WEOF;
@@ -191,11 +191,14 @@ inline void obuffer_set_curr(wc_io_observer_unlocked cio,wchar_t* ptr) noexcept
 	details::fp_wide_hack::hack_wpset<4>(cio.fp,ptr);
 }
 
-extern "C" std::wint_t __woverflow (FILE *,std::wint_t) noexcept;
-
-inline void overflow(wc_io_observer_unlocked cio,wchar_t ch)
+namespace details
 {
-	if(__woverflow(cio.fp,static_cast<std::wint_t>(ch))==WEOF)[[unlikely]]
+extern std::wint_t glibc_woverflow (FILE *,std::wint_t) noexcept asm("__woverflow");
+}
+
+inline void obuffer_overflow(wc_io_observer_unlocked cio,wchar_t ch)
+{
+	if(details::glibc_woverflow(cio.fp,static_cast<std::wint_t>(ch))==WEOF)[[unlikely]]
 		throw_posix_error();
 }
 
@@ -220,7 +223,7 @@ inline void ibuffer_set_curr(u32c_io_observer_unlocked cio,[[gnu::may_alias]] ch
 	details::fp_wide_hack::hack_wpset<0,char32_t>(cio.fp,ptr);
 }
 
-inline bool underflow(u32c_io_observer_unlocked cio) noexcept
+inline bool ibuffer_underflow(u32c_io_observer_unlocked cio) noexcept
 {
 	ibuffer_set_curr(cio,ibuffer_end(cio));
 	return __wunderflow(cio.fp)!=WEOF;
@@ -246,19 +249,21 @@ inline void obuffer_set_curr(u32c_io_observer_unlocked cio,[[gnu::may_alias]] ch
 	details::fp_wide_hack::hack_wpset<4,char32_t>(cio.fp,ptr);
 }
 
-inline void overflow(u32c_io_observer_unlocked cio,char32_t ch)
+inline void obuffer_overflow(u32c_io_observer_unlocked cio,char32_t ch)
 {
-	if(__woverflow(cio.fp,static_cast<std::wint_t>(ch))==WEOF)[[unlikely]]
+	if(details::glibc_woverflow(cio.fp,static_cast<std::wint_t>(ch))==WEOF)[[unlikely]]
 		throw_posix_error();
 }
 
-
-extern "C" int __flbf(std::FILE* fp) noexcept;
+namespace details
+{
+extern int glibc_flbf(std::FILE* fp) noexcept asm("__flbf");
+}
 
 template<std::integral ch_type>
 inline bool obuffer_is_line_buffering(basic_c_io_observer_unlocked<ch_type> ciou) noexcept
 {
-	return __flbf(ciou.fp);
+	return details::glibc_flbf(ciou.fp);
 }
 
 static_assert(buffer_output_stream<c_io_observer_unlocked>);

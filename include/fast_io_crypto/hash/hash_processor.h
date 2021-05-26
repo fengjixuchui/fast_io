@@ -8,6 +8,13 @@ namespace details
 
 class compress_current_position
 {};
+
+template<typename Func>
+concept hash_require_block_init=requires(Func& func,std::byte const* ptr)
+{
+	func.block_init(ptr);
+};
+
 }
 
 template<std::integral ch_type,typename Func>
@@ -18,20 +25,23 @@ public:
 	using function_type = Func;
 	function_type& function;
 	inline static constexpr std::size_t block_size = function_type::block_size;
-	[[no_unique_address]] std::array<std::byte,block_size> temporary_buffer{};
-	[[no_unique_address]] std::conditional_t<block_size==0,details::compress_current_position,std::size_t> current_position{};
+#if __has_cpp_attribute(no_unique_address)
+	[[no_unique_address]]
+#endif
+	::fast_io::freestanding::array<std::byte,block_size> temporary_buffer{};
+#if __has_cpp_attribute(no_unique_address)
+	[[no_unique_address]]
+#endif
+	std::conditional_t<block_size==0,details::compress_current_position,std::size_t> current_position{};
 	constexpr basic_hash_processor(function_type& func) noexcept:function(func)
 	{
-		if constexpr(requires(Func& func)
-		{
-			func.block_init(temporary_buffer);
-		})
-			current_position+=func.block_init(temporary_buffer);
+		if constexpr(details::hash_require_block_init<function_type>)
+			current_position+=func.block_init(temporary_buffer.data());
 	}
 	constexpr void do_final() noexcept
 	{
 		if constexpr(block_size!=0)
-			function.digest(std::as_bytes(std::span<std::byte const>{temporary_buffer.data(),current_position}));
+			function.digest(temporary_buffer.data(),current_position);
 		else
 			function.digest();
 	}
@@ -40,61 +50,79 @@ public:
 	constexpr ~basic_hash_processor()
 	{
 		secure_clear(temporary_buffer.data(),block_size);
-		secure_clear(std::addressof(current_position),sizeof(current_position));
+		secure_clear(__builtin_addressof(current_position),sizeof(current_position));
 	}
 };
 
 namespace details::hash_processor
 {
 
-template<std::integral ch_type,typename Func,std::contiguous_iterator Iter>
-requires (std::same_as<std::iter_value_t<Iter>,ch_type>||std::same_as<ch_type,char>)
-inline constexpr void write_cold_path(basic_hash_processor<ch_type,Func>& out,Iter begin,Iter end)
+template<std::integral ch_type,typename Func>
+#if __has_cpp_attribute(gnu::cold)
+[[gnu::cold]]
+#endif
+inline constexpr void write_cold_path_impl(basic_hash_processor<ch_type,Func>& out,ch_type const* begin,ch_type const* end) noexcept
 {
 	if(out.current_position)
 	{
 		std::size_t to_copy{Func::block_size-out.current_position};
-		memcpy(out.temporary_buffer.data()+out.current_position,std::to_address(begin),to_copy);
-		out.function(std::span<std::byte const,Func::block_size>{out.temporary_buffer});
+		my_memcpy(out.temporary_buffer.data()+out.current_position,begin,to_copy);
+		out.function(out.temporary_buffer.data(),out.temporary_buffer.size());
 		begin+=to_copy;
 		out.current_position={};
 	}
 	std::size_t const total_bytes((end-begin)*sizeof(*begin));
 	std::size_t const blocks(total_bytes/Func::block_size);
 	std::size_t const blocks_bytes(blocks*Func::block_size);
-	out.function(std::span<std::byte const>{reinterpret_cast<std::byte const*>(std::to_address(begin)),blocks_bytes});	
+	out.function(reinterpret_cast<std::byte const*>(begin),blocks_bytes);
 	std::size_t const to_copy(total_bytes-blocks_bytes);
-	memcpy(out.temporary_buffer.data(),reinterpret_cast<std::byte const*>(std::to_address(end))-to_copy,to_copy);
+	if(to_copy)
+		my_memcpy(out.temporary_buffer.data(),reinterpret_cast<std::byte const*>(end)-to_copy,to_copy);
 	out.current_position=to_copy;
 }
 
+template<std::integral ch_type,typename Func,::fast_io::freestanding::contiguous_iterator Iter>
+requires (std::same_as<::fast_io::freestanding::iter_value_t<Iter>,ch_type>||std::same_as<ch_type,char>)
+inline constexpr void write_cold_path(basic_hash_processor<ch_type,Func>& out,Iter begin,Iter end)
+{
+	if constexpr(std::same_as<::fast_io::freestanding::iter_value_t<Iter>,ch_type>)
+		write_cold_path_impl(out,::fast_io::freestanding::to_address(begin),::fast_io::freestanding::to_address(end));
+	else
+	{
+		write_cold_path_impl(out,
+			reinterpret_cast<char const*>(::fast_io::freestanding::to_address(begin)),
+			reinterpret_cast<char const*>(::fast_io::freestanding::to_address(end)));
+	}
 }
 
-template<std::integral ch_type,typename Func,std::contiguous_iterator Iter>
-requires (std::same_as<std::iter_value_t<Iter>,ch_type>||std::same_as<ch_type,char>)
+}
+
+template<std::integral ch_type,typename Func,::fast_io::freestanding::contiguous_iterator Iter>
+requires (std::same_as<::fast_io::freestanding::iter_value_t<Iter>,ch_type>||std::same_as<ch_type,char>)
 inline void write(basic_hash_processor<ch_type,Func>& out,Iter begin,Iter end)
 {
-	if(std::same_as<std::iter_value_t<Iter>,char>)
+	if(std::same_as<::fast_io::freestanding::iter_value_t<Iter>,char>)
 	{
 		if constexpr(Func::block_size==0)
 		{
-			out.function(std::as_bytes(std::span{std::to_address(begin),std::to_address(end)}));
+			out.function(::fast_io::freestanding::to_address(begin),::fast_io::freestanding::to_address(end)-::fast_io::freestanding::to_address(begin));
 		}
 		else
 		{
-		std::size_t const bytes(end-begin);
-		std::size_t to_copy{Func::block_size-out.current_position};
-		if(bytes<to_copy)[[likely]]
-		{
-			memcpy(out.temporary_buffer.data()+out.current_position,std::to_address(begin),bytes);
-			out.current_position+=bytes;
-			return;
-		}
-		details::hash_processor::write_cold_path(out,begin,end);
+			std::size_t const bytes(end-begin);
+			std::size_t to_copy{Func::block_size-out.current_position};
+			if(bytes<to_copy)[[likely]]
+			{
+				if(bytes)
+					::fast_io::details::my_memcpy(out.temporary_buffer.data()+out.current_position,::fast_io::freestanding::to_address(begin),bytes);
+				out.current_position+=bytes;
+				return;
+			}
+			details::hash_processor::write_cold_path(out,begin,end);
 		}
 	}
 	else
-		write(out,reinterpret_cast<char const*>(std::to_address(begin)),reinterpret_cast<char const*>(std::to_address(end)));
+		write(out,reinterpret_cast<char const*>(::fast_io::freestanding::to_address(begin)),reinterpret_cast<char const*>(::fast_io::freestanding::to_address(end)));
 }
 
 template<std::integral ch_type,typename Func>

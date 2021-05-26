@@ -30,13 +30,13 @@ struct cxa_demangle
 	{
 		if(buffer==nullptr)
 			fast_terminate();
-		memcpy(buffer,other.buffer,length);
+		::fast_io::details::my_memcpy(buffer,other.buffer,length);
 		buffer[length]=0;
 	}
 	cxa_demangle& operator=(cxa_demangle const& other) noexcept
 	{
 		auto newp{reinterpret_cast<char*>(malloc(other.length+1))};
-		memcpy(newp,other.buffer,other.length);
+		::fast_io::details::my_memcpy(newp,other.buffer,other.length);
 		newp[other.length]=0;
 		free(buffer);
 		buffer=newp;
@@ -50,7 +50,7 @@ struct cxa_demangle
 	}
 	cxa_demangle& operator=(cxa_demangle&& other) noexcept
 	{
-		if(std::addressof(other)==this)
+		if(__builtin_addressof(other)==this)
 			return *this;
 		free(buffer);
 		buffer=other.buffer;
@@ -59,9 +59,9 @@ struct cxa_demangle
 		other.length=0;
 		return *this;
 	}
-	explicit constexpr operator std::string_view() noexcept
+	explicit constexpr operator ::fast_io::freestanding::string_view() noexcept
 	{
-		return std::string_view(buffer,length);
+		return ::fast_io::freestanding::string_view(buffer,length);
 	}
 	~cxa_demangle()
 	{

@@ -22,11 +22,16 @@ public:
 	{
 		return fb;
 	}
+	inline constexpr native_handle_type release() noexcept
+	{
+		auto temp{fb};
+		fb=nullptr;
+		return temp;
+	}
 	explicit constexpr operator bool() const noexcept
 	{
 		return fb;
 	}
-#if defined(__GLIBCXX__) || defined(__LIBCPP_VERSION)  || defined(_MSVC_STL_UPDATE)
 	explicit operator basic_c_io_observer_unlocked<char_type>() const noexcept
 	{
 		return basic_c_io_observer_unlocked<char_type>{details::streambuf_hack::fp_hack(fb)};
@@ -52,13 +57,12 @@ public:
 		(static_cast<basic_posix_io_observer<char_type>>(*this));
 	}
 #endif
-#endif
 };
 
 template<typename T>
 inline void flush(basic_general_streambuf_io_observer<T> h)
 {
-	if(h.native_handle()->pubsync()==-1)
+	if(h.fb->pubsync()==-1)
 		throw_posix_error(EIO);
 }
 
@@ -153,7 +157,6 @@ using u32stringbuf_io_observer = basic_stringbuf_io_observer<char32_t>;
 #pragma warning(pop)
 #endif
 
-#if defined(__GLIBCXX__) || defined(__LIBCPP_VERSION)  || defined(_MSVC_STL_UPDATE)
 template<std::integral ch_type,typename Traits>
 requires zero_copy_input_stream<basic_c_io_observer_unlocked<ch_type>>
 inline constexpr decltype(auto) zero_copy_in_handle(basic_filebuf_io_observer<ch_type,Traits> h)
@@ -167,53 +170,104 @@ inline constexpr decltype(auto) zero_copy_out_handle(basic_filebuf_io_observer<c
 	return zero_copy_out_handle(static_cast<basic_c_io_observer_unlocked<ch_type>>(h));
 }
 
-template<std::integral ch_type,typename Traits,typename... Args>
-inline auto seek(basic_filebuf_io_observer<ch_type,Traits> h,Args&& ...args)
+template<std::integral ch_type,typename Traits>
+inline auto seek(basic_filebuf_io_observer<ch_type,Traits> h,std::intmax_t offset=0,seekdir s=seekdir::cur)
 {
-	h.fb->flush();
-	h.fb->clear();
-	return seek(static_cast<basic_c_io_observer_unlocked<ch_type>>(h),std::forward<Args>(args)...);
+	h.fb->pubsync();
+	return seek(static_cast<basic_c_io_observer_unlocked<ch_type>>(h),offset,s);
 }
 
-template<std::integral ch_type,typename... Args>
+template<std::integral ch_type,typename traits_type,typename... Args>
 requires io_controllable<basic_c_io_observer_unlocked<ch_type>,Args...>
-inline decltype(auto) io_control(basic_filebuf_io_observer<ch_type> h,Args&& ...args)
+inline decltype(auto) io_control(basic_filebuf_io_observer<ch_type,traits_type> h,Args&& ...args)
 {
 	return io_control(static_cast<basic_c_io_observer_unlocked<ch_type>>(h),std::forward<Args>(args)...);
 }
 
-template<std::integral ch_type>
+template<std::integral ch_type,typename traits_type>
 requires requires(basic_c_io_observer_unlocked<ch_type> piob)
 {
 	status(piob);
 }
-inline constexpr auto status(basic_streambuf_io_observer<ch_type> ciob)
+inline constexpr auto status(basic_streambuf_io_observer<ch_type,traits_type> ciob)
 {
 	return status(static_cast<basic_c_io_observer_unlocked<ch_type>>(ciob));
 }
 
-template<std::integral ch_type>
+template<std::integral ch_type,typename traits_type>
 requires requires(basic_c_io_observer_unlocked<ch_type> piob)
 {
 	status(piob);
 }
-inline constexpr auto status(basic_filebuf_io_observer<ch_type> ciob)
+inline constexpr auto status(basic_filebuf_io_observer<ch_type,traits_type> ciob)
 {
 	return status(static_cast<basic_c_io_observer_unlocked<ch_type>>(ciob));
 }
 
-template<std::integral char_type>
-inline constexpr posix_at_entry at(basic_filebuf_io_observer<char_type> other) noexcept
+template<std::integral char_type,typename traits_type>
+inline constexpr posix_at_entry at(basic_filebuf_io_observer<char_type,traits_type> other) noexcept
 {
 	return posix_at_entry{details::fp_to_fd(details::streambuf_hack::fp_hack(other.fb))};
 }
 
+template<typename T>
+requires (std::same_as<T,std::basic_streambuf<typename T::char_type,typename T::traits_type>>||
+std::derived_from<T,std::basic_filebuf<typename T::char_type,typename T::traits_type>>)
+inline bool is_character_device(basic_general_streambuf_io_observer<T> other)
+{
+	using char_type  = typename T::char_type;
+	basic_c_io_observer<char_type> bciob{static_cast<basic_c_io_observer<char_type>>(other)};
+	if constexpr(std::same_as<T,std::basic_streambuf<typename T::char_type,typename T::traits_type>>)
+	{
+		if(bciob.fp==nullptr)
+#ifdef EBADF
+			throw_posix_error(EBADF);
+#else
+			throw_posix_error(EINVAL);
+#endif
+	}
+	return is_character_device(bciob);
+
+}
+
+template<typename T>
+requires (std::same_as<T,std::basic_streambuf<typename T::char_type,typename T::traits_type>>||
+std::derived_from<T,std::basic_filebuf<typename T::char_type,typename T::traits_type>>)
+inline void clear_screen(basic_general_streambuf_io_observer<T> other)
+{
+	using char_type  = typename T::char_type;
+	basic_c_io_observer<char_type> bciob{static_cast<basic_c_io_observer<char_type>>(other)};
+	if constexpr(std::same_as<T,std::basic_streambuf<typename T::char_type,typename T::traits_type>>)
+	{
+		if(bciob.fp==nullptr)
+#ifdef EBADF
+			throw_posix_error(EBADF);
+#else
+			throw_posix_error(EINVAL);
+#endif
+	}
+	details::lock_guard guard{bciob};
+	std::FILE* fp{bciob.fp};
+	int fd{details::fp_unlocked_to_fd(fp)};
+#ifdef _WIN32
+	void* handle{details::my_get_osfile_handle(fd)};
+	if(!win32::details::win32_is_character_device(handle))
+		return;
+	other.fb->pubsync();
+	details::c_flush_unlocked_impl(fp);
+	win32::details::win32_clear_screen_main(handle);
+#else
+	if(!details::posix_is_character_device(fd))
+		return;
+	other.fb->pubsync();
+	details::c_flush_unlocked_impl(fp);
+	details::posix_clear_screen_main(fd);
 #endif
 }
 
-#if defined(__GLIBCXX__) || defined(__LIBCPP_VERSION) || defined(_MSVC_STL_UPDATE)
+}
+
 #include"bp_hack/impl.h"
-#endif
 
 namespace fast_io
 {
@@ -266,32 +320,32 @@ inline std::size_t streambuf_read_impl(basic_streambuf_io_observer<char_type,tra
 
 }
 
-template<typename T,std::contiguous_iterator Iter>
-requires (std::same_as<typename T::char_type,std::iter_value_t<Iter>>||std::same_as<typename T::char_type,char>)
+template<typename T,::fast_io::freestanding::contiguous_iterator Iter>
+requires (std::same_as<typename T::char_type,::fast_io::freestanding::iter_value_t<Iter>>||std::same_as<typename T::char_type,char>)
 [[nodiscard]] inline Iter read(basic_general_streambuf_io_observer<T> t,Iter begin,Iter end)
 {
 	using char_type = typename T::char_type;
 	using traits_type = typename T::traits_type;
-	if constexpr(std::same_as<typename T::char_type,std::iter_value_t<Iter>>)
+	if constexpr(std::same_as<typename T::char_type,::fast_io::freestanding::iter_value_t<Iter>>)
 		return begin+details::streambuf_read_impl(basic_streambuf_io_observer<char_type,traits_type>{t.fb},
-			std::to_address(begin),static_cast<std::size_t>(end-begin));
+			::fast_io::freestanding::to_address(begin),static_cast<std::size_t>(end-begin));
 	else
 		return begin+details::streambuf_read_impl(basic_streambuf_io_observer<char_type,traits_type>{t.fb},
-			reinterpret_cast<char*>(std::to_address(begin)),static_cast<std::size_t>(end-begin)*sizeof(*begin))/(*begin);
+			reinterpret_cast<char*>(::fast_io::freestanding::to_address(begin)),static_cast<std::size_t>(end-begin)*sizeof(*begin))/(*begin);
 }
 
-template<typename T,std::contiguous_iterator Iter>
-requires (std::same_as<typename T::char_type,std::iter_value_t<Iter>>||std::same_as<typename T::char_type,char>)
+template<typename T,::fast_io::freestanding::contiguous_iterator Iter>
+requires (std::same_as<typename T::char_type,::fast_io::freestanding::iter_value_t<Iter>>||std::same_as<typename T::char_type,char>)
 inline Iter write(basic_general_streambuf_io_observer<T> t,Iter begin,Iter end)
 {
 	using char_type = typename T::char_type;
 	using traits_type = typename T::traits_type;
-	if constexpr(std::same_as<typename T::char_type,std::iter_value_t<Iter>>)
+	if constexpr(std::same_as<typename T::char_type,::fast_io::freestanding::iter_value_t<Iter>>)
 		return begin+details::streambuf_write_impl(basic_streambuf_io_observer<char_type,traits_type>{t.fb},
-			std::to_address(begin),static_cast<std::size_t>(end-begin));
+			::fast_io::freestanding::to_address(begin),static_cast<std::size_t>(end-begin));
 	else
 		return begin+details::streambuf_write_impl(basic_streambuf_io_observer<char_type,traits_type>{t.fb},
-			reinterpret_cast<char const*>(std::to_address(begin)),static_cast<std::size_t>(end-begin)*sizeof(*begin))/(*begin);
+			reinterpret_cast<char const*>(::fast_io::freestanding::to_address(begin)),static_cast<std::size_t>(end-begin)*sizeof(*begin))/(*begin);
 }
-
+static_assert(value_based_stream<filebuf_io_observer>);
 }

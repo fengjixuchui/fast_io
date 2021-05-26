@@ -21,9 +21,9 @@ struct nt_dirent
 {
 	void* d_handle{reinterpret_cast<void*>(static_cast<std::uintptr_t>(-1))};
 	file_type d_type{};
-	std::array<wchar_t,0x2001> native_d_name_array{};
+	::fast_io::freestanding::array<wchar_t,0x2001> native_d_name_array{};
 	std::size_t native_d_name_size{};
-	std::array<char8_t,0x8004> d_name_array{};
+	::fast_io::freestanding::array<char8_t,0x8004> d_name_array{};
 	std::size_t d_name_size{};
 	inline constexpr wcstring_view native_d_name() const noexcept
 	{
@@ -42,11 +42,11 @@ template<nt_family family>
 inline nt_dirent* set_nt_dirent(nt_dirent* entry,bool start)
 {
 	io_status_block block{};
-	std::array<std::byte,0x4000> buffer;
+	::fast_io::freestanding::array<std::byte,0x4000> buffer;
 	win32::nt::dir_information d_info{buffer.data()};
 	auto status{nt_query_directory_file<family==nt_family::zw>(entry->d_handle,nullptr,nullptr,nullptr,
-	std::addressof(block),d_info.DirInfo,
-	buffer.size(),file_information_class::FileFullDirectoryInformation,
+	__builtin_addressof(block),d_info.DirInfo,
+	static_cast<std::uint32_t>(buffer.size()),file_information_class::FileFullDirectoryInformation,
 	true,nullptr,start)};
 	if(status)
 	{
@@ -57,7 +57,7 @@ inline nt_dirent* set_nt_dirent(nt_dirent* entry,bool start)
 	auto ful_dir_info{d_info.FullDirInfo};
 	entry->native_d_name_size=ful_dir_info->FileNameLength/sizeof(wchar_t);
 	if(ful_dir_info->FileNameLength)
-		memcpy(entry->native_d_name_array.data(),ful_dir_info->FileName,ful_dir_info->FileNameLength);
+		::fast_io::details::my_memcpy(entry->native_d_name_array.data(),ful_dir_info->FileName,ful_dir_info->FileNameLength);
 	entry->native_d_name_array[entry->native_d_name_size]=0;
 
 	using char16_may_alias_pointer
@@ -176,25 +176,25 @@ inline nt_family_directory_iterator<family>& operator++(nt_family_directory_iter
 }
 
 template<nt_family family>
-inline constexpr bool operator==(std::default_sentinel_t, nt_family_directory_iterator<family> b) noexcept
+inline constexpr bool operator==(::fast_io::freestanding::default_sentinel_t, nt_family_directory_iterator<family> b) noexcept
 {
 	return b.entry==nullptr;
 }
 
 template<nt_family family>
-inline constexpr bool operator==(nt_family_directory_iterator<family> b, std::default_sentinel_t other) noexcept
+inline constexpr bool operator==(nt_family_directory_iterator<family> b, ::fast_io::freestanding::default_sentinel_t other) noexcept
 {
 	return other==b;
 }
 
 template<nt_family family>
-inline constexpr bool operator!=(std::default_sentinel_t other,nt_family_directory_iterator<family> b) noexcept
+inline constexpr bool operator!=(::fast_io::freestanding::default_sentinel_t other,nt_family_directory_iterator<family> b) noexcept
 {
 	return !(other==b);
 }
 
 template<nt_family family>
-inline constexpr bool operator!=(nt_family_directory_iterator<family> b, std::default_sentinel_t other) noexcept
+inline constexpr bool operator!=(nt_family_directory_iterator<family> b, ::fast_io::freestanding::default_sentinel_t other) noexcept
 {
 	return !(other==b);
 }
@@ -224,7 +224,7 @@ inline nt_family_directory_iterator<family> begin(nt_family_directory_generator<
 }
 
 template<nt_family family>
-inline std::default_sentinel_t end(nt_family_directory_generator<family> const&) noexcept
+inline ::fast_io::freestanding::default_sentinel_t end(nt_family_directory_generator<family> const&) noexcept
 {
 	return {};
 }
@@ -277,7 +277,8 @@ inline nt_family_recursive_directory_iterator<family>& operator++(nt_family_recu
 		if(prdit.stack.empty())
 		{
 			prdit.entry->d_handle=prdit.root_handle;
-			if(!(prdit.entry=win32::nt::details::nt_dirent_next<family>(prdit.entry)))
+			prdit.entry=win32::nt::details::nt_dirent_next<family>(prdit.entry);
+			if(prdit.entry==nullptr)
 				return prdit;
 		}
 		else
@@ -335,7 +336,7 @@ inline nt_family_recursive_directory_iterator<family> begin(nt_family_recursive_
 }
 
 template<nt_family family>
-inline std::default_sentinel_t end(nt_family_recursive_directory_generator<family> const&) noexcept
+inline ::fast_io::freestanding::default_sentinel_t end(nt_family_recursive_directory_generator<family> const&) noexcept
 {
 	return {};
 }
@@ -347,25 +348,25 @@ inline nt_directory_entry operator*(nt_family_recursive_directory_iterator<famil
 }
 
 template<nt_family family>
-inline bool operator==(std::default_sentinel_t, nt_family_recursive_directory_iterator<family> const& b) noexcept
+inline bool operator==(::fast_io::freestanding::default_sentinel_t, nt_family_recursive_directory_iterator<family> const& b) noexcept
 {
 	return b.stack.empty()&&b.entry == nullptr;
 }
 
 template<nt_family family>
-inline bool operator==(nt_family_recursive_directory_iterator<family> const& b, std::default_sentinel_t sntnl) noexcept
+inline bool operator==(nt_family_recursive_directory_iterator<family> const& b, ::fast_io::freestanding::default_sentinel_t sntnl) noexcept
 {
 	return sntnl==b;
 }
 
 template<nt_family family>
-inline bool operator!=(std::default_sentinel_t sntnl, nt_family_recursive_directory_iterator<family> const& b) noexcept
+inline bool operator!=(::fast_io::freestanding::default_sentinel_t sntnl, nt_family_recursive_directory_iterator<family> const& b) noexcept
 {
 	return !(sntnl==b);
 }
 
 template<nt_family family>
-inline bool operator!=(nt_family_recursive_directory_iterator<family> const& b, std::default_sentinel_t sntnl) noexcept
+inline bool operator!=(nt_family_recursive_directory_iterator<family> const& b, ::fast_io::freestanding::default_sentinel_t sntnl) noexcept
 {
 	return sntnl!=b;
 }
@@ -383,6 +384,90 @@ inline zw_recursive_directory_generator recursive(zw_at_entry zate)
 	return {zate.handle,std::unique_ptr<nt_dirent>(new nt_dirent)};
 }
 
-using directory_entry = nt_directory_entry;
+
+template<std::integral char_type>
+inline constexpr std::size_t print_reserve_size(io_reserve_type_t<char_type,nt_directory_entry>,
+	nt_directory_entry ent) noexcept
+{
+	if constexpr(std::same_as<char_type,typename nt_directory_entry::native_char_type>)
+		return native_filename(ent).size();
+	else if constexpr(std::same_as<char_type,char8_t>)
+		return filename(ent).size();
+	else
+		return details::cal_full_reserve_size<
+			sizeof(typename nt_directory_entry::native_char_type),
+			sizeof(char_type)>(native_filename(ent).size());
+}
+
+inline u8cstring_view extension(nt_directory_entry ent) noexcept
+{
+	auto fnm{filename(ent)};
+	auto pos{fnm.rfind(u8'.')};
+	if(pos==static_cast<std::size_t>(-1))
+		return {};
+	if(pos==0)
+		return {};
+	if(2<fnm.size()&&pos==1&&fnm.front()==u8'.')
+		return {};
+	return u8cstring_view(null_terminated,fnm.data()+pos,fnm.data()+fnm.size());
+}
+
+inline ::fast_io::freestanding::u8string_view stem(nt_directory_entry ent) noexcept
+{
+	::fast_io::freestanding::u8string_view fnm{filename(ent)};
+	auto pos{fnm.rfind(u8'.')};
+	if(pos==static_cast<std::size_t>(-1))
+		return fnm;
+	if(pos==0)
+		return fnm;
+	if(2<fnm.size()&&pos==1&&fnm.front()==u8'.')
+		return fnm;
+	return ::fast_io::freestanding::u8string_view(fnm.data(),pos);
+}
+
+template<std::integral char_type>
+requires ((std::same_as<char_type,char8_t>)||(std::same_as<char_type,nt_directory_entry::native_char_type>))
+inline basic_io_scatter_t<char_type> print_scatter_define(print_scatter_type_t<char_type>,nt_directory_entry pth)
+{
+	if constexpr(std::same_as<char_type,char8_t>)
+	{
+		auto name{filename(pth)};
+		return {name.data(),name.size()};
+	}
+	else
+	{
+		auto name{native_filename(pth)};
+		return {name.data(),name.size()};
+	}
+}
+
+template<::fast_io::freestanding::random_access_iterator Iter>
+inline constexpr Iter print_reserve_define(io_reserve_type_t<::fast_io::freestanding::iter_value_t<Iter>,nt_directory_entry>,
+	Iter iter,nt_directory_entry ent) noexcept
+{
+	using char_type = ::fast_io::freestanding::iter_value_t<Iter>;
+	if constexpr(std::same_as<char_type,typename nt_directory_entry::native_char_type>)
+	{
+		auto nfnm{native_filename(ent)};
+		return details::non_overlapped_copy_n(nfnm.data(),nfnm.size(),iter);
+	}
+	else if constexpr(std::same_as<char_type,char8_t>)
+	{
+		auto fnm{filename(ent)};
+		return details::non_overlapped_copy_n(fnm.data(),fnm.size(),iter);
+	}
+	else
+	{
+		auto fnm{filename(ent)};
+		if constexpr(std::is_pointer_v<Iter>)
+			return details::codecvt::general_code_cvt_full<encoding_scheme::utf>(fnm.data(),fnm.data()+fnm.size(),iter);
+		else
+			return iter+(details::codecvt::general_code_cvt_full<encoding_scheme::utf>(fnm.data(),fnm.data()+fnm.size(),::fast_io::freestanding::to_address(iter))-::fast_io::freestanding::to_address(iter));
+	}
+}
+
+#ifndef __CYGWIN__
+using native_directory_entry = nt_directory_entry;
+#endif
 
 }

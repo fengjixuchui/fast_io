@@ -59,8 +59,8 @@ inline constexpr auto pow5bits(std::uint32_t e)
 }
 #ifdef __SIZEOF_INT128__
 
-constexpr inline std::array<std::uint64_t,4> mul_128_256_shift(
-		std::array<std::uint64_t,2> const& a,std::array<std::uint64_t,4> const& b,
+constexpr inline ::fast_io::freestanding::array<std::uint64_t,4> mul_128_256_shift(
+		::fast_io::freestanding::array<std::uint64_t,2> const& a,::fast_io::freestanding::array<std::uint64_t,4> const& b,
 		std::uint32_t const shift,std::uint32_t const corr)
 {
 	__uint128_t a0{a.front()};
@@ -112,7 +112,7 @@ constexpr inline std::array<std::uint64_t,4> mul_128_256_shift(
 	}
 }
 
-constexpr inline std::array<std::uint64_t,4> generic_compute_pow5_inv(std::uint32_t const i)
+constexpr inline ::fast_io::freestanding::array<std::uint64_t,4> generic_compute_pow5_inv(std::uint32_t const i)
 {
 	constexpr std::uint32_t pow5_table_size{static_cast<std::uint32_t>(pow5<long double,true>::table.size())};
 	std::uint32_t const base((i + pow5_table_size - 1) / pow5_table_size);
@@ -129,7 +129,7 @@ constexpr inline std::array<std::uint64_t,4> generic_compute_pow5_inv(std::uint3
 		return mul_128_256_shift(pow5<long double,true>::table[offset], mul, delta, corr);
 	}
 }
-constexpr inline std::array<std::uint64_t,4> generic_compute_pow5(std::uint32_t const i)
+constexpr inline ::fast_io::freestanding::array<std::uint64_t,4> generic_compute_pow5(std::uint32_t const i)
 {
 	constexpr std::uint32_t pow5_table_size{static_cast<std::uint32_t>(pow5<long double,true>::table.size())};
 	std::uint32_t const base(i / pow5_table_size);
@@ -147,9 +147,9 @@ constexpr inline std::array<std::uint64_t,4> generic_compute_pow5(std::uint32_t 
 	}
 }
 
-constexpr __uint128_t mul_shift_generic(__uint128_t const m,std::array<std::uint64_t,4> const& mul,std::int32_t const j)
+constexpr __uint128_t mul_shift_generic(__uint128_t const m,::fast_io::freestanding::array<std::uint64_t,4> const& mul,std::int32_t const j)
 {
-	std::array<std::uint64_t,2> a{static_cast<std::uint64_t>(m),static_cast<std::uint64_t>(m>>64)};
+	::fast_io::freestanding::array<std::uint64_t,2> a{static_cast<std::uint64_t>(m),static_cast<std::uint64_t>(m>>64)};
 	auto res{mul_128_256_shift(a, mul, j, 0)};
 	return (static_cast<__uint128_t>(res[1])<<64)|res.front();
 }
@@ -157,16 +157,16 @@ constexpr __uint128_t mul_shift_generic(__uint128_t const m,std::array<std::uint
 #endif
 template<std::unsigned_integral T,std::size_t muldiff=sizeof(T)*8>
 requires std::same_as<T,std::uint64_t>
-inline constexpr T mul_shift(T m, std::array<T,2> const& mul, std::size_t j)
+inline constexpr T mul_shift(T m, ::fast_io::freestanding::array<T,2> const& mul, std::size_t j)
 {
 #if defined(_MSC_VER) && defined(_M_X64)
 	if constexpr(std::same_as<T,std::uint64_t>)
 	{
 		// m is maximum 55 bits
 		std::uint64_t high1;                                   // 128
-		std::uint64_t low1{_umul128(m, mul[1], std::addressof(high1))}; // 64
+		std::uint64_t low1{_umul128(m, mul[1], __builtin_addressof(high1))}; // 64
 		std::uint64_t high0;                                   // 64
-		_umul128(m, mul.front(), std::addressof(high0));                       // 0
+		_umul128(m, mul.front(), __builtin_addressof(high0));                       // 0
 		std::uint64_t const sum{high0 + low1};
 		if (sum < high0)
 			++high1; // overflow into high1

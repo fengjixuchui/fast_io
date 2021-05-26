@@ -53,21 +53,21 @@ inline constexpr void impl_svt(output& out,input& in,manip::scan_transmitter<Fun
 			auto ed{ibuffer_end(in)};
 			if(curr!=ed)[[likely]]
 			{
-				auto i{std::find_if(curr,ed,func.reference)};
+				auto i{::fast_io::freestanding::find_if(curr,ed,func.reference)};
 				write(out,curr,i);
 				ibuffer_set_curr(in,i);
 				if(i!=ed)[[likely]]
 					return;
 			}
 		}
-		while(underflow(in));
+		while(ibuffer_underflow(in));
 	}
 	else
 	{
 		auto curr{ibuffer_curr(in)};
 		if(curr==ibuffer_end(in))[[unlikely]]
 		{
-			if(!underflow(in))
+			if(!ibuffer_underflow(in))
 				return;
 			curr=ibuffer_curr(in);
 		}
@@ -111,7 +111,7 @@ inline constexpr bool scan_transmit(output&& out,input&& in,Args&& ...args)
 		auto ed{ibuffer_end(in)};
 		if(curr==ed)
 		{
-			if(!underflow(in))
+			if(!ibuffer_underflow(in))
 				return false;
 		}
 		((details::impl_svt(out,in,std::forward<Args>(args))),...);

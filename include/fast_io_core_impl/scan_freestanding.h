@@ -16,9 +16,6 @@ template<std::integral char_type,typename T>
 		return parameter<std::remove_reference_t<T>&>{t};
 }
 
-[[noreturn]] inline void throw_scan_error(std::errc);
-
-
 template<input_stream T>
 requires std::is_trivially_copyable_v<T>
 struct unget_temp_buffer
@@ -104,7 +101,7 @@ struct unget_temp_buffer
 #endif
 };
 
-template<input_stream T,std::input_or_output_iterator Iter>
+template<input_stream T,::fast_io::freestanding::input_or_output_iterator Iter>
 inline constexpr Iter read(unget_temp_buffer<T>& in,Iter begin, Iter end)
 {
 	if(begin==end)
@@ -123,40 +120,31 @@ inline constexpr Iter read(unget_temp_buffer<T>& in,Iter begin, Iter end)
 template<typename T>
 inline constexpr auto ibuffer_begin(unget_temp_buffer<T>& in) noexcept
 {
-	return std::addressof(in.buffer);
+	return __builtin_addressof(in.buffer);
 }
 
 template<typename T>
 inline constexpr auto ibuffer_curr(unget_temp_buffer<T>& in) noexcept
 {
-	return std::addressof(in.buffer)+in.pos;
+	return __builtin_addressof(in.buffer)+in.pos;
 }
 
 template<typename T>
 inline constexpr auto ibuffer_end(unget_temp_buffer<T>& in) noexcept
 {
-	return std::addressof(in.buffer)+in.pos_end;
+	return __builtin_addressof(in.buffer)+in.pos_end;
 }
 
 template<typename T>
 inline constexpr auto ibuffer_set_curr(unget_temp_buffer<T>& in,typename T::char_type* ptr) noexcept
 {
-	in.pos=ptr-std::addressof(in.buffer);
-}
-
-namespace details
-{
-template<typename T>
-concept try_get_input_stream=requires(T in)
-{
-	{try_get(in)}->std::convertible_to<std::pair<typename T::char_type,bool>>;
-};
+	in.pos=ptr-__builtin_addressof(in.buffer);
 }
 
 template<typename T>
-inline constexpr bool underflow(unget_temp_buffer<T>& in)
+inline constexpr bool ibuffer_underflow(unget_temp_buffer<T>& in)
 {
-	if constexpr(details::try_get_input_stream<T>)
+	if constexpr(try_get_input_stream<T>)
 	{
 		auto ret{try_get(in.input)};
 		in.buffer=ret.first;
@@ -166,7 +154,7 @@ inline constexpr bool underflow(unget_temp_buffer<T>& in)
 	}
 	else
 	{
-		bool not_eof{read(in.input,std::addressof(in.buffer),std::addressof(in.buffer)+1)!=std::addressof(in.buffer)};
+		bool not_eof{read(in.input,__builtin_addressof(in.buffer),__builtin_addressof(in.buffer)+1)!=__builtin_addressof(in.buffer)};
 		in.pos={};
 		in.pos_end=not_eof;
 		return not_eof;
@@ -175,15 +163,18 @@ inline constexpr bool underflow(unget_temp_buffer<T>& in)
 namespace details
 {
 template<buffer_input_stream input,typename T,typename P>
+#if __has_cpp_attribute(gnu::cold)
+[[gnu::cold]]
+#endif
 inline constexpr bool scan_single_status_impl(input in,T& state_machine,P arg)
 {
-	for(;state_machine.code==std::errc::resource_unavailable_try_again;)
+	for(;state_machine.code==parse_code::partial;)
 	{
-		if(!underflow(in))
+		if(!ibuffer_underflow(in))
 		{
 			if(!state_machine.test_eof(arg))
 				return false;
-			if(state_machine.code==std::errc{})[[likely]]
+			if(state_machine.code==parse_code{})[[likely]]
 				return true;
 			break;
 		}
@@ -191,10 +182,10 @@ inline constexpr bool scan_single_status_impl(input in,T& state_machine,P arg)
 		auto end{ibuffer_end(in)};
 		state_machine(curr,end,arg);
 		ibuffer_set_curr(in, state_machine.iter);
-		if(state_machine.code==std::errc{})[[likely]]
+		if(state_machine.code==parse_code::ok)[[likely]]
 			return true;
 	}
-	throw_scan_error(state_machine.code);
+	throw_parse_code(state_machine.code);
 }
 template<buffer_input_stream input,typename T>
 requires (context_scanable<typename input::char_type,T,false>||skipper<typename input::char_type,T>
@@ -223,11 +214,11 @@ requires (context_scanable<typename input::char_type,T,false>||skipper<typename 
 			{
 				auto state_machine{scan_context_define(scan_context<context_scanable<char_type,T,true>>,curr,end,arg)};
 				ibuffer_set_curr(in, state_machine.iter);
-				if(state_machine.code!=std::errc{})
+				if(state_machine.code!=parse_code{})[[unlikely]]
 				{
-					if(state_machine.code==std::errc::resource_unavailable_try_again)
+					if(state_machine.code==parse_code::partial)
 						return false;
-					throw_scan_error(state_machine.code);
+					throw_parse_code(state_machine.code);
 				}
 				return true;
 			}
@@ -241,7 +232,7 @@ requires (context_scanable<typename input::char_type,T,false>||skipper<typename 
 		{
 			for(;(curr=skip_define(curr,end,arg))==end;)
 			{
-				if(!underflow(in))
+				if(!ibuffer_underflow(in))
 					return true;
 				curr=ibuffer_curr(in);
 				end=ibuffer_end(in);
@@ -255,7 +246,7 @@ requires (context_scanable<typename input::char_type,T,false>||skipper<typename 
 			{
 				for(;(curr=scan_skip_define(scan_skip_type<T>,curr,end))==end;)
 				{
-					if(!underflow(in))
+					if(!ibuffer_underflow(in))[[unlikely]]
 						return false;
 					curr=ibuffer_curr(in);
 					end=ibuffer_end(in);
@@ -265,7 +256,7 @@ requires (context_scanable<typename input::char_type,T,false>||skipper<typename 
 			{
 				auto state_machine{scan_context_define(scan_context<false>,curr,end,arg)};
 				ibuffer_set_curr(in, state_machine.iter);
-				if(state_machine.code!=std::errc{})[[likely]]
+				if(state_machine.code!=parse_code{})[[unlikely]]
 					return scan_single_status_impl(in,state_machine,arg);
 				return true;
 			}
@@ -289,7 +280,9 @@ requires (status_input_stream<input>||input_stream<input>)
 		return scan_freestanding_decay(io_ref(unlocked_in),args...);
 	}
 	else if constexpr(buffer_input_stream<input>)
+	{
 		return (details::scan_single_impl(in,args)&&...);
+	}
 	else
 	{
 		unget_temp_buffer in_buffer(io_ref(in));

@@ -5,6 +5,7 @@ namespace fast_io
 
 namespace details
 {
+
 template<constructible_to_path path_type>
 inline constexpr auto to_its_cstring_view(path_type&& pth) noexcept
 {
@@ -49,14 +50,28 @@ mknodat,
 unlinkat
 };
 
+#if defined(__CYGWIN__)
+extern int renameat(int olddirfd,char const* oldpath,int newdirfd, char const* newpath) noexcept asm("renameat");
+extern int linkat(int olddirfd,char const* oldpath,int newdirfd, char const* newpath,int flags) noexcept asm("linkat");
+extern int symlinkat(char const* oldpath, int newdirfd, char const *newpath) noexcept asm("symlinkat");
+extern int fchmodat(int dirfd, char const *pathname, mode_t mode, int flags) noexcept asm("fchmodat");
+extern int utimensat(int dirfd, char const *pathname,struct timespec const times[2], int flags) noexcept asm("utimensat");
+extern int fchownat(int dirfd, char const *pathname,uid_t owner, gid_t group, int flags) noexcept asm("fchownat");
+extern int fstatat(int dirfd, char const *pathname, struct stat *buf,int flags) noexcept asm("fstatat");
+extern int mkdirat(int dirfd, char const* pathname, mode_t mode) noexcept asm("mkdirat");
+extern int mknodat(int dirfd, char const* pathname, mode_t mode, dev_t dev) noexcept asm("mknodat");
+extern int unlinkat(int dirfd, char const*pathname, int flags) noexcept asm("unlinkat");
+extern int readlinkat(int dirfd, char const *pathname,char *buf, size_t bufsiz) noexcept asm("readlinkat");
+#endif
+
 inline void posix_renameat_impl(int olddirfd,char const* oldpath,
 	int newdirfd,char const* newpath)
 {
 	system_call_throw_error(
-#if defined(__linux__)
+#if defined(__linux__) && defined(__NR_renameat)
 	system_call<__NR_renameat,int>
 #else
-	::renameat
+	renameat
 #endif
 	(olddirfd,oldpath,newdirfd,newpath));
 }
@@ -68,7 +83,7 @@ inline void posix_linkat_impl(int olddirfd,char const* oldpath,
 #if defined(__linux__)
 	system_call<__NR_linkat,int>
 #else
-	::linkat
+	linkat
 #endif
 	(olddirfd,oldpath,newdirfd,newpath,flags));
 }
@@ -97,12 +112,18 @@ inline auto posix12_api_dispatcher(char const* oldpath,
 #if defined(__linux__)
 		system_call<__NR_symlinkat,int>
 #else
-		::symlinkat
+		symlinkat
 #endif
 		(oldpath,newdirfd,newpath));
 	}
 }
 
+#if defined(__wasi__) && !defined(__wasilibc_unmodified_upstream)
+inline void posix_fchownat_impl(int, const char *, uintmax_t, uintmax_t, int)
+{
+	throw_posix_error(ENOTSUP);
+}
+#else
 inline void posix_fchownat_impl(int dirfd, const char *pathname, uintmax_t owner, uintmax_t group, int flags)
 {
 	if constexpr(sizeof(uintmax_t)>sizeof(uid_t))
@@ -121,25 +142,37 @@ inline void posix_fchownat_impl(int dirfd, const char *pathname, uintmax_t owner
 #if defined(__linux__)
 	system_call<__NR_fchownat,int>
 #else
-	::fchownat
+	fchownat
 #endif
 	(dirfd,pathname,owner,group,flags));
 }
+#endif
 
+#if defined(__wasi__) && !defined(__wasilibc_unmodified_upstream)
+inline void posix_fchmodat_impl(int, const char *, mode_t, int)
+{
+	throw_posix_error(ENOTSUP);
+}
+#else
 inline void posix_fchmodat_impl(int dirfd, const char *pathname, mode_t mode, int flags)
 {
 	system_call_throw_error(
 #if defined(__linux__)
 	system_call<__NR_fchmodat,int>
 #else
-	::fchmodat
+	fchmodat
 #endif
 	(dirfd,pathname,mode,flags));
 }
+#endif
 
 inline posix_file_status posix_fstatat_impl(int dirfd, const char *pathname, int flags)
 {
+#if defined(__linux__) && !defined(__mlibc__)
 	struct stat64 buf;
+#else
+	struct stat buf;
+#endif
 	system_call_throw_error(
 #if defined(__linux__)
 	system_call<
@@ -150,9 +183,9 @@ inline posix_file_status posix_fstatat_impl(int dirfd, const char *pathname, int
 #endif
 	,int>
 #else
-	::fstatat64
+	fstatat
 #endif
-	(dirfd,pathname,std::addressof(buf),flags));
+	(dirfd,pathname,__builtin_addressof(buf),flags));
 	return struct_stat_to_posix_file_status(buf);
 }
 
@@ -164,10 +197,17 @@ inline void posix_mkdirat_impl(int dirfd, const char *pathname, mode_t mode)
 	__NR_mkdirat
 	,int>
 #else
-	::mkdirat
+	mkdirat
 #endif
 	(dirfd,pathname,mode));
 }
+
+#if (defined(__wasi__) && !defined(__wasilibc_unmodified_upstream)) || defined(__DARWIN_C_LEVEL)
+inline void posix_mknodat_impl(int, const char *, mode_t,std::uintmax_t)
+{
+	throw_posix_error(ENOTSUP);
+}
+#else
 
 inline void posix_mknodat_impl(int dirfd, const char *pathname, mode_t mode,std::uintmax_t dev)
 {
@@ -185,10 +225,12 @@ inline void posix_mknodat_impl(int dirfd, const char *pathname, mode_t mode,std:
 #endif
 	,int>
 #else
-	::mknodat
+	mknodat
 #endif
 	(dirfd,pathname,mode,dev));
 }
+
+#endif
 
 inline void posix_unlinkat_impl(int dirfd,char const* path,int flags)
 {
@@ -196,7 +238,7 @@ inline void posix_unlinkat_impl(int dirfd,char const* path,int flags)
 #if defined(__linux__)
 	system_call<__NR_unlinkat,int>
 #else
-	::unlinkat
+	unlinkat
 #endif
 	(dirfd,path,flags));
 }
@@ -240,14 +282,14 @@ int flags)
 	system_call_throw_error(
 #if defined(__linux__)
 
-#if defined(__NR__utimensat64)
+#if defined(__NR_utimensat64)
 	system_call<__NR_utimensat64,int>
 #else
 	system_call<__NR_utimensat,int>
 #endif
 
 #else
-	::utimensat64
+	utimensat
 #endif
 	(dirfd,path,tsptr,flags));
 }
@@ -283,14 +325,14 @@ inline auto posix_deal_with22(int olddirfd,char const* oldpath,
 	}
 	else
 	{
-		posix_path_dealer newpdealer(newpath.data(),newpath.size());
+		posix_api_encoding_converter newpdealer(newpath.data(),newpath.size());
 		return posix22_api_dispatcher<dsp>(olddirfd,oldpath,newdirfd,newpdealer.c_str());
 	}
 }
 
-template<posix_api_22 dsp,std::integral char_type1,std::integral char_type2,typename... Args>
+template<posix_api_22 dsp,std::integral char_type1,std::integral char_type2>
 inline auto posix_deal_with22(int olddirfd,basic_cstring_view<char_type1> oldpath,
-	int newdirfd,basic_cstring_view<char_type2> newpath,Args... args)
+	int newdirfd,basic_cstring_view<char_type2> newpath)
 {
 	if constexpr(sizeof(char_type1)==1&&sizeof(char_type2)==1)
 	{
@@ -299,23 +341,22 @@ inline auto posix_deal_with22(int olddirfd,basic_cstring_view<char_type1> oldpat
 	}
 	else if constexpr(sizeof(char_type1)==1&&sizeof(char_type2)!=1)
 	{
-
-		posix_path_dealer dealer(newpath.data(),newpath.size());
+		posix_api_encoding_converter converter(newpath.data(),newpath.size());
 		return posix22_api_dispatcher<dsp>(olddirfd,reinterpret_cast<char const*>(oldpath.c_str()),
-		newdirfd,dealer.c_str());
+		newdirfd,converter.native_c_str());
 	}
 	else if constexpr(sizeof(char_type1)!=1&&sizeof(char_type2)==1)
 	{
-		posix_path_dealer opdealer(oldpath.data(),oldpath.size());
-		return posix22_api_dispatcher<dsp>(olddirfd,opdealer.c_str(),
+		posix_api_encoding_converter op_converter(oldpath.data(),oldpath.size());
+		return posix22_api_dispatcher<dsp>(olddirfd,op_converter.native_c_str(),
 		newdirfd,reinterpret_cast<char const*>(newpath.c_str()));
 	}
 	else
 	{
-		posix_path_dealer opdealer(oldpath.data(),oldpath.size());
-		posix_path_dealer newpdealer(newpath.data(),newpath.size());
-		return posix22_api_dispatcher<dsp>(olddirfd,opdealer.c_str(),
-		newdirfd,newpdealer.c_str());
+		posix_api_encoding_converter opdealer(oldpath.data(),oldpath.size());
+		posix_api_encoding_converter newpdealer(newpath.data(),newpath.size());
+		return posix22_api_dispatcher<dsp>(olddirfd,opdealer.native_c_str(),
+		newdirfd,newpdealer.native_c_str());
 	}
 }
 
@@ -332,23 +373,22 @@ inline auto posix_deal_with12(
 	}
 	else if constexpr(sizeof(char_type1)==1&&sizeof(char_type2)!=1)
 	{
-
-		posix_path_dealer dealer(newpath.data(),newpath.size());
+		posix_api_encoding_converter converter(newpath.data(),newpath.size());
 		return posix12_api_dispatcher<dsp>(reinterpret_cast<char const*>(oldpath.c_str()),
-		newdirfd,dealer.c_str());
+		newdirfd,converter.native_c_str());
 	}
 	else if constexpr(sizeof(char_type1)!=1&&sizeof(char_type2)==1)
 	{
-		posix_path_dealer opdealer(oldpath.data(),oldpath.size());
-		return posix12_api_dispatcher<dsp>(opdealer.c_str(),
+		posix_api_encoding_converter op_converter(oldpath.data(),oldpath.size());
+		return posix12_api_dispatcher<dsp>(op_converter.native_c_str(),
 		newdirfd,reinterpret_cast<char const*>(newpath.c_str()));
 	}
 	else
 	{
-		posix_path_dealer opdealer(oldpath.data(),oldpath.size());
-		posix_path_dealer newpdealer(newpath.data(),newpath.size());
-		return posix12_api_dispatcher<dsp>(opdealer.c_str(),
-		newdirfd,newpdealer.c_str());
+		posix_api_encoding_converter op_converter(oldpath.data(),oldpath.size());
+		posix_api_encoding_converter new_converter(newpath.data(),newpath.size());
+		return posix12_api_dispatcher<dsp>(op_converter.native_c_str(),
+		newdirfd,new_converter.native_c_str());
 	}
 }
 
@@ -366,8 +406,8 @@ inline auto posix_deal_with1x(
 	}
 	else
 	{
-		posix_path_dealer dealer(path.data(),path.size());
-		return posix1x_api_dispatcher<dsp>(dirfd,dealer.c_str(),args...);
+		posix_api_encoding_converter converter(path.data(),path.size());
+		return posix1x_api_dispatcher<dsp>(dirfd,converter.native_c_str(),args...);
 	}
 }
 
@@ -576,7 +616,7 @@ inline constexpr std::size_t read_linkbuffer_size() noexcept
 inline std::size_t posix_readlinkat_common_impl(int dirfd,char const* pathname,char* buffer)
 {
 	constexpr std::size_t buffer_size{read_linkbuffer_size()};
-	int bytes{
+	std::ptrdiff_t bytes{
 #if defined(__linux__)
 	system_call<
 #if __NR_readlinkat
@@ -584,7 +624,7 @@ inline std::size_t posix_readlinkat_common_impl(int dirfd,char const* pathname,c
 #endif
 	,int>
 #else
-	::readlinkat
+	readlinkat
 #endif
 	(dirfd,pathname,buffer,buffer_size)
 	};
@@ -601,8 +641,8 @@ inline std::size_t read_linkat_impl_phase2(char* dst,basic_posix_readlinkat_t<pa
 	}
 	else
 	{
-		posix_path_dealer dealer(rlkat.path.data(),rlkat.path.size());
-		return posix_readlinkat_common_impl(rlkat.dirfd,dealer.c_str(),dst);
+		posix_api_encoding_converter converter(rlkat.path.data(),rlkat.path.size());
+		return posix_readlinkat_common_impl(rlkat.dirfd,converter.native_c_str(),dst);
 	}
 }
 
@@ -641,8 +681,8 @@ inline constexpr std::size_t print_reserve_size(io_reserve_type_t<char_type,basi
 	}
 }
 
-template<std::contiguous_iterator Iter,std::integral char_type>
-inline constexpr Iter print_reserve_define(io_reserve_type_t<std::iter_value_t<Iter>,
+template<::fast_io::freestanding::contiguous_iterator Iter,std::integral char_type>
+inline constexpr Iter print_reserve_define(io_reserve_type_t<::fast_io::freestanding::iter_value_t<Iter>,
 	basic_posix_readlinkat_t<char_type>>,
 	Iter iter,
 	basic_posix_readlinkat_t<char_type> rlkat)

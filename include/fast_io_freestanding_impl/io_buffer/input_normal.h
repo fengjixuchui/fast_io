@@ -4,7 +4,7 @@ namespace fast_io::details
 {
 
 template<stream T,std::integral char_type>
-inline constexpr bool underflow_rl_impl(T t,basic_io_buffer_pointers<char_type>& ibuffer,std::size_t bfsz)
+inline constexpr bool ibuffer_underflow_rl_impl(T t,basic_io_buffer_pointers<char_type>& ibuffer,std::size_t bfsz)
 {
 	if(ibuffer.buffer_begin==nullptr)
 		ibuffer.buffer_end=ibuffer.buffer_curr=ibuffer.buffer_begin=allocate_iobuf_space<char_type>(bfsz);
@@ -14,12 +14,18 @@ inline constexpr bool underflow_rl_impl(T t,basic_io_buffer_pointers<char_type>&
 }
 
 template<std::size_t bfsz,stream T,std::integral char_type>
-inline constexpr bool underflow_impl(T t,basic_io_buffer_pointers<char_type>& ibuffer)
+#if __has_cpp_attribute(gnu::cold)
+[[gnu::cold]]
+#endif
+inline constexpr bool ibuffer_underflow_impl(T t,basic_io_buffer_pointers<char_type>& ibuffer)
 {
-	return underflow_rl_impl(t,ibuffer,bfsz);
+	return ibuffer_underflow_rl_impl(t,ibuffer,bfsz);
 }
 
-template<typename T,std::integral char_type,std::random_access_iterator Iter>
+template<typename T,std::integral char_type,::fast_io::freestanding::random_access_iterator Iter>
+#if __has_cpp_attribute(gnu::cold)
+[[gnu::cold]]
+#endif
 inline constexpr Iter iobuf_read_unhappy_decay_impl(T t,basic_io_buffer_pointers<char_type>& ibuffer,Iter first,Iter last,std::size_t buffer_size)
 {
 	std::size_t iter_diff(static_cast<std::size_t>(last-first));

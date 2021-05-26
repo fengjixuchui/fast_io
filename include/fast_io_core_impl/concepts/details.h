@@ -29,7 +29,7 @@ concept output_stream_impl = (stream_char_type_requirement<T>||
 })
 )&&requires(T&& out,typename std::remove_cvref_t<T>::char_type const* b)
 {
-	{write(out,b,b)};
+	write(out,b,b);
 };
 
 template<typename T>
@@ -61,22 +61,22 @@ concept random_access_stream_impl = requires(T&& t)
 template<typename T>
 concept buffer_input_stream_impl = requires(T&& in)
 {
-	{ibuffer_begin(in)}->std::convertible_to<typename std::remove_cvref_t<T>::char_type const*>;
+	ibuffer_begin(in);
 	ibuffer_set_curr(in,ibuffer_curr(in));
-	{ibuffer_end(in)}->std::convertible_to<typename std::remove_cvref_t<T>::char_type const*>;
-	{underflow(in)}->std::convertible_to<bool>;
+	ibuffer_end(in);
+	{ibuffer_underflow(in)}->std::convertible_to<bool>;
 };
 
 template<typename T>
 concept contiguous_input_stream_impl = requires(T&& in)
 {
-	underflow_forever_false(in);
+	ibuffer_underflow_never(in);
 };
 
 template<typename T>
 concept contiguous_output_stream_impl = requires(T&& out)
 {
-	overflow_never(out);
+	obuffer_overflow_never(out);
 };
 
 template<typename T>
@@ -88,16 +88,12 @@ concept refill_buffer_input_stream_impl = requires(T&& in)
 template<typename T>
 concept buffer_output_stream_impl = requires(T&& out,typename std::remove_cvref_t<T>::char_type ch)
 {
-	{obuffer_begin(out)}->std::convertible_to<typename std::remove_cvref_t<T>::char_type*>;
-	{obuffer_end(out)}->std::convertible_to<typename std::remove_cvref_t<T>::char_type*>;
+	obuffer_begin(out);
+	obuffer_end(out);
 	obuffer_set_curr(out,obuffer_curr(out));
-	overflow(out,ch);
+	obuffer_overflow(out,ch);
 };
-template<typename T>
-concept maybe_buffer_output_stream_impl = requires(T&& out)
-{
-	{obuffer_is_active(out)}->std::convertible_to<bool>;
-};
+
 template<typename T>
 concept flush_output_stream_impl = requires(T&& out)
 {
@@ -111,7 +107,7 @@ concept fill_nc_output_stream_impl = requires(T&& out,std::size_t n,typename std
 };
 
 template<typename T>
-concept dynamic_buffer_output_stream_impl = requires(T&& out,std::size_t size,typename std::remove_cvref_t<T>::char_type* ptr)
+concept dynamic_output_stream_impl = requires(T&& out,std::size_t size,typename std::remove_cvref_t<T>::char_type* ptr)
 {
 	oreserve(out,size);
 	oshrink_to_fit(out);
@@ -156,7 +152,7 @@ concept status_stream_impl = requires(T&& stm)
 template<typename T>
 concept scatter_input_stream_impl = requires(T&& in,io_scatters_t sp)
 {
-	{scatter_read(in,sp)}->std::same_as<std::size_t>;
+	scatter_read(in,sp);
 };
 
 template<typename T>

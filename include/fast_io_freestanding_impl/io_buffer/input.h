@@ -61,7 +61,7 @@ buffer_mode mde,
 typename decoratorstype,
 std::size_t bfs>
 requires ((mde&buffer_mode::in)==buffer_mode::in)
-inline constexpr bool underflow(basic_io_buffer<handletype,mde,decoratorstype,bfs>& bios)
+inline constexpr bool ibuffer_underflow(basic_io_buffer<handletype,mde,decoratorstype,bfs>& bios)
 {
 	if constexpr(((mde&buffer_mode::out)==buffer_mode::out)&&
 	((mde&buffer_mode::tie)==buffer_mode::tie))
@@ -72,16 +72,16 @@ inline constexpr bool underflow(basic_io_buffer<handletype,mde,decoratorstype,bf
 			details::iobuf_output_flush_impl(io_ref(bios.handle),bios.obuffer);
 	}
 	if constexpr(details::has_internal_decorator_impl<decoratorstype>)
-		return details::underflow_impl_deco<basic_io_buffer<handletype,mde,decoratorstype,bfs>::need_secure_clear,bfs>(io_ref(bios.handle),internal_decorator(bios.decorators),bios.ibuffer,bios.ibuffer_external);
+		return details::ibuffer_underflow_impl_deco<basic_io_buffer<handletype,mde,decoratorstype,bfs>::need_secure_clear,bfs>(io_ref(bios.handle),internal_decorator(bios.decorators),bios.ibuffer,bios.ibuffer_external);
 	else
-		return details::underflow_impl<bfs>(io_ref(bios.handle),bios.ibuffer);
+		return details::ibuffer_underflow_impl<bfs>(io_ref(bios.handle),bios.ibuffer);
 }
 
 namespace details
 {
 
 
-template<typename T,std::random_access_iterator Iter>
+template<typename T,::fast_io::freestanding::random_access_iterator Iter>
 inline constexpr Iter iobuf_read_unhappy_impl(T& bios,Iter first,Iter last)
 {
 	if constexpr(((T::mode&buffer_mode::out)==buffer_mode::out)&&((T::mode&buffer_mode::tie)==buffer_mode::tie))
@@ -111,17 +111,17 @@ inline constexpr Iter iobuf_read_unhappy_impl(T& bios,Iter first,Iter last)
 template<stream handletype,
 buffer_mode mde,
 typename decorators,
-std::size_t bfs,std::random_access_iterator Iter>
+std::size_t bfs,::fast_io::freestanding::random_access_iterator Iter>
 requires (((mde&buffer_mode::in)==buffer_mode::in)&&details::allow_iobuf_punning<typename decorators::internal_type,Iter>)
 inline constexpr Iter read(basic_io_buffer<handletype,mde,decorators,bfs>& bios,Iter first,Iter last)
 {
-	using iter_char_type = std::iter_value_t<Iter>;
+	using iter_char_type = ::fast_io::freestanding::iter_value_t<Iter>;
 	using char_type = typename decorators::internal_type;
 	if constexpr(std::same_as<iter_char_type,char_type>)
 	{
-		if constexpr(std::contiguous_iterator<Iter>&&!std::is_pointer_v<Iter>)
+		if constexpr(::fast_io::freestanding::contiguous_iterator<Iter>&&!std::is_pointer_v<Iter>)
 		{
-			return first+(read(bios,std::to_address(first),std::to_address(last))-std::to_address(first));
+			return first+(read(bios,::fast_io::freestanding::to_address(first),::fast_io::freestanding::to_address(last))-::fast_io::freestanding::to_address(first));
 		}
 		else
 		{
@@ -136,11 +136,71 @@ inline constexpr Iter read(basic_io_buffer<handletype,mde,decorators,bfs>& bios,
 	}
 	else
 	{
-		auto newb{reinterpret_cast<char*>(std::to_address(first))};
+		auto newb{reinterpret_cast<char*>(::fast_io::freestanding::to_address(first))};
 		auto ret{read(bios,newb,
-			reinterpret_cast<char*>(std::to_address(last)))};
+			reinterpret_cast<char*>(::fast_io::freestanding::to_address(last)))};
 		return first+(ret-newb)/sizeof(*first);
 	}
+}
+
+
+
+template<random_access_stream handletype,
+buffer_mode mde,
+typename decoratorstype,
+std::size_t bfs>
+requires ((mde&buffer_mode::in)!=buffer_mode::in||!details::has_internal_decorator_impl<decoratorstype>)
+inline constexpr std::uintmax_t seek(basic_io_buffer<handletype,mde,decoratorstype,bfs>& bios,std::intmax_t pos=0,seekdir sdir=seekdir::cur)
+{
+	if constexpr((mde&buffer_mode::out)==buffer_mode::out)
+	{
+		if constexpr(details::has_external_decorator_impl<decoratorstype>)
+			details::iobuf_output_flush_impl_deco<basic_io_buffer<handletype,mde,decoratorstype,bfs>::need_secure_clear>(io_ref(bios.handle),external_decorator(bios.decorators),bios.obuffer,bfs);
+		else
+			details::iobuf_output_flush_impl(io_ref(bios.handle),bios.obuffer);
+	}
+	if constexpr((mde&buffer_mode::in)==buffer_mode::in)
+	{
+		if(sdir==seekdir::cur)
+		{
+			std::size_t offset{static_cast<std::size_t>(bios.ibuffer.buffer_end-bios.ibuffer.buffer_curr)*sizeof(typename basic_io_buffer<handletype,mde,decoratorstype,bfs>::char_type)};
+#if defined(_MSC_VER) 
+			if(pos<INTMAX_MIN+static_cast<std::intmax_t>(static_cast<std::uintmax_t>(offset)))
+			{
+				pos=0;
+				sdir=seekdir::beg;
+			}
+			else
+			{
+				pos-=static_cast<std::intmax_t>(static_cast<std::uintmax_t>(offset));
+			}
+#else
+#if defined(__has_builtin) && __has_builtin(__builtin_sub_overflow)
+			if(__builtin_sub_overflow(pos,static_cast<std::ptrdiff_t>(offset),__builtin_addressof(pos)))
+			{
+				pos=0;
+				sdir=seekdir::beg;
+			}
+#else
+			if(pos<INTMAX_MIN+static_cast<std::intmax_t>(static_cast<std::uintmax_t>(offset)))
+			{
+				pos=0;
+				sdir=seekdir::beg;
+			}
+			else
+			{
+				pos-=static_cast<std::intmax_t>(static_cast<std::uintmax_t>(offset));
+			}
+#endif
+#endif
+		}
+	}
+	std::uintmax_t new_position{seek(bios.handle,pos,sdir)};
+	if constexpr((mde&buffer_mode::in)==buffer_mode::in)
+	{
+		bios.ibuffer.buffer_end=bios.ibuffer.buffer_curr=bios.ibuffer.buffer_begin;
+	}
+	return new_position;
 }
 
 }

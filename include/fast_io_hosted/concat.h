@@ -44,7 +44,7 @@ inline constexpr T deal_with_one(U t)
 		return T(1,t.reference);
 	else
 	{
-		std::array<value_type,size> array;
+		::fast_io::freestanding::array<value_type,size> array;
 		if constexpr(ln)
 		{
 			auto p {print_reserve_define(io_reserve_type<typename T::value_type,no_cvref>,array.data(),t)};
@@ -123,14 +123,14 @@ inline constexpr std::size_t scatter_concat_with_reserve_recursive(char_type* pt
 }
 
 template<bool line,typename char_type,std::size_t arg_number>
-inline constexpr auto deal_with_scatters(std::array<basic_io_scatter_t<char_type>,arg_number>& scatters,std::size_t sz)
+inline constexpr auto deal_with_scatters(::fast_io::freestanding::array<basic_io_scatter_t<char_type>,arg_number>& scatters,std::size_t sz)
 {
 	std::basic_string<char_type> str;
 	if constexpr(line)
 		str.reserve(sz+1);
 	else
 		str.reserve(sz);
-	fast_io::ostring_ref oref{str};
+	basic_ostring_ref<char_type> oref{&str};
 	auto it(str.data());
 	for(auto const& e : scatters)
 		it=details::non_overlapped_copy_n(e.base,e.len,it);
@@ -157,13 +157,13 @@ inline constexpr char_type* concat_with_reserve_recursive(char_type* ptr,T t,Arg
 }
 
 template<bool line,typename char_type,std::size_t arg_number>
-inline constexpr void deal_with_scatters_string(std::basic_string<char_type>& str,std::array<basic_io_scatter_t<char_type>,arg_number>& scatters,std::size_t sz)
+inline constexpr void deal_with_scatters_string(std::basic_string<char_type>& str,::fast_io::freestanding::array<basic_io_scatter_t<char_type>,arg_number>& scatters,std::size_t sz)
 {
 	if constexpr(line)
 		str.reserve(sz+1+str.size());
 	else
 		str.reserve(sz+str.size());
-	fast_io::ostring_ref oref{str};
+	basic_ostring_ref<char_type> oref{&str};
 	auto it(str.data());
 	for(auto const& e : scatters)
 		it=details::non_overlapped_copy_n(e.base,e.len,it);
@@ -185,7 +185,7 @@ inline constexpr auto concat_fallback(Args ...args)
 	{
 		if constexpr(((reserve_printable<char_type,Args>)&&...))
 		{
-			std::array<char_type,decay::calculate_scatter_reserve_size<char_type,Args...>()+static_cast<std::size_t>(line)> array;
+			::fast_io::freestanding::array<char_type,decay::calculate_scatter_reserve_size<char_type,Args...>()+static_cast<std::size_t>(line)> array;
 			auto ptr{concat_with_reserve_recursive<char_type>(array.data(),args...)};
 			if constexpr(line)
 			{
@@ -199,14 +199,14 @@ inline constexpr auto concat_fallback(Args ...args)
 		}
 		else
 		{
-			std::array<basic_io_scatter_t<char_type>,sizeof...(Args)> scatters;
+			::fast_io::freestanding::array<basic_io_scatter_t<char_type>,sizeof...(Args)> scatters;
 			if constexpr(((scatter_type_printable<char_type,Args>)&&...))
 				return deal_with_scatters<line,char_type>(scatters,scatter_concat_recursive<char_type>(
 					scatters.data(),args...));
 			else
 			{
 				constexpr std::size_t sca_sz{decay::calculate_scatter_reserve_size<char_type,Args...>()};
-				std::array<char_type,sca_sz> array;
+				::fast_io::freestanding::array<char_type,sca_sz> array;
 				return deal_with_scatters<line,char_type>(scatters,scatter_concat_with_reserve_recursive<char_type>(
 					array.data(),scatters.data(),args...));
 			}
@@ -215,7 +215,7 @@ inline constexpr auto concat_fallback(Args ...args)
 	else
 	{
 		std::basic_string<char_type> bas;
-		fast_io::ostring_ref itb(bas);
+		basic_ostring_ref<char_type> itb{&bas};
 		if constexpr(line)
 			println_freestanding_decay(io_ref(itb),args...);
 		else
@@ -230,21 +230,21 @@ inline constexpr decltype(auto) deal_with_first_is_string_rvalue_reference_decay
 {
 	if constexpr(((scatter_type_printable<char_type,Args>||reserve_printable<char_type,Args>)&&...))
 	{
-		std::array<basic_io_scatter_t<char_type>,sizeof...(Args)> scatters;
+		::fast_io::freestanding::array<basic_io_scatter_t<char_type>,sizeof...(Args)> scatters;
 		if constexpr(((scatter_type_printable<char_type,Args>)&&...))
 			deal_with_scatters_string<line>(u,scatters,scatter_concat_recursive<char_type>(
 				scatters.data(),args...));
 		else
 		{
 			constexpr std::size_t sca_sz{decay::calculate_scatter_reserve_size<char_type,Args...>()};
-			std::array<char_type,sca_sz> array;
+			::fast_io::freestanding::array<char_type,sca_sz> array;
 			deal_with_scatters_string<line>(u,scatters,scatter_concat_with_reserve_recursive<char_type>(
 				array.data(),scatters.data(),args...));
 		}
 	}
 	else
 	{
-		ostring_ref t{u};
+		basic_ostring_ref<char_type> t{&u};
 		{
 			if constexpr(line)
 				println_freestanding_decay(io_ref(t),args...);
@@ -323,11 +323,11 @@ constexpr
 void in_place_to(T& t,Args&& ...args)
 {
 	std::string str;
-	ostring_ref ref{str};
+	ostring_ref ref{&str};
 	print_freestanding(ref,std::forward<Args>(args)...);
-	istring_view is(str);
+	basic_istring_view<char> is(str);
 	if(!scan_freestanding(is,t))
-		throw_scan_error(std::errc::resource_unavailable_try_again);
+		throw_parse_code(parse_code::partial);
 	//No Decoration?
 }
 
@@ -339,7 +339,7 @@ constexpr
 void in_place_to(std::string& t,Args&& ...args)
 {
 	t.clear();
-	ostring_ref ref{t};
+	ostring_ref ref{&t};
 	print_freestanding(ref,std::forward<Args>(args)...);
 }
 
@@ -350,12 +350,6 @@ inline constexpr T to(Args&& ...args)
 	{
 		return fast_io::concat<T>(std::forward<Args>(args)...);
 	}
-	else if constexpr(std::same_as<T,std::runtime_error>||
-		std::same_as<T,std::logic_error>||std::same_as<T,std::domain_error>||
-		std::same_as<T,std::invalid_argument>||std::same_as<T,std::length_error>||
-		std::same_as<T,std::out_of_range>||std::same_as<T,std::range_error>||
-		std::same_as<T,std::overflow_error>||std::same_as<T,std::underflow_error>)
-		return T(fast_io::concat(std::forward<Args>(args)...));
 	else
 	{
 		T t;

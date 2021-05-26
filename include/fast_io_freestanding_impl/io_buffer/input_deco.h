@@ -4,7 +4,7 @@ namespace fast_io::details
 {
 
 template<bool nsecure,stream T,typename decot,std::integral char_type>
-inline constexpr bool underflow_rl_impl_deco(T t,decot deco,
+inline constexpr bool ibuffer_underflow_rl_impl_deco(T t,decot deco,
 	basic_io_buffer_pointers_with_cap<char_type>& ibuffer,
 	basic_io_buffer_pointers_only_begin<typename T::char_type>& ibuffer_external,
 	std::size_t bfsz)
@@ -47,17 +47,25 @@ inline constexpr bool underflow_rl_impl_deco(T t,decot deco,
 }
 
 template<bool nsecure,std::size_t bfsz,stream T,typename decot,std::integral char_type>
-inline constexpr bool underflow_impl_deco(T t,decot deco,basic_io_buffer_pointers_with_cap<char_type>& ibuffer,
+#if __has_cpp_attribute(gnu::cold)
+[[gnu::cold]]
+#endif
+inline constexpr bool ibuffer_underflow_impl_deco(T t,decot deco,basic_io_buffer_pointers_with_cap<char_type>& ibuffer,
 	basic_io_buffer_pointers_only_begin<typename T::char_type>& ibuffer_external)
 {
+#if 0
 	if constexpr(maybe_noop_decorator<char_type,decot>)
 	{
 
 	}
-	return underflow_rl_impl_deco<nsecure>(t,deco,ibuffer,ibuffer_external,bfsz);
+#endif
+	return ibuffer_underflow_rl_impl_deco<nsecure>(t,deco,ibuffer,ibuffer_external,bfsz);
 }
 
-template<bool nsecure,typename T,typename decot,std::integral char_type,std::contiguous_iterator Iter>
+template<bool nsecure,typename T,typename decot,std::integral char_type,::fast_io::freestanding::contiguous_iterator Iter>
+#if __has_cpp_attribute(gnu::cold)
+[[gnu::cold]]
+#endif
 inline constexpr Iter iobuf_read_unhappy_decay_impl_deco(T t,decot deco,
 	basic_io_buffer_pointers_with_cap<char_type>& ibuffer,
 	basic_io_buffer_pointers_only_begin<typename T::char_type>& ibuffer_external,
@@ -96,7 +104,7 @@ inline constexpr Iter iobuf_read_unhappy_decay_impl_deco(T t,decot deco,
 			std::size_t cap{static_cast<std::size_t>(ibuffer.buffer_cap-ibuffer.buffer_begin)};
 			if(cap<new_size)
 			{
-				deallocate_iobuf_space<char_type,nsecure>(ibuffer.buffer_begin,cap);
+				deallocate_iobuf_space<nsecure,char_type>(ibuffer.buffer_begin,cap);
 				ibuffer.buffer_cap=ibuffer.buffer_end=ibuffer.buffer_curr=ibuffer.buffer_begin=nullptr;
 				ibuffer.buffer_cap=(ibuffer.buffer_end=ibuffer.buffer_curr=ibuffer.buffer_begin=
 				allocate_iobuf_space<char_type>(new_size))+new_size;

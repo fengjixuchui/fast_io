@@ -1,22 +1,30 @@
 #pragma once
 
-#ifndef _MSC_VER
-#include"../../fast_io_crypto/hash/hash_processor.h"
-#include"../../fast_io_crypto/hash/sha.h"
-#endif
+#if defined(_WIN32) || defined(__CYGWIN__)
 
-#ifdef _WIN32
-#include"win32_api.h"
+#if 0
+#include"../../fast_io_crypto/hash/hash_processor.h"
+#include"../../fast_io_crypto/hash/sha_impl.h"
+#endif
+#include"win32/impl.h"
+
+#if defined(_WIN32) || defined(__CYGWIN__)
+namespace fast_io
+{
+
+inline constexpr std::uint32_t win32_stdin_number(static_cast<std::uint32_t>(-10));
+inline constexpr std::uint32_t win32_stdout_number(static_cast<std::uint32_t>(-11));
+inline constexpr std::uint32_t win32_stderr_number(static_cast<std::uint32_t>(-12));
+
+}
+#endif
 #include"win32_error.h"
-#include"nt_api.h"
+#include"nt/impl.h"
 #include"nt_error.h"
 #include"nt.h"
 #include"win32_iocp_overlapped.h"
 #include"win32.h"
-#include"win32_path_dealer.h"
 //#include"com_error.h"
-#else
-#include"posix_path_dealer.h"
 #endif
 #include"linux/system_call.h"
 #include"posix.h"
@@ -24,7 +32,7 @@
 namespace fast_io
 {
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__WINE__)
 inline constexpr auto native_stdin_number(win32_stdin_number);
 inline constexpr auto native_stdout_number(win32_stdout_number);
 inline constexpr auto native_stderr_number(win32_stderr_number);

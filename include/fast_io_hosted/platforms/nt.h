@@ -8,7 +8,7 @@ Referenced from Windows Internal Version 7
 */
 enum class nt_family
 {
-alpc,	//Alpc: Advanced Local Proedure Calls
+alpc,	//Alpc: Advanced Local Procedure Calls
 cc,	//Cc: Common Cache
 cm,	//Cm: Configuration manager
 dbg,	//Dbg: kernel debug support
@@ -250,19 +250,7 @@ struct nt_file_openmode
 
 inline void nt_file_rtl_path(wchar_t const* filename,win32::nt::unicode_string& nt_name,wchar_t const*& part_name,win32::nt::rtl_relative_name_u& relative_name)
 {
-	if(!win32::nt::rtl_dos_path_name_to_nt_path_name_u(filename,std::addressof(nt_name),std::addressof(part_name),std::addressof(relative_name)))
-		throw_nt_error(0xC0000039);
-}
-
-inline void nt_file_rtl_path_code_cvt(cstring_view filename,char16_t* buffer_data,win32::nt::unicode_string& nt_name,wchar_t const*& part_name,win32::nt::rtl_relative_name_u& relative_name)
-{
-	*::fast_io::details::codecvt::general_code_cvt_full(filename.data(),filename.data()+filename.size(),buffer_data)=0;
-	using wchar_t_may_alias_ptr
-#if __has_cpp_attribute(gnu::may_alias)
-	[[gnu::may_alias]]
-#endif
-	= wchar_t*;
-	if(!win32::nt::rtl_dos_path_name_to_nt_path_name_u(reinterpret_cast<wchar_t_may_alias_ptr>(buffer_data),std::addressof(nt_name),std::addressof(part_name),std::addressof(relative_name)))
+	if(!win32::nt::rtl_dos_path_name_to_nt_path_name_u(filename,__builtin_addressof(nt_name),__builtin_addressof(part_name),__builtin_addressof(relative_name)))
 		throw_nt_error(0xC0000039);
 }
 
@@ -274,12 +262,13 @@ inline void* nt_create_file_common_impl(void* directory,win32::nt::unicode_strin
 		.RootDirectory=directory,
 		.ObjectName=relative_path,
 		.Attributes=mode.ObjAttributes,
-		.SecurityDescriptor=mode.ObjAttributes&0x00000002?std::addressof(sec_attr):nullptr,
+		.SecurityDescriptor=mode.ObjAttributes&0x00000002?__builtin_addressof(sec_attr):nullptr,
+		.SecurityQualityOfService=nullptr
 	};
 	void* handle{};
 	win32::nt::io_status_block block{};
 	auto const status{win32::nt::nt_create_file<zw>(
-	std::addressof(handle),mode.DesiredAccess,std::addressof(obj),std::addressof(block),nullptr,mode.FileAttributes,
+	__builtin_addressof(handle),mode.DesiredAccess,__builtin_addressof(obj),__builtin_addressof(block),nullptr,mode.FileAttributes,
 	mode.ShareAccess,mode.CreateDisposition,mode.CreateOptions,nullptr,0)};
 	if(status)
 		throw_nt_error(status);
@@ -296,34 +285,33 @@ inline std::uint16_t filename_bytes(std::size_t sz)
 	return static_cast<std::uint16_t>(sz);
 }
 
-template<bool zw,std::integral char_type>
+template<bool zw,bool ok=true,std::integral char_type>
+requires (ok)
 inline void* nt_create_file_impl(basic_cstring_view<char_type> filename,nt_open_mode const& mode)
 {
 	wchar_t const* part_name{};
 	win32::nt::rtl_relative_name_u relative_name{};
 	win32::nt::unicode_string nt_name{};
+	using wchar_t_may_alias_ptr
+#if __has_cpp_attribute(gnu::may_alias)
+	[[gnu::may_alias]]
+#endif
+	= wchar_t const*;
 	if constexpr(std::same_as<char_type,wchar_t>)
 	{
 		nt_file_rtl_path(filename.c_str(),nt_name,part_name,relative_name);
 	}
-	else if constexpr(std::same_as<char_type,char16_t>)
+	else if constexpr(sizeof(char_type)==sizeof(wchar_t))
 	{
-		using wchar_t_may_alias_ptr
-#if __has_cpp_attribute(gnu::may_alias)
-		[[gnu::may_alias]]
-#endif
-		= wchar_t*;
 		nt_file_rtl_path(reinterpret_cast<wchar_t_may_alias_ptr>(filename.c_str()),nt_name,part_name,relative_name);
 	}
 	else
 	{
-		::fast_io::details::local_operator_new_array_ptr<char16_t> buffer(
-			::fast_io::details::intrinsics::add_or_overflow_die(
-			::fast_io::details::cal_decorated_reserve_size<sizeof(char_type),sizeof(char16_t)>(filename.size()),1));
-		nt_file_rtl_path_code_cvt(filename,buffer.ptr,nt_name,part_name,relative_name);
+		nt_api_encoding_converter converter(filename.data(),filename.size());
+		nt_file_rtl_path(converter.native_c_str(),nt_name,part_name,relative_name);
 	}
-	win32::nt::rtl_unicode_string_unique_ptr us_ptr{std::addressof(nt_name)};
-	return nt_create_file_common_impl<zw>(nullptr,std::addressof(nt_name),mode);
+	win32::nt::rtl_unicode_string_unique_ptr us_ptr{__builtin_addressof(nt_name)};
+	return nt_create_file_common_impl<zw>(nullptr,__builtin_addressof(nt_name),mode);
 }
 
 template<bool zw,std::integral char_type>
@@ -336,7 +324,7 @@ inline void* nt_create_file_directory_impl(void* directory,basic_cstring_view<ch
 			.Length=bytes,
 			.MaximumLength=bytes,
 			.Buffer=const_cast<wchar_t*>(filename.c_str())};
-		return nt_create_file_common_impl<zw>(directory,std::addressof(relative_path),mode);
+		return nt_create_file_common_impl<zw>(directory,__builtin_addressof(relative_path),mode);
 	}
 	else if constexpr(std::same_as<char_type,char16_t>)
 	{
@@ -356,14 +344,12 @@ inline void* nt_create_file_directory_impl(void* directory,basic_cstring_view<ch
 			.MaximumLength=bytes,
 			.Buffer=const_cast<wchar_t_may_alias_ptr>(
 				reinterpret_cast<wchar_t_may_alias_const_ptr>(filename.c_str()))};
-		return nt_create_file_common_impl<zw>(directory,std::addressof(relative_path),mode);
+		return nt_create_file_common_impl<zw>(directory,__builtin_addressof(relative_path),mode);
 	}
 	else
 	{
-		::fast_io::details::local_operator_new_array_ptr<char16_t> buffer(
-			::fast_io::details::cal_decorated_reserve_size<sizeof(char_type),sizeof(char16_t)>(filename.size()));
-		auto buffer_data_end=::fast_io::details::codecvt::general_code_cvt_full(filename.data(),filename.data()+filename.size(),buffer.ptr);
-		std::uint16_t const bytes(filename_bytes(buffer_data_end-buffer.ptr));
+		nt_api_encoding_converter converter(filename.data(),filename.size());
+		std::uint16_t const bytes(filename_bytes(converter.size()));
 		using wchar_t_may_alias_ptr
 #if __has_cpp_attribute(gnu::may_alias)
 		[[gnu::may_alias]]
@@ -372,8 +358,8 @@ inline void* nt_create_file_directory_impl(void* directory,basic_cstring_view<ch
 		win32::nt::unicode_string relative_path{
 			.Length=bytes,
 			.MaximumLength=bytes,
-			.Buffer=reinterpret_cast<wchar_t_may_alias_ptr>(buffer.ptr)};
-		return nt_create_file_common_impl<zw>(directory,std::addressof(relative_path),mode);
+			.Buffer=reinterpret_cast<wchar_t_may_alias_ptr>(converter.buffer_data)};
+		return nt_create_file_common_impl<zw>(directory,__builtin_addressof(relative_path),mode);
 	}
 
 }
@@ -387,7 +373,7 @@ inline std::size_t nt_read_impl(void* __restrict handle,void* __restrict begin,s
 			size=static_cast<std::size_t>(UINT32_MAX);
 	win32::nt::io_status_block block{};
 	auto const status{win32::nt::nt_read_file<zw>(handle,nullptr,nullptr,nullptr,
-		std::addressof(block), begin, static_cast<std::uint32_t>(size), nullptr, nullptr)};
+		__builtin_addressof(block), begin, static_cast<std::uint32_t>(size), nullptr, nullptr)};
 	if(status)
 		throw_nt_error(status);
 	return block.Information;
@@ -406,7 +392,7 @@ inline std::size_t nt_write_impl(void* __restrict handle,void const* __restrict 
 				to_write_this_round=static_cast<std::uint32_t>(size);
 			win32::nt::io_status_block block{};
 			auto const status{win32::nt::nt_write_file<zw>(handle,nullptr,nullptr,nullptr,
-				std::addressof(block), begin, to_write_this_round, nullptr, nullptr)};
+				__builtin_addressof(block), begin, to_write_this_round, nullptr, nullptr)};
 			if(status)
 				throw_nt_error(status);
 			std::uint32_t number_of_bytes_written{static_cast<std::uint32_t>(block.Information)};
@@ -421,7 +407,7 @@ inline std::size_t nt_write_impl(void* __restrict handle,void const* __restrict 
 	{
 		win32::nt::io_status_block block{};
 		auto const status{win32::nt::nt_write_file<zw>(handle,nullptr,nullptr,nullptr,
-			std::addressof(block), begin, static_cast<std::uint32_t>(size), nullptr, nullptr)};
+			__builtin_addressof(block), begin, static_cast<std::uint32_t>(size), nullptr, nullptr)};
 		if(status)
 			throw_nt_error(status);
 		return block.Information;
@@ -430,10 +416,12 @@ inline std::size_t nt_write_impl(void* __restrict handle,void const* __restrict 
 
 }
 
+#ifndef __CYGWIN__
 namespace details
 {
-inline std::intptr_t my_get_osfhandle(int) noexcept;
+inline void* my_get_osfile_handle(int fd) noexcept;
 }
+#endif
 
 struct nt_at_entry
 {
@@ -441,7 +429,9 @@ struct nt_at_entry
 	void* handle{reinterpret_cast<void*>(static_cast<std::uintptr_t>(-1))};
 	explicit constexpr nt_at_entry() noexcept=default;
 	explicit constexpr nt_at_entry(void* mhandle) noexcept:handle(mhandle){}
-	nt_at_entry(posix_at_entry pate) noexcept:handle(reinterpret_cast<void*>(details::my_get_osfhandle(pate.fd))){}
+#ifndef __CYGWIN__
+	nt_at_entry(posix_at_entry pate) noexcept:handle(details::my_get_osfile_handle(pate.fd)){}
+#endif
 };
 
 template<nt_family family>
@@ -462,8 +452,8 @@ struct nt_fs_dirent
 
 using zw_at_entry=nt_family_at_entry<nt_family::zw>;
 
-template<std::integral ch_type>
-class basic_win32_io_observer;
+template<win32_family family,std::integral ch_type>
+class basic_win32_family_io_observer;
 
 template<nt_family family,std::integral ch_type>
 requires (family==nt_family::nt||family==nt_family::zw)
@@ -485,9 +475,10 @@ public:
 	{
 		return handle!=reinterpret_cast<void*>(static_cast<std::uintptr_t>(-1));
 	}
-	explicit operator basic_win32_io_observer<char_type>() const noexcept
+	template<win32_family family2>
+	explicit operator basic_win32_family_io_observer<family2,char_type>() const noexcept
 	{
-		return basic_win32_io_observer<char_type>{reinterpret_cast<void*>(handle)};
+		return basic_win32_family_io_observer<family2,char_type>{reinterpret_cast<void*>(handle)};
 	}
 	template<nt_family family2>
 	explicit constexpr operator basic_nt_family_io_observer<family2,char_type>() const noexcept
@@ -533,16 +524,16 @@ inline constexpr basic_nt_family_io_observer<family,ch_type> io_value_handle(bas
 	return other;
 }
 
-template<nt_family family,std::integral ch_type,std::contiguous_iterator Iter>
+template<nt_family family,std::integral ch_type,::fast_io::freestanding::contiguous_iterator Iter>
 [[nodiscard]] inline Iter read(basic_nt_family_io_observer<family,ch_type> obs,Iter begin,Iter end)
 {
-	return begin+win32::nt::details::nt_read_impl<family==nt_family::zw>(obs.handle,std::to_address(begin),(end-begin)*sizeof(*begin))/sizeof(*begin);
+	return begin+win32::nt::details::nt_read_impl<family==nt_family::zw>(obs.handle,::fast_io::freestanding::to_address(begin),(end-begin)*sizeof(*begin))/sizeof(*begin);
 }
 
-template<nt_family family,std::integral ch_type,std::contiguous_iterator Iter>
+template<nt_family family,std::integral ch_type,::fast_io::freestanding::contiguous_iterator Iter>
 inline Iter write(basic_nt_family_io_observer<family,ch_type> obs,Iter cbegin,Iter cend)
 {
-	return cbegin+win32::nt::details::nt_write_impl<family==nt_family::zw>(obs.handle,std::to_address(cbegin),(cend-cbegin)*sizeof(*cbegin))/sizeof(*cbegin);
+	return cbegin+win32::nt::details::nt_write_impl<family==nt_family::zw>(obs.handle,::fast_io::freestanding::to_address(cbegin),(cend-cbegin)*sizeof(*cbegin))/sizeof(*cbegin);
 }
 
 template<nt_family family,std::integral ch_type>
@@ -571,8 +562,8 @@ inline std::uint64_t nt_seek64_impl(void* __restrict handle,std::int64_t offset,
 	{
 		std::uint64_t fps{};
 		auto status{win32::nt::nt_query_information_file<zw>(handle,
-			std::addressof(block),
-			std::addressof(fps),
+			__builtin_addressof(block),
+			__builtin_addressof(fps),
 			sizeof(std::uint64_t),
 			win32::nt::file_information_class::FilePositionInformation)};
 		if(status)
@@ -584,8 +575,8 @@ inline std::uint64_t nt_seek64_impl(void* __restrict handle,std::int64_t offset,
 	{
 		win32::nt::file_standard_information fsi;
 		auto status{win32::nt::nt_query_information_file<zw>(handle,
-			std::addressof(block),
-			std::addressof(fsi),
+			__builtin_addressof(block),
+			__builtin_addressof(fsi),
 			sizeof(win32::nt::file_standard_information),
 			win32::nt::file_information_class::FileStandardInformation)};
 		if(status)
@@ -599,8 +590,8 @@ inline std::uint64_t nt_seek64_impl(void* __restrict handle,std::int64_t offset,
 	if(static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max())<file_position)
 		file_position=0;
 	auto status{win32::nt::nt_set_information_file<zw>(handle,
-		std::addressof(block),
-		std::addressof(file_position),
+		__builtin_addressof(block),
+		__builtin_addressof(file_position),
 		sizeof(std::uint64_t),
 		win32::nt::file_information_class::FilePositionInformation)};
 	if(status)
@@ -619,7 +610,7 @@ inline void* nt_dup_impl(void* handle)
 {
 	void* current_process{reinterpret_cast<void*>(static_cast<intptr_t>(-1))};
 	void* new_handle{};
-	auto status{win32::nt::nt_duplicate_object<zw>(current_process,handle,current_process,std::addressof(new_handle),0,0x00000002L,2)};
+	auto status{win32::nt::nt_duplicate_object<zw>(current_process,handle,current_process,__builtin_addressof(new_handle),0,0x00000002L,2)};
 	if(status)
 		throw_nt_error(status);
 	return new_handle;
@@ -640,8 +631,8 @@ inline void nt_truncate_impl(void* handle,std::uintmax_t newfilesizem)
 	std::uint64_t newfilesize{static_cast<std::uint64_t>(newfilesizem)};
 	win32::nt::io_status_block block{};
 	auto status{win32::nt::nt_set_information_file<zw>(handle,
-		std::addressof(block),
-		std::addressof(newfilesize),
+		__builtin_addressof(block),
+		__builtin_addressof(newfilesize),
 		sizeof(std::uint64_t),
 		win32::nt::file_information_class::FileEndOfFileInformation)};
 	if(status)
@@ -671,21 +662,21 @@ public:
 	explicit constexpr basic_nt_family_io_handle() noexcept = default;
 	template<typename native_hd>
 	requires std::same_as<native_handle_type,std::remove_cvref_t<native_hd>>
-	explicit constexpr basic_nt_family_io_handle(native_hd hd) noexcept:basic_nt_family_io_observer<family,ch_type>(hd){}
+	explicit constexpr basic_nt_family_io_handle(native_hd hd) noexcept:basic_nt_family_io_observer<family,ch_type>{hd}{}
 	void reset(native_handle_type newhandle=reinterpret_cast<void*>(static_cast<std::uintptr_t>(-1))) noexcept
 	{
-		if(this->native_handle()!=static_cast<std::uintptr_t>(-1))[[likely]]
-			win32::nt::nt_close<family==nt_family::zw>(this->native_handle());
-		this->native_handle()=newhandle;
+		if(this->handle!=static_cast<std::uintptr_t>(-1))[[likely]]
+			win32::nt::nt_close<family==nt_family::zw>(this->handle);
+		this->handle=newhandle;
 	}
 	void close()
 	{
-		if(this->native_handle()!=reinterpret_cast<void*>(static_cast<std::uintptr_t>(-1)))[[likely]]
+		if(this->handle!=reinterpret_cast<void*>(static_cast<std::uintptr_t>(-1)))[[likely]]
 		{
-			auto status{win32::nt::nt_close<family==nt_family::zw>(this->native_handle())};
+			auto status{win32::nt::nt_close<family==nt_family::zw>(this->handle)};
 			if(status)[[unlikely]]
 				throw_nt_error(status);
-			this->native_handle()=reinterpret_cast<void*>(static_cast<std::uintptr_t>(-1));
+			this->handle=reinterpret_cast<void*>(static_cast<std::uintptr_t>(-1));
 		}
 	}
 	basic_nt_family_io_handle(basic_nt_family_io_handle const& other):basic_nt_family_io_observer<family,ch_type>(win32::nt::details::nt_dup_impl<family==nt_family::zw>(other.handle)){}
@@ -695,15 +686,15 @@ public:
 		return *this;
 	}
 	constexpr basic_nt_family_io_handle(basic_nt_family_io_handle&& b) noexcept:
-		basic_nt_family_io_observer<family,ch_type>(b.release()){}
+		basic_nt_family_io_observer<family,ch_type>{b.handle}{}
 	basic_nt_family_io_handle& operator=(basic_nt_family_io_handle&& b) noexcept
 	{
-		if(std::addressof(b)!=this)
+		if(__builtin_addressof(b)!=this)
 		{
-			if(this->native_handle()!=reinterpret_cast<void*>(static_cast<std::uintptr_t>(-1)))[[likely]]
-				win32::nt::nt_close<family==nt_family::zw>(this->native_handle());
-			this->native_handle() = b.native_handle();
-			b.native_handle()=reinterpret_cast<void*>(static_cast<std::uintptr_t>(-1));
+			if(this->handle!=reinterpret_cast<void*>(static_cast<std::uintptr_t>(-1)))[[likely]]
+				win32::nt::nt_close<family==nt_family::zw>(this->handle);
+			this->handle = b.handle;
+			b.handle=reinterpret_cast<void*>(static_cast<std::uintptr_t>(-1));
 		}
 		return *this;
 	}
@@ -770,8 +761,8 @@ public:
 	basic_nt_family_file& operator=(basic_nt_family_file&&) noexcept=default;
 	~basic_nt_family_file()
 	{
-		if(this->native_handle()!=reinterpret_cast<void*>(static_cast<std::uintptr_t>(-1)))[[likely]]
-			win32::nt::nt_close<family==nt_family::zw>(this->native_handle());
+		if(this->handle!=reinterpret_cast<void*>(static_cast<std::uintptr_t>(-1)))[[likely]]
+			win32::nt::nt_close<family==nt_family::zw>(this->handle);
 	}
 };
 
@@ -803,10 +794,6 @@ using u16nt_file=basic_nt_file<char16_t>;
 using u32nt_io_observer=basic_nt_io_observer<char32_t>;
 using u32nt_io_handle=basic_nt_io_handle<char32_t>;
 using u32nt_file=basic_nt_file<char32_t>;
-
-inline constexpr std::uint32_t nt_stdin_number(static_cast<std::uint32_t>(-10));
-inline constexpr std::uint32_t nt_stdout_number(static_cast<std::uint32_t>(-11));
-inline constexpr std::uint32_t nt_stderr_number(static_cast<std::uint32_t>(-12));
 
 template<std::integral char_type=char>
 inline basic_nt_io_observer<char_type> nt_stdin() noexcept
@@ -855,10 +842,6 @@ using u16zw_file=basic_zw_file<char16_t>;
 using u32zw_io_observer=basic_zw_io_observer<char32_t>;
 using u32zw_io_handle=basic_zw_io_handle<char32_t>;
 using u32zw_file=basic_zw_file<char32_t>;
-
-inline constexpr std::uint32_t zw_stdin_number(static_cast<std::uint32_t>(-10));
-inline constexpr std::uint32_t zw_stdout_number(static_cast<std::uint32_t>(-11));
-inline constexpr std::uint32_t zw_stderr_number(static_cast<std::uint32_t>(-12));
 
 template<std::integral char_type=char>
 inline basic_zw_io_observer<char_type> zw_stdin() noexcept

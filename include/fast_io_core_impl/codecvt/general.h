@@ -52,7 +52,7 @@ encoding_scheme src_encoding=encoding_scheme::execution_charset,
 encoding_scheme encoding=encoding_scheme::execution_charset,
 std::integral src_char_type,std::integral dest_char_type>
 requires (sizeof(src_char_type)<=4 &&sizeof(dest_char_type)<=4)
-inline constexpr code_cvt_result<src_char_type,dest_char_type> general_code_cvt(src_char_type const* src_first,src_char_type const* src_last,dest_char_type* __restrict__ dst) noexcept
+inline constexpr code_cvt_result<src_char_type,dest_char_type> general_code_cvt(src_char_type const* src_first,src_char_type const* src_last,dest_char_type* __restrict dst) noexcept
 {
 	if constexpr(src_encoding==encoding_scheme::execution_charset)
 	{
@@ -161,13 +161,14 @@ https://stackoverflow.com/questions/23919515/how-to-convert-from-utf-16-to-utf-3
 	}
 	else
 	{
-#if __SSE__ && __cpp_lib_is_constant_evaluated>=201811L
+#if (defined(_MSC_VER)&&defined(_M_AMD64)&&!defined(__clang__)) || (defined(__SSE__) && defined(__x86_64__) && __cpp_lib_is_constant_evaluated>=201811L)
 		if constexpr(src_encoding!=encoding_scheme::utf_ebcdic&&encoding!=encoding_scheme::utf_ebcdic&&1==sizeof(src_char_type)
 		&&(1==sizeof(dest_char_type)||encoding_is_utf(encoding)))
 		{
 		if (!std::is_constant_evaluated())
 		{
-		while(sizeof(__m128i) < static_cast<std::size_t>(src_last-src_first))
+		constexpr std::size_t m128i_size{16};
+		while(m128i_size < static_cast<std::size_t>(src_last-src_first))
 		{
 			if (static_cast<char8_t>(*src_first) < 0x80)
 			{
@@ -287,7 +288,7 @@ encoding_scheme src_encoding=encoding_scheme::execution_charset,
 encoding_scheme encoding=encoding_scheme::execution_charset,typename state_type,
 std::integral src_char_type,std::integral dest_char_type>
 requires (sizeof(src_char_type)<=4 &&sizeof(dest_char_type)<=4)
-inline constexpr dest_char_type* general_code_cvt(state_type& __restrict__ state,src_char_type const* src_first,src_char_type const* src_last,dest_char_type* __restrict__ dst) noexcept
+inline constexpr dest_char_type* general_code_cvt(state_type& __restrict state,src_char_type const* src_first,src_char_type const* src_last,dest_char_type* __restrict dst) noexcept
 {
 	if constexpr(src_encoding==encoding_scheme::execution_charset)
 	{
@@ -310,7 +311,7 @@ inline constexpr dest_char_type* general_code_cvt(state_type& __restrict__ state
 		if(state.state)
 		{
 			if(src_first==src_last)
-				return {src_first,dst};
+				return dst;
 			char16_t low{state.value};
 			if constexpr(!is_native_scheme(src_encoding))
 				low=byte_swap(low);
@@ -422,12 +423,14 @@ encoding_scheme src_encoding=encoding_scheme::execution_charset,
 encoding_scheme encoding=encoding_scheme::execution_charset,
 std::integral src_char_type,std::integral dest_char_type>
 requires (sizeof(src_char_type)<=4 &&sizeof(dest_char_type)<=4)
-inline constexpr dest_char_type* general_code_cvt_full(src_char_type const* src_first,src_char_type const* src_last,dest_char_type* __restrict__ dst) noexcept
+inline constexpr dest_char_type* general_code_cvt_full(src_char_type const* src_first,src_char_type const* src_last,dest_char_type* __restrict dst) noexcept
 {
 	if constexpr(src_encoding==encoding_scheme::execution_charset)
 	{
-		return general_code_cvt_full<get_execution_charset_encoding_scheme<src_char_type>(src_encoding),
-			get_execution_charset_encoding_scheme<dest_char_type>(encoding)>(src_first,src_last,dst);
+		constexpr auto src_scheme = get_execution_charset_encoding_scheme<src_char_type>(src_encoding);
+		constexpr auto dst_scheme = get_execution_charset_encoding_scheme<dest_char_type>(encoding);
+		return general_code_cvt_full<src_scheme,
+			dst_scheme>(src_first,src_last,dst);
 	}
 	else
 	{
@@ -463,25 +466,35 @@ struct code_cvt_t
 	basic_io_scatter_t<char_type> reference;
 };
 
-template<
-encoding_scheme src_scheme=encoding_scheme::execution_charset,
-encoding_scheme dst_scheme=encoding_scheme::execution_charset,
-typename rg>
-constexpr code_cvt_t<encoding_scheme::execution_charset,encoding_scheme::execution_charset,std::ranges::range_value_t<std::remove_cvref_t<rg>>> code_cvt(rg&& t)
-{
-	if constexpr(std::is_array_v<std::remove_cvref_t<rg>>)
-		return {{std::ranges::data(t),std::ranges::size(t)-1}};
-	else
-		return {{std::ranges::data(t),std::ranges::size(t)}};
-}
 
 template<
 encoding_scheme src_scheme=encoding_scheme::execution_charset,
 encoding_scheme dst_scheme=encoding_scheme::execution_charset,
-std::integral char_type>
-constexpr code_cvt_t<encoding_scheme::execution_charset,encoding_scheme::execution_charset,char_type> code_cvt(chvw_t<char_type const*> t) noexcept
+std::integral char_type,std::size_t N>
+constexpr code_cvt_t<src_scheme,dst_scheme,char_type> code_cvt(char_type const (&t)[N])
 {
-	std::basic_string_view<char_type> view(t.reference);
+	return {{t,N-1}};
+}
+
+
+#if __STDC_HOSTED__==1 && (!defined(_GLIBCXX_HOSTED) || _GLIBCXX_HOSTED==1) && !defined(_LIBCPP_VERSION)
+template<
+encoding_scheme src_scheme=encoding_scheme::execution_charset,
+encoding_scheme dst_scheme=encoding_scheme::execution_charset,
+typename rg>
+requires (!std::is_array_v<std::remove_cvref_t<rg>>)
+constexpr code_cvt_t<src_scheme,dst_scheme,std::ranges::range_value_t<std::remove_cvref_t<rg>>> code_cvt(rg&& t)
+{
+	return {{std::ranges::data(t),std::ranges::size(t)}};
+}
+#endif
+template<
+encoding_scheme src_scheme=encoding_scheme::execution_charset,
+encoding_scheme dst_scheme=encoding_scheme::execution_charset,
+std::integral char_type>
+constexpr code_cvt_t<src_scheme,dst_scheme,char_type> code_cvt(chvw_t<char_type const*> t) noexcept
+{
+	::fast_io::freestanding::basic_string_view<char_type> view(t.reference);
 	return {{view.data(),view.size()}};
 }
 
@@ -501,9 +514,9 @@ template<
 encoding_scheme src_scheme=encoding_scheme::execution_charset,
 encoding_scheme dst_scheme=encoding_scheme::execution_charset,
 std::integral src_char_type,
-std::contiguous_iterator Iter>
+::fast_io::freestanding::contiguous_iterator Iter>
 inline constexpr Iter print_reserve_define(
-io_reserve_type_t<std::iter_value_t<Iter>,code_cvt_t<src_scheme,dst_scheme,src_char_type>>,
+io_reserve_type_t<::fast_io::freestanding::iter_value_t<Iter>,code_cvt_t<src_scheme,dst_scheme,src_char_type>>,
 Iter iter,
 code_cvt_t<src_scheme,dst_scheme,src_char_type> v) noexcept
 {

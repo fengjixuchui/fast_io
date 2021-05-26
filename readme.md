@@ -38,37 +38,99 @@ However, they might not work current fast_io since fast_io keeps changing.
 This i18n repo stores the i18n source files.
 https://bitbucket.org/ejsvifq_mabmip/fast_io_i18n
 
-## Online manual
-https://ewindy.gitee.io/fast_io_man
+## Online docs
+https://ewindy.gitee.io/fast_io_rst/index.html
 
 ## Compiler Support
-- GCC 11.
-You can download the latest GCC compiler for windows here. https://bitbucket.org/ejsvifq_mabmip/mingw-gcc/src/master/ 
-For Linux, you can watch this video to help you install the latest GCC easily. https://www.youtube.com/watch?v=qFToZjo2x24
-- VS 19.28.29617
-- Clang 12 with GNU libstdc++, including windows. No Clang with libc++ yet since libc++ has not supported concepts and ranges headers.
-- Clang 12 with msvc stl.
-- Todo: Intel C++ Compiler
+- GCC 11 or GCC 12
+- VS 19.29.29917
+- Clang 13
+
+## C++ standard library support
+
+- GCC libstdc++
+- LLVM libc++
+- MSVC STL
+
+## Architecture Support
+- i686
+- x86_64
+- arm
+- aarch64
+- riscv
+- riscv64
+- powerpc64
+- wasm32-wasi
+- All architectures should work. (Just i do not have time to build all cross-toolchains to test them one by one)
 
 ## Platform Support
-- Windows
+- Windows 10
+- Windows Server 2019
 - Linux
-- BSD platforms (Including FreeBSD, NetBSD, OpenBSD and Mac)
+- BSD platforms (Including FreeBSD, NetBSD, OpenBSD)
+- Apple Darwin (MacOS)
 - Microsoft DOS
+- FreeDOS
 - Barebone (No any operating system.)
 - Cygwin/MSYS2
-- Todo: Webassembly
+- Android
+- Wine
+- ReactOS
+- Windows Runtime
+- Nintendo DS (devkitPro)
+- Webassembly
+- Any other platform (if you want me to support it, tell me, including your own OS)
+
+## Legacy Windows Version Support (need define _WIN32_WINNT and _WIN32_WINDOWS version by yourself)
+- Microsoft Memphis
+- Windows 98 FE
+- Windows 98 SE
+- Windows ME
+- Microsoft Neptune
+- Windows NT
+- Windows 2000
+- Windows Whistler
+- Windows XP
+- Windows Server 2003
+- Windows Longhorn
+- Windows Vista
+- Windows Server 2008
+- Windows 7
+- Windows 8
+- Windows 8.1
+- Windows Server 2012
+- Windows Server 2015
+
+## Legacy Windows Version Support with DJGPP toolchain
+- Windows 1.0
+- Windows 2.0
+- Windows 3.0
+- Windows 3.1
+- Microsoft Chicago
+- Windows 95
+- Windows 95 Plus!
+- Microsoft Memphis
+- Windows 98 FE
+- Windows 98 SE
+- Windows ME
 
 ## Supported libc FILE* hacks platforms
 - glibc
 - MSVCRT
 - Universal CRT
-- BSD libc
+- Wine's Emulated MSVCRT
+- Wine's Emulated UCRT
+- ReactOS Emulated MSVCRT
+- ReactOS Emulated UCRT
+- BSD libc/Apple Darwin
 - MUSL libc
-- MSDOS CRT
-- Newlib (Compilation success. Luckily newlib shares the same code as BSD libc. However, we still need to test on a bare bone operating system.)
-- To do (before we supported them, they will be emulated with POSIX apis):
-- Bionic
+- DJGPP
+- Newlib
+- Bionic(Android)
+- uclibc-ng
+- wasi libc
+- mlibc (this is a new libc which still contains a lot of bugs currently)
+- Todo list: avr-libc ??
 
 ## Supported C++ standard library std::streambuf/std::filebuf hacks platforms
 - GCC libstdc++
@@ -77,6 +139,7 @@ For Linux, you can watch this video to help you install the latest GCC easily. h
 
 ## Special Support
 - LLVM Address Sanitizer
+- Full freestanding support (which means we do not have any headers besides freestanding headers. Tested with GCC's --disable-hosted-libstdcxx without any libc, including newlib)
 
 ## Design Goal
 

@@ -6,7 +6,7 @@ namespace fast_io
 namespace details
 {
 
-inline constexpr void U64TO8(std::byte *p, std::uint64_t v) {
+inline constexpr void U64TO8(std::byte *p, std::uint64_t v) noexcept {
 	p[0] = static_cast<std::byte>((v      ) & 0xff);
 	p[1] = static_cast<std::byte>((v >>  8) & 0xff);
 	p[2] = static_cast<std::byte>((v >> 16) & 0xff);
@@ -16,7 +16,7 @@ inline constexpr void U64TO8(std::byte *p, std::uint64_t v) {
 	p[6] = static_cast<std::byte>((v >> 48) & 0xff);
 	p[7] = static_cast<std::byte>((v >> 56) & 0xff);
 }
-inline constexpr std::uint64_t U8TO64(std::byte const *p) {
+inline constexpr std::uint64_t U8TO64(std::byte const *p) noexcept {
 	return
 		(((std::uint64_t)(std::to_integer<std::uint64_t>(p[0]))      ) |
 		(( std::uint64_t)(std::to_integer<std::uint64_t>(p[1])) <<  8) |
@@ -64,7 +64,7 @@ inline constexpr std::uint64_t U8TO64(std::byte const *p) {
 struct poly1305
 {
 	inline static constexpr std::size_t block_size = 16;
-	using key_type = std::array<std::byte,block_size>;
+	using key_type = ::fast_io::freestanding::array<std::byte,block_size>;
 	key_type key;
 	struct poly1305_state_internal_t {
 		std::uint64_t r[3];
@@ -74,14 +74,14 @@ struct poly1305
 		unsigned char buffer[block_size];
 		unsigned char final;
 	} internal_state;
-	std::array<unsigned char, 16> mac;
+	::fast_io::freestanding::array<unsigned char, 16> mac;
 	poly1305(std::span<std::byte const> init_key)
 	{
 		key_type key = {};
 		if (init_key.size()>32) {
-			memcpy(key.data(),init_key.data(),32);
+			::fast_io::details::my_memcpy(key.data(),init_key.data(),32);
 		} else {
-			memcpy(key.data(),init_key.data(),init_key.size());
+			::fast_io::details::my_memcpy(key.data(),init_key.data(),init_key.size());
 		}
 		poly1305_state_internal_t *st = &internal_state;
 		std::uint64_t t0,t1;
@@ -106,7 +106,7 @@ struct poly1305
 		st->leftover = 0;
 		st->final = 0;
 	}
-	poly1305(std::string_view key):poly1305(std::as_bytes(std::span{key.data(),key.size()})){}
+	poly1305(::fast_io::freestanding::string_view key):poly1305(std::as_bytes(std::span{key.data(),key.size()})){}
 	std::size_t block_init(std::span<std::byte,block_size> sp)
 	{
 		return 0;
@@ -182,8 +182,8 @@ struct poly1305
 		std::uint64_t t0,t1;
 
 		// pad zero and process last block
-		std::array<std::byte, block_size> block_padded = {};
-		memcpy(block_padded.data(), final_block.data(), final_block.size());
+		::fast_io::freestanding::array<std::byte, block_size> block_padded = {};
+		::fast_io::details::my_memcpy(block_padded.data(), final_block.data(), final_block.size());
 		(*this)(std::span<std::byte const,block_size>(block_padded));
 
 		/* fully carry h */
@@ -237,7 +237,7 @@ inline constexpr std::size_t print_reserve_size(io_reserve_type_t<char_type,poly
 	return 32;
 }
 
-template<std::integral char_type,std::random_access_iterator caiter>
+template<std::integral char_type,::fast_io::freestanding::random_access_iterator caiter>
 inline constexpr caiter print_reserve_define(io_reserve_type_t<char_type,poly1305>,caiter iter,auto& i)
 {
 	auto to_hex([](unsigned char ch){return ch>=10?ch-10+'A':ch+'0';});

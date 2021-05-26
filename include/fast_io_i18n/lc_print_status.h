@@ -350,7 +350,7 @@ inline constexpr void lc_print_fallback(basic_lc_all<typename output::char_type>
 		||lc_scatter_printable<char_type,Args>
 		)&&...))
 	{
-		std::array<io_scatter_t,sizeof...(Args)+static_cast<std::size_t>(ln)> scatters;
+		::fast_io::freestanding::array<io_scatter_t,sizeof...(Args)+static_cast<std::size_t>(ln)> scatters;
 		if constexpr(((scatter_printable<char_type,Args>||lc_scatter_printable<char_type,Args>)&&...))
 		{
 			lc_scatter_print_recursive(lc,scatters.data(),args...);
@@ -359,19 +359,19 @@ inline constexpr void lc_print_fallback(basic_lc_all<typename output::char_type>
 				if constexpr(std::same_as<char_type,char>)
 				{
 					char_type ch('\n');
-					scatters.back()={std::addressof(ch),sizeof(ch)};
+					scatters.back()={__builtin_addressof(ch),sizeof(ch)};
 					scatter_write(out,{scatters.data(),scatters.size()});
 				}
 				else if constexpr(std::same_as<char_type,wchar_t>)
 				{
 					char_type ch(L'\n');
-					scatters.back()={std::addressof(ch),sizeof(ch)};
+					scatters.back()={__builtin_addressof(ch),sizeof(ch)};
 					scatter_write(out,{scatters.data(),scatters.size()});
 				}
 				else
 				{
 					char_type ch(u8'\n');
-					scatters.back()={std::addressof(ch),sizeof(ch)};
+					scatters.back()={__builtin_addressof(ch),sizeof(ch)};
 					scatter_write(out,{scatters.data(),scatters.size()});
 				}
 			}
@@ -380,7 +380,7 @@ inline constexpr void lc_print_fallback(basic_lc_all<typename output::char_type>
 		}
 		else
 		{
-			std::array<char_type,calculate_scatter_reserve_size<char_type,Args...>()> array;
+			::fast_io::freestanding::array<char_type,calculate_scatter_reserve_size<char_type,Args...>()> array;
 			local_operator_new_array_ptr<char_type> new_ptr(calculate_lc_scatter_dynamic_reserve_size<char_type>(lc,args...));
 			lc_scatter_print_with_dynamic_reserve_recursive(lc,scatters.data(),array.data(),new_ptr.ptr,args...);
 			if constexpr(ln)
@@ -388,19 +388,19 @@ inline constexpr void lc_print_fallback(basic_lc_all<typename output::char_type>
 				if constexpr(std::same_as<char_type,char>)
 				{
 					char_type ch('\n');
-					scatters.back()={std::addressof(ch),sizeof(ch)};
+					scatters.back()={__builtin_addressof(ch),sizeof(ch)};
 					scatter_write(out,{scatters.data(),scatters.size()});
 				}
 				else if constexpr(std::same_as<char_type,wchar_t>)
 				{
 					char_type ch(L'\n');
-					scatters.back()={std::addressof(ch),sizeof(ch)};
+					scatters.back()={__builtin_addressof(ch),sizeof(ch)};
 					scatter_write(out,{scatters.data(),scatters.size()});
 				}
 				else
 				{
 					char_type ch(u8'\n');
-					scatters.back()={std::addressof(ch),sizeof(ch)};
+					scatters.back()={__builtin_addressof(ch),sizeof(ch)};
 					scatter_write(out,{scatters.data(),scatters.size()});
 				}
 			}

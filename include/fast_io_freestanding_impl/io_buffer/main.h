@@ -15,8 +15,14 @@ struct basic_decorators
 	using internal_type = ch_type;
 	using internal_decorator_type=internaltype;
 	using external_decorator_type=externaltype;
-	[[no_unique_address]] internal_decorator_type internal_decorator;
-	[[no_unique_address]] external_decorator_type external_decorator;
+#if __has_cpp_attribute(no_unique_address) >= 201803
+	[[no_unique_address]]
+#endif
+	internal_decorator_type internal_decorator;
+#if __has_cpp_attribute(no_unique_address) >= 201803
+	[[no_unique_address]]
+#endif
+	external_decorator_type external_decorator;
 };
 
 template<std::integral char_type,typename internaltype,typename externaltype>
@@ -36,27 +42,52 @@ inline constexpr auto external_decorator(basic_decorators<char_type,internaltype
 namespace details
 {
 
-template<typename T,typename decot,std::random_access_iterator Iter>
+template<typename T,typename decot,::fast_io::freestanding::random_access_iterator Iter>
 inline constexpr void write_with_deco(T t,decot deco,Iter first,Iter last,
 	basic_io_buffer_pointers_no_curr<typename T::char_type>& external_buffer,
 	std::size_t buffer_size)
 {
 	using external_char_type = typename T::char_type;
 	using decot_no_cvref_t = std::remove_cvref_t<decot>;
-	if(external_buffer.buffer_begin==nullptr)
+#if 0
+	if constexpr(requires()
 	{
-		std::size_t size{deco_reserve_size(io_reserve_type<external_char_type,decot_no_cvref_t>,deco,buffer_size)};
-		external_buffer.buffer_begin=allocate_iobuf_space<external_char_type>(size);
-		external_buffer.buffer_end=external_buffer.buffer_begin+size;
+		deco_reserve_size(io_reserve_type<external_char_type,decot_no_cvref_t>,deco,first,last)
+	})
+	{
+		for(;first!=last;)
+		{
+			std::size_t this_round{buffer_size};
+			std::size_t diff{static_cast<std::size_t>(last-first)};
+			if(diff<this_round)
+				this_round=diff;
+			std::size_t size{deco_reserve_size(io_reserve_type<external_char_type,decot_no_cvref_t>,deco,first,last)};
+			std::size_t current_buffer_size{external_buffer.buffer_end-external_buffer.buffer_begin};
+			if(current_buffer_size<size)
+			{
+				auto current_ptr{allocate_iobuf_space<external_char_type>(size)};
+				deallocate_iobuf_space(external_buffer.buffer_begin,current_buffer_size);
+			}
+		}
 	}
-	for(auto buffer_begin{external_buffer.buffer_begin};first!=last;)
+	else
+#endif
 	{
-		std::size_t this_round{buffer_size};
-		std::size_t diff{static_cast<std::size_t>(last-first)};
-		if(diff<this_round)
-			this_round=diff;
-		write(t,buffer_begin,deco_reserve_define(io_reserve_type<external_char_type,decot_no_cvref_t>,deco,first,first+this_round,buffer_begin));
-		first+=this_round;
+		if(external_buffer.buffer_begin==nullptr)
+		{
+			std::size_t size{deco_reserve_size(io_reserve_type<external_char_type,decot_no_cvref_t>,deco,buffer_size)};
+			external_buffer.buffer_begin=allocate_iobuf_space<external_char_type>(size);
+			external_buffer.buffer_end=external_buffer.buffer_begin+size;
+		}
+		for(auto buffer_begin{external_buffer.buffer_begin};first!=last;)
+		{
+			std::size_t this_round{buffer_size};
+			std::size_t diff{static_cast<std::size_t>(last-first)};
+			if(diff<this_round)
+				this_round=diff;
+			write(t,buffer_begin,deco_reserve_define(io_reserve_type<external_char_type,decot_no_cvref_t>,deco,first,first+this_round,buffer_begin));
+			first+=this_round;
+		}
 	}
 }
 
@@ -169,16 +200,20 @@ private:
 	{
 		if constexpr((mode&buffer_mode::out)==buffer_mode::out)
 		{
+#if (defined(_MSC_VER)&&_HAS_EXCEPTIONS!=0) || (!defined(_MSC_VER)&&__cpp_exceptions)
 #if __cpp_exceptions
 			try
 			{
 #endif
+#endif
 				close_throw_impl();
+#if (defined(_MSC_VER)&&_HAS_EXCEPTIONS!=0) || (!defined(_MSC_VER)&&__cpp_exceptions)
 #if __cpp_exceptions
 			}
 			catch(...)
 			{
 			}
+#endif
 #endif
 		}
 	}
@@ -290,7 +325,7 @@ public:
 #endif
 	basic_io_buffer& operator=(basic_io_buffer&& other) noexcept requires(std::movable<handle_type>)
 	{
-		if(this==std::addressof(other))
+		if(this==__builtin_addressof(other))
 			return *this;
 		cleanup_impl();
 		ibuffer=other.ibuffer;

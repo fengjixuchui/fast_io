@@ -85,7 +85,7 @@ struct default_ieee754_traits {
 		return std::bit_cast<T>(u);
 #else
 		T x;
-		std::memcpy(&x, &u, sizeof(carrier_uint));
+		::fast_io::details::my_memcpy(&x, &u, sizeof(carrier_uint));
 		return x;
 #endif
 	}
@@ -98,7 +98,7 @@ struct default_ieee754_traits {
 		return std::bit_cast<carrier_uint>(x);
 #else
 		carrier_uint u;
-		std::memcpy(&u, &x, sizeof(carrier_uint));
+		::fast_io::details::my_memcpy(&u, &x, sizeof(carrier_uint));
 		return u;
 #endif
 	}
@@ -273,25 +273,25 @@ namespace detail {
 
 namespace wuint {
 struct uint128 {
-	uint128() = default;
+	constexpr uint128() = default;
 
-#if (defined(__GNUC__) || defined(__clang__)) && defined(__SIZEOF_INT128__) && defined(__x86_64__)
-	unsigned __int128	internal_;
+#if defined(__SIZEOF_INT128__)
+	__uint128_t	internal;
 
 	constexpr uint128(std::uint64_t high, std::uint64_t low) noexcept :
-		internal_{ ((unsigned __int128)low) | (((unsigned __int128)high) << 64) } {}
+		internal{ ((__uint128_t)low) | (((__uint128_t)high) << 64) } {}
 
-	constexpr uint128(unsigned __int128 u) noexcept : internal_{ u } {}
+	constexpr uint128(__uint128_t u) noexcept : internal{ u } {}
 
 	constexpr std::uint64_t high() const noexcept {
-		return std::uint64_t(internal_ >> 64);
+		return std::uint64_t(internal >> 64);
 	}
 	constexpr std::uint64_t low() const noexcept {
-		return std::uint64_t(internal_);
+		return std::uint64_t(internal);
 	}
 
 	uint128& operator+=(std::uint64_t n) & noexcept {
-		internal_ += n;
+		internal += n;
 		return *this;
 	}
 #else
@@ -333,12 +333,12 @@ inline std::uint64_t umul64(std::uint32_t x, std::uint32_t y) noexcept {
 
 // Get 128-bit result of multiplication of two 64-bit unsigned integers
 
-#if defined(_MSC_VER) && !defined(__clang__)
-__declspec(safebuffers)
+#if __has_cpp_attribute(msvc::safebuffers)
+[[msvc::safebuffers]]
 #endif
 inline uint128 umul128(std::uint64_t x, std::uint64_t y) noexcept {
-#if (defined(__GNUC__) || defined(__clang__)) && defined(__SIZEOF_INT128__) && defined(__x86_64__)
-	return (unsigned __int128)(x) * (unsigned __int128)(y);
+#if defined(__SIZEOF_INT128__)
+	return uint128((__uint128_t)(x) * (__uint128_t)(y));
 #elif defined(_MSC_VER) && defined(_M_X64)
 	uint128 result;
 	result.low_ = _umul128(x, y, &result.high_);
@@ -361,12 +361,12 @@ inline uint128 umul128(std::uint64_t x, std::uint64_t y) noexcept {
 #endif
 }
 
-#if defined(_MSC_VER) && !defined(__clang__)
-__declspec(safebuffers)
+#if __has_cpp_attribute(msvc::safebuffers)
+[[msvc::safebuffers]]
 #endif
 inline std::uint64_t umul128_upper64(std::uint64_t x, std::uint64_t y) noexcept {
 #if (defined(__GNUC__) || defined(__clang__)) && defined(__SIZEOF_INT128__) && defined(__x86_64__)
-	auto p = (unsigned __int128)(x) * (unsigned __int128)(y);
+	auto p = (__uint128_t)(x) * (__uint128_t)(y);
 	return std::uint64_t(p >> 64);
 #elif defined(_MSC_VER) && defined(_M_X64)
 	return __umulh(x, y);
@@ -388,8 +388,8 @@ inline std::uint64_t umul128_upper64(std::uint64_t x, std::uint64_t y) noexcept 
 }
 
 // Get upper 64-bits of multiplication of a 64-bit unsigned integer and a 128-bit unsigned integer
-#if defined(_MSC_VER) && !defined(__clang__)
-__declspec(safebuffers)
+#if __has_cpp_attribute(msvc::safebuffers)
+[[msvc::safebuffers]]
 #endif
 inline std::uint64_t umul192_upper64(std::uint64_t x, uint128 y) noexcept {
 	auto g0 = umul128(x, y.high());
@@ -418,8 +418,8 @@ inline std::uint32_t umul96_upper32(std::uint32_t x, std::uint64_t y) noexcept {
 }
 
 // Get middle 64-bits of multiplication of a 64-bit unsigned integer and a 128-bit unsigned integer
-#if defined(_MSC_VER) && !defined(__clang__)
-__declspec(safebuffers)
+#if __has_cpp_attribute(msvc::safebuffers)
+[[msvc::safebuffers]]
 #endif
 inline std::uint64_t umul192_middle64(std::uint64_t x, uint128 y) noexcept {
 	auto g01 = x * y.high();
@@ -485,21 +485,21 @@ template <
 	return int((std::int32_t(e) * c - s) >> shift_amount);
 }
 
-static constexpr std::uint64_t log10_2_fractional_digits{ 0x4d10'4d42'7de7'fbcc };
-static constexpr std::uint64_t log10_4_over_3_fractional_digits{ 0x1ffb'fc2b'bc78'0375 };
-static constexpr std::size_t floor_log10_pow2_shift_amount = 22;
-static constexpr int floor_log10_pow2_input_limit = 1700;
-static constexpr int floor_log10_pow2_minus_log10_4_over_3_input_limit = 1700;
+inline constexpr std::uint64_t log10_2_fractional_digits{ 0x4d10'4d42'7de7'fbcc };
+inline constexpr std::uint64_t log10_4_over_3_fractional_digits{ 0x1ffb'fc2b'bc78'0375 };
+inline constexpr std::size_t floor_log10_pow2_shift_amount = 22;
+inline constexpr int floor_log10_pow2_input_limit = 1700;
+inline constexpr int floor_log10_pow2_minus_log10_4_over_3_input_limit = 1700;
 
-static constexpr std::uint64_t log2_10_fractional_digits{ 0x5269'e12f'346e'2bf9 };
-static constexpr std::size_t floor_log2_pow10_shift_amount = 19;
-static constexpr int floor_log2_pow10_input_limit = 1233;
+inline constexpr std::uint64_t log2_10_fractional_digits{ 0x5269'e12f'346e'2bf9 };
+inline constexpr std::size_t floor_log2_pow10_shift_amount = 19;
+inline constexpr int floor_log2_pow10_input_limit = 1233;
 
-static constexpr std::uint64_t log5_2_fractional_digits{ 0x6e40'd1a4'143d'cb94 };
-static constexpr std::uint64_t log5_3_fractional_digits{ 0xaebf'4791'5d44'3b24 };
-static constexpr std::size_t floor_log5_pow2_shift_amount = 20;
-static constexpr int floor_log5_pow2_input_limit = 1492;
-static constexpr int floor_log5_pow2_minus_log5_3_input_limit = 2427;
+inline constexpr std::uint64_t log5_2_fractional_digits{ 0x6e40'd1a4'143d'cb94 };
+inline constexpr std::uint64_t log5_3_fractional_digits{ 0xaebf'4791'5d44'3b24 };
+inline constexpr std::size_t floor_log5_pow2_shift_amount = 20;
+inline constexpr int floor_log5_pow2_input_limit = 1492;
+inline constexpr int floor_log5_pow2_minus_log5_3_input_limit = 2427;
 
 // For constexpr computation
 // Returns -1 when n = 0
@@ -2106,60 +2106,60 @@ struct compressed : base {
 
 namespace policy {
 namespace sign {
-static constexpr auto ignore = detail::policy_impl::sign::ignore{};
-static constexpr auto return_sign = detail::policy_impl::sign::return_sign{};
+inline constexpr auto ignore = detail::policy_impl::sign::ignore{};
+inline constexpr auto return_sign = detail::policy_impl::sign::return_sign{};
 }
 
 namespace trailing_zero {
-static constexpr auto ignore = detail::policy_impl::trailing_zero::ignore{};
-static constexpr auto remove = detail::policy_impl::trailing_zero::remove{};
-static constexpr auto report = detail::policy_impl::trailing_zero::report{};
+inline constexpr auto ignore = detail::policy_impl::trailing_zero::ignore{};
+inline constexpr auto remove = detail::policy_impl::trailing_zero::remove{};
+inline constexpr auto report = detail::policy_impl::trailing_zero::report{};
 }
 
 namespace rounding_mode {
-static constexpr auto nearest_to_even =
+inline constexpr auto nearest_to_even =
 detail::policy_impl::rounding_mode::nearest_to_even{};
-static constexpr auto nearest_to_odd =
+inline constexpr auto nearest_to_odd =
 detail::policy_impl::rounding_mode::nearest_to_odd{};
-static constexpr auto nearest_toward_plus_infinity =
+inline constexpr auto nearest_toward_plus_infinity =
 detail::policy_impl::rounding_mode::nearest_toward_plus_infinity{};
-static constexpr auto nearest_toward_minus_infinity =
+inline constexpr auto nearest_toward_minus_infinity =
 detail::policy_impl::rounding_mode::nearest_toward_minus_infinity{};
-static constexpr auto nearest_toward_zero =
+inline constexpr auto nearest_toward_zero =
 detail::policy_impl::rounding_mode::nearest_toward_zero{};
-static constexpr auto nearest_away_from_zero =
+inline constexpr auto nearest_away_from_zero =
 detail::policy_impl::rounding_mode::nearest_away_from_zero{};
 
-static constexpr auto nearest_to_even_static_boundary =
+inline constexpr auto nearest_to_even_static_boundary =
 detail::policy_impl::rounding_mode::nearest_to_even_static_boundary{};
-static constexpr auto nearest_to_odd_static_boundary =
+inline constexpr auto nearest_to_odd_static_boundary =
 detail::policy_impl::rounding_mode::nearest_to_odd_static_boundary{};
-static constexpr auto nearest_toward_plus_infinity_static_boundary =
+inline constexpr auto nearest_toward_plus_infinity_static_boundary =
 detail::policy_impl::rounding_mode::nearest_toward_plus_infinity_static_boundary{};
-static constexpr auto nearest_toward_minus_infinity_static_boundary =
+inline constexpr auto nearest_toward_minus_infinity_static_boundary =
 detail::policy_impl::rounding_mode::nearest_toward_minus_infinity_static_boundary{};
 
-static constexpr auto toward_plus_infinity =
+inline constexpr auto toward_plus_infinity =
 detail::policy_impl::rounding_mode::toward_plus_infinity{};
-static constexpr auto toward_minus_infinity =
+inline constexpr auto toward_minus_infinity =
 detail::policy_impl::rounding_mode::toward_minus_infinity{};
-static constexpr auto toward_zero =
+inline constexpr auto toward_zero =
 detail::policy_impl::rounding_mode::toward_zero{};
-static constexpr auto away_from_zero =
+inline constexpr auto away_from_zero =
 detail::policy_impl::rounding_mode::away_from_zero{};
 }
 
 namespace correct_rounding {
-static constexpr auto do_not_care = detail::policy_impl::correct_rounding::do_not_care{};
-static constexpr auto to_even = detail::policy_impl::correct_rounding::to_even{};
-static constexpr auto to_odd = detail::policy_impl::correct_rounding::to_odd{};
-static constexpr auto away_from_zero = detail::policy_impl::correct_rounding::away_from_zero{};
-static constexpr auto toward_zero = detail::policy_impl::correct_rounding::toward_zero{};
+inline constexpr auto do_not_care = detail::policy_impl::correct_rounding::do_not_care{};
+inline constexpr auto to_even = detail::policy_impl::correct_rounding::to_even{};
+inline constexpr auto to_odd = detail::policy_impl::correct_rounding::to_odd{};
+inline constexpr auto away_from_zero = detail::policy_impl::correct_rounding::away_from_zero{};
+inline constexpr auto toward_zero = detail::policy_impl::correct_rounding::toward_zero{};
 }
 
 namespace cache {
-static constexpr auto normal = detail::policy_impl::cache::normal{};
-static constexpr auto compressed = detail::policy_impl::cache::compressed{};
+inline constexpr auto normal = detail::policy_impl::cache::normal{};
+inline constexpr auto compressed = detail::policy_impl::cache::compressed{};
 }
 
 }
@@ -2243,8 +2243,8 @@ static constexpr int shorter_interval_tie_upper_threshold =
 
 template <class ReturnType, class IntervalTypeProvider, class SignPolicy,
 class TrailingZeroPolicy, class CorrectRoundingPolicy, class CachePolicy>
-#if defined(_MSC_VER) && !defined(__clang__)
-__declspec(safebuffers)
+#if __has_cpp_attribute(msvc::safebuffers)
+[[msvc::safebuffers]]
 #endif
 inline static ReturnType compute_nearest(ieee754_bits<Float> const br) noexcept
 {
@@ -2517,8 +2517,8 @@ else
 }
 
 template <class ReturnType, class SignPolicy, class TrailingZeroPolicy, class CachePolicy>
-#ifdef _MSC_VER
-__declspec(safebuffers)
+#if __has_cpp_attribute(msvc::safebuffers)
+[[msvc::safebuffers]]
 #endif
  static ReturnType
 compute_left_closed_directed(ieee754_bits<Float> const br) noexcept
@@ -2609,8 +2609,8 @@ return ret_value;
 
 template <class ReturnType, class SignPolicy, class TrailingZeroPolicy, class CachePolicy>
 
-#if defined(_MSC_VER) && !defined(__clang__)
-__declspec(safebuffers)
+#if __has_cpp_attribute(msvc::safebuffers)
+[[msvc::safebuffers]]
 #endif
  static ReturnType
 compute_right_closed_directed(ieee754_bits<Float> const br) noexcept
@@ -3138,11 +3138,13 @@ return convert_to_policy_holder(policy_pair_list{});
 ////////////////////////////////////////////////////////////////////////////////////////
 
 template <class Float, class... Policies>
-#if defined(_MSC_VER) && !defined(__clang__)
-__declspec(safebuffers)
+#if __has_cpp_attribute(msvc::safebuffers)
+[[msvc::safebuffers]]
 #endif
-#if defined(__GNUC__) || defined(__clang__)
+#if __has_cpp_attribute(gnu::always_inline)
 [[gnu::always_inline]]
+#elif __has_cpp_attribute(msvc::forceinline)
+[[msvc::forceinline]]
 #endif
 inline auto to_decimal(Float x, Policies... policies)
 {

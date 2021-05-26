@@ -10,7 +10,7 @@ public:
 	using char_type = ch_type;
 	char_type *begin_ptr{},*curr_ptr{},*end_ptr{};
 	constexpr basic_omemory_map() = default;
-	basic_omemory_map(native_memory_map_io_observer iob,std::size_t offset=0):begin_ptr(reinterpret_cast<char_type*>(iob.address_begin+offset)),curr_ptr(begin_ptr),end_ptr(begin_ptr+iob.bytes()/sizeof(char_type)){}
+	constexpr basic_omemory_map(native_memory_map_file const& iob,std::size_t offset=0):begin_ptr(reinterpret_cast<char_type*>(iob.address_begin+offset)),curr_ptr(begin_ptr),end_ptr(begin_ptr+iob.size()/sizeof(char_type)){}
 
 	constexpr std::size_t written_bytes() const noexcept
 	{
@@ -32,10 +32,10 @@ inline constexpr void omemory_map_write_impl(basic_omemory_map<char_type>& bomp,
 }
 }
 
-template<std::integral char_type,std::contiguous_iterator Iter>
+template<std::integral char_type,::fast_io::freestanding::contiguous_iterator Iter>
 constexpr void write(basic_omemory_map<char_type>& bomp,Iter begin,Iter end) noexcept
 {
-	details::omemory_map_write_impl(bomp,std::to_address(begin),std::to_address(end));
+	details::omemory_map_write_impl(bomp,::fast_io::freestanding::to_address(begin),::fast_io::freestanding::to_address(end));
 }
 
 template<std::integral char_type>
@@ -55,7 +55,7 @@ constexpr char_type* obuffer_end(basic_omemory_map<char_type>& bomp) noexcept
 }
 
 template<std::integral char_type>
-constexpr void overflow(basic_omemory_map<char_type>&,char_type) noexcept
+constexpr void obuffer_overflow(basic_omemory_map<char_type>&,char_type) noexcept
 {
 	fast_terminate();
 }
@@ -67,7 +67,7 @@ constexpr void obuffer_set_curr(basic_omemory_map<char_type>& bomp,char_type* pt
 }
 
 template<std::integral char_type>
-constexpr void overflow_never(basic_omemory_map<char_type>&) noexcept{}
+constexpr void obuffer_obuffer_overflow_never(basic_omemory_map<char_type>&) noexcept{}
 
 using omemory_map = basic_omemory_map<char>;
 
@@ -78,10 +78,10 @@ public:
 	using char_type = ch_type;
 	char_type *begin_ptr{},*curr_ptr{},*end_ptr{};
 	constexpr basic_imemory_map() = default;
-	basic_imemory_map(native_memory_map_io_observer iob,std::size_t offset=0):begin_ptr(reinterpret_cast<char_type*>(iob.address_begin+offset)),curr_ptr(this->begin_ptr),end_ptr(this->begin_ptr+iob.bytes()/sizeof(char_type)){}
+	constexpr basic_imemory_map(native_memory_map_file const& iob,std::size_t offset=0):begin_ptr(reinterpret_cast<char_type*>(iob.address_begin+offset)),curr_ptr(this->begin_ptr),end_ptr(this->begin_ptr+iob.size()/sizeof(char_type)){}
 };
 
-template<std::integral char_type,std::contiguous_iterator Iter>
+template<std::integral char_type,::fast_io::freestanding::contiguous_iterator Iter>
 constexpr Iter read(basic_imemory_map<char_type>& bomp,Iter begin,Iter end) noexcept
 {
 	std::size_t to_read(end-begin);
@@ -110,7 +110,7 @@ constexpr char_type* ibuffer_end(basic_imemory_map<char_type>& bomp) noexcept
 }
 
 template<std::integral char_type>
-constexpr bool underflow(basic_imemory_map<char_type>&) noexcept
+constexpr bool ibuffer_underflow(basic_imemory_map<char_type>&) noexcept
 {
 	return false;
 }
@@ -122,7 +122,7 @@ constexpr void ibuffer_set_curr(basic_imemory_map<char_type>& bomp,char_type* pt
 }
 
 template<std::integral char_type>
-constexpr void underflow_forever_false(basic_imemory_map<char_type>&) noexcept{}
+constexpr void ibuffer_underflow_never(basic_imemory_map<char_type>&) noexcept{}
 
 using imemory_map = basic_imemory_map<char>;
 

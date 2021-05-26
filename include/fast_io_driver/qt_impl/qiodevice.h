@@ -89,18 +89,18 @@ inline std::uintmax_t qio_device_seek_impl(QIODevice* __restrict qdevice,std::in
 
 }
 
-template<std::integral ch_type,typename T,std::contiguous_iterator Iter>
+template<std::integral ch_type,typename T,::fast_io::freestanding::contiguous_iterator Iter>
 inline Iter write(basic_general_qdevice_io_observer<ch_type,T> qiob,Iter begin,Iter end)
 {
-	return begin+details::qio_device_write_impl(qiob.qdevice,std::to_address(begin),
-		(std::to_address(end)-std::to_address(begin))*sizeof(*begin))/sizeof(*begin);
+	return begin+details::qio_device_write_impl(qiob.qdevice,::fast_io::freestanding::to_address(begin),
+		(::fast_io::freestanding::to_address(end)-::fast_io::freestanding::to_address(begin))*sizeof(*begin))/sizeof(*begin);
 }
 
-template<std::integral ch_type,typename T,std::contiguous_iterator Iter>
+template<std::integral ch_type,typename T,::fast_io::freestanding::contiguous_iterator Iter>
 inline Iter read(basic_general_qdevice_io_observer<ch_type,T> qiob,Iter begin,Iter end)
 {
-	return begin+details::qio_device_read_impl(qiob.qdevice,std::to_address(begin),
-		(std::to_address(end)-std::to_address(begin))*sizeof(*begin))/sizeof(*begin);
+	return begin+details::qio_device_read_impl(qiob.qdevice,::fast_io::freestanding::to_address(begin),
+		(::fast_io::freestanding::to_address(end)-::fast_io::freestanding::to_address(begin))*sizeof(*begin))/sizeof(*begin);
 }
 
 template<std::integral ch_type,typename T>
@@ -146,17 +146,13 @@ inline constexpr posix_at_entry at(basic_general_qdevice_io_observer<T,ch_type> 
 }
 
 using qiodevice_io_observer = basic_qiodevice_io_observer<char>;
-#ifndef __MSDOS__
 using wqiodevice_io_observer = basic_qiodevice_io_observer<wchar_t>;
-#endif
 using u8qiodevice_io_observer = basic_qiodevice_io_observer<char8_t>;
 using u16qiodevice_io_observer = basic_qiodevice_io_observer<char16_t>;
 using u32qiodevice_io_observer = basic_qiodevice_io_observer<char32_t>;
 
 using qt_io_observer = basic_qt_io_observer<char>;
-#ifndef __MSDOS__
 using wqt_io_observer = basic_qt_io_observer<wchar_t>;
-#endif
 using u8qt_io_observer = basic_qt_io_observer<char8_t>;
 using u16qt_io_observer = basic_qt_io_observer<char16_t>;
 using u32qt_io_observer = basic_qt_io_observer<char32_t>;
