@@ -1,6 +1,6 @@
 #pragma once
 
-#if defined(__WINNT__) || defined(_MSC_VER) || defined(__MSDOS__)
+#if defined(_WIN32) || defined(__MSDOS__)
 #include<io.h>
 #include<sys/stat.h>
 #include<sys/types.h>
@@ -1188,8 +1188,8 @@ public:
 		throw_posix_error(ENOTSUP);
 #else
 		::fast_io::freestanding::array<int,2> a2{pipes.front().fd,pipes.back().fd};
-#if defined(__WINNT__) || defined(_MSC_VER)
-		if(_pipe(a2.data(),1048576,_O_BINARY)==-1)
+#if defined(_WIN32)
+		if(noexcept_call(_pipe,a2.data(),1048576,_O_BINARY)==-1)
 #else
 		if(::pipe(a2.data())==-1)
 #endif
@@ -1312,10 +1312,22 @@ inline std::conditional_t<report_einval,std::pair<std::size_t,bool>,std::size_t>
 	zero_copy_transmit_once(output& outp,input& inp,std::size_t bytes,std::intmax_t offset)
 {
 #ifdef __linux__
+	if constexpr(sizeof(std::intmax_t)>sizeof(std::int64_t))
+	{
+		if(offset<static_cast<std::intmax_t>(std::numeric_limits<std::int64_t>::min())&&
+			static_cast<std::intmax_t>(std::numeric_limits<std::int64_t>::max())<offset)
+			throw_posix_error(EINVAL);
+	}
 	std::intmax_t *np{};
 	if constexpr(random_access)
 		np=__builtin_addressof(offset);
-	std::ptrdiff_t transmitted_bytes{system_call<__NR_sendfile,std::ptrdiff_t>(zero_copy_out_handle(outp),zero_copy_in_handle(inp),np,bytes)};
+	std::ptrdiff_t transmitted_bytes{system_call<
+#if defined(__NR_sendfile64)
+__NR_sendfile64
+#else
+__NR_sendfile
+#endif
+,std::ptrdiff_t>(zero_copy_out_handle(outp),zero_copy_in_handle(inp),np,bytes)};
 	if(static_cast<std::size_t>(transmitted_bytes)+static_cast<std::size_t>(4096)<static_cast<std::size_t>(4096))
 	{
 		if constexpr(report_einval)
