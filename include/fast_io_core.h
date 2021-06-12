@@ -49,6 +49,8 @@
 #include"fast_io_core_impl/compare.h"
 #endif
 
+#include"fast_io_core_impl/alias.h"
+
 #include"fast_io_core_impl/secure_clear_guard.h"
 #include"fast_io_core_impl/local_new_array_ptr.h"
 #include"fast_io_core_impl/dynamic_io_buffer.h"
@@ -60,7 +62,6 @@
 
 #include"fast_io_core_impl/igenerator.h"
 #include"fast_io_core_impl/io_ref.h"
-#include"fast_io_core_impl/print_scan.h"
 #include"fast_io_core_impl/print_freestanding.h"
 #include"fast_io_core_impl/scan_transmit/scan_transmit.h"
 
@@ -86,6 +87,8 @@
 #include"fast_io_core_impl/enums/impl.h"
 
 #include"fast_io_core_impl/simd/impl.h"
+
+#include"fast_io_core_impl/integers/sto/sto_contiguous.h"
 
 #if !(defined(FAST_IO_DISABLE_CODECVT)&&(__STDC_HOSTED__==0 || (defined(_GLIBCXX_HOSTED) && _GLIBCXX_HOSTED==0)))
 #include"fast_io_core_impl/codecvt/impl.h"

@@ -65,17 +65,100 @@ inline constexpr decltype(auto) noexcept_call(F* f,Args&& ...args) noexcept
 namespace details
 {
 
-template<std::unsigned_integral U>
-requires (sizeof(U)==1||sizeof(U)==2||sizeof(U)==4||sizeof(U)==8)
+
+template<typename T>
+using my_make_signed_t=
+#ifdef __SIZEOF_INT128__
+std::conditional_t<
+std::same_as<std::remove_cv_t<T>,__int128_t>||std::same_as<std::remove_cv_t<T>,__uint128_t>,
+std::conditional_t<std::same_as<std::remove_cv_t<T>,__int128_t>,T,
+std::conditional_t<std::same_as<T,__uint128_t volatile const>,__int128_t volatile const,
+std::conditional_t<std::same_as<T,__uint128_t const>,__int128_t const,
+std::conditional_t<std::same_as<T,__uint128_t volatile>,__int128_t volatile,
+__int128_t>>>>,
+std::make_signed_t<std::conditional_t<std::same_as<std::remove_cv_t<T>,__int128_t>||std::same_as<std::remove_cv_t<T>,__uint128_t>,int,T>>>;
+#else
+std::make_signed_t<T>;
+#endif
+template<typename T>
+using my_make_unsigned_t=
+#ifdef __SIZEOF_INT128__
+std::conditional_t<
+std::same_as<std::remove_cv_t<T>,__int128_t>||std::same_as<std::remove_cv_t<T>,__uint128_t>,
+std::conditional_t<std::same_as<std::remove_cv_t<T>,__uint128_t>,T,
+std::conditional_t<std::same_as<T,__int128_t volatile const>,__uint128_t volatile const,
+std::conditional_t<std::same_as<T,__int128_t const>,__uint128_t const,
+std::conditional_t<std::same_as<T,__int128_t volatile>,__uint128_t volatile,
+__uint128_t>>>>,
+std::make_unsigned_t<std::conditional_t<std::same_as<std::remove_cv_t<T>,__int128_t>||std::same_as<std::remove_cv_t<T>,__uint128_t>,int,T>>>;
+#else
+std::make_unsigned_t<T>;
+#endif
+
+template<typename T>
+concept my_integral = 
+std::integral<T>
+#ifdef __SIZEOF_INT128__
+||std::same_as<std::remove_cv_t<T>,__uint128_t>||std::same_as<std::remove_cv_t<T>,__int128_t>
+#endif
+;
+
+template<typename T>
+concept my_signed_integral = 
+std::signed_integral<T>
+#ifdef __SIZEOF_INT128__
+||std::same_as<std::remove_cv_t<T>,__int128_t>
+#endif
+;
+template<typename T>
+concept my_unsigned_integral = my_integral<T>&&!my_signed_integral<T>;
+
+#ifdef __SIZEOF_INT128__ 
+inline constexpr __uint128_t calculate_byteswap_ff(std::size_t v) noexcept
+{
+	return static_cast<__uint128_t>(0xff)<<(v*8);
+}
+template<std::size_t v>
+inline constexpr __uint128_t uint128_t_bsv{calculate_byteswap_ff(v)};
+#endif
+
+template<typename U>
+requires (sizeof(U)==1||sizeof(U)==2||sizeof(U)==4||sizeof(U)==8
+#ifdef __SIZEOF_INT128__ 
+||sizeof(U)==16
+#endif
+)
 inline constexpr U byte_swap_naive_impl(U a) noexcept
 {
+#ifdef __SIZEOF_INT128__
+	if constexpr(sizeof(U)==16)
+	{
+		return  ((a & uint128_t_bsv<15>) >> 120)|
+			((a & uint128_t_bsv<14>) >> 104)|
+			((a & uint128_t_bsv<13>) >> 88) |
+			((a & uint128_t_bsv<12>) >> 72) |
+			((a & uint128_t_bsv<11>) >> 56) |
+			((a & uint128_t_bsv<10>) >> 40) |
+			((a & uint128_t_bsv<9>) >> 24) |
+			((a & uint128_t_bsv<8>) >> 8)  |
+			((a & uint128_t_bsv<7>) << 8)  |
+			((a & uint128_t_bsv<6>) << 24) |
+			((a & uint128_t_bsv<5>) << 40) |
+			((a & uint128_t_bsv<4>) << 56) |
+			((a & uint128_t_bsv<3>) << 72) |
+			((a & uint128_t_bsv<2>) << 88) |
+			((a & uint128_t_bsv<1>) << 104)|
+			((a & uint128_t_bsv<0>) << 120);
+	}
+	else
+#endif
 	if constexpr(sizeof(U)==8)
 	{
 		return  ((a & 0xff00000000000000ULL) >> 56) |
 			((a & 0x00ff000000000000ULL) >> 40) |
 			((a & 0x0000ff0000000000ULL) >> 24) |
 			((a & 0x000000ff00000000ULL) >> 8)  |
-			((a & 0x00000000ff000000ULL) >> 8)  |
+			((a & 0x00000000ff000000ULL) << 8)  |
 			((a & 0x0000000000ff0000ULL) << 24) |
 			((a & 0x000000000000ff00ULL) << 40) |
 			((a & 0x00000000000000ffULL) << 56) ;
@@ -96,15 +179,32 @@ inline constexpr U byte_swap_naive_impl(U a) noexcept
 		return a;
 }
 
-template<std::unsigned_integral U>
-requires (sizeof(U)==1||sizeof(U)==2||sizeof(U)==4||sizeof(U)==8)
+template<typename U>
+requires (sizeof(U)==1||sizeof(U)==2||sizeof(U)==4||sizeof(U)==8
+#ifdef __SIZEOF_INT128__ 
+||sizeof(U)==16
+#endif
+)
 inline constexpr U byte_swap(U a) noexcept
 {
 	if constexpr(sizeof(U)==1)
 		return a;
 	else
 	{
-#if (defined(__GNUG__) || defined(__clang__))
+#if (defined(__GNUC__) || defined(__clang__))
+#ifdef __SIZEOF_INT128__
+	if constexpr(sizeof(U)==16)
+#if __has_builtin(__builtin_bswap128)
+		return __builtin_bswap128(a);
+#else
+	{
+		std::uint64_t high(__builtin_bswap64(static_cast<std::uint64_t>(a>>64)));
+		std::uint64_t low(__builtin_bswap64(static_cast<std::uint64_t>(a)));
+		return (static_cast<__uint128_t>(low)<<64)|static_cast<__uint128_t>(high);
+	}
+#endif
+	else
+#endif
 	if constexpr(sizeof(U)==8)
 		return __builtin_bswap64(a);
 	else if constexpr(sizeof(U)==4)
@@ -136,13 +236,15 @@ inline constexpr U byte_swap(U a) noexcept
 	}
 }
 
-template<std::unsigned_integral U>
+template<my_unsigned_integral U>
 inline constexpr U big_endian(U u) noexcept
 {
-	if constexpr(std::endian::little==std::endian::native)
+	if constexpr(sizeof(U)==1||std::endian::big==std::endian::native)
+		return u;
+	else if constexpr(std::endian::little==std::endian::native)
 		return byte_swap(u);
 	else
-		return u;
+		return byte_swap_naive_impl(u);	//support architectures like PDP11
 }
 
 inline
@@ -230,7 +332,7 @@ inline constexpr output_iter non_overlapped_copy_n(input_iter first,std::size_t 
 		return result+=count;
 	}
 	else
-		::fast_io::freestanding::copy_n(first,count,result);
+		return ::fast_io::freestanding::copy_n(first,count,result);
 	}
 }
 
@@ -322,8 +424,8 @@ inline constexpr output_iter my_copy_backward(input_iter first,input_iter last,o
 	else
 #endif
 	{
-	using input_value_type = typename std::iterator_traits<input_iter>::value_type;
-	using output_value_type = typename std::iterator_traits<output_iter>::value_type;
+	using input_value_type = typename ::fast_io::freestanding::iter_value_t<input_iter>;
+	using output_value_type = typename ::fast_io::freestanding::iter_value_t<output_iter>;
 	if constexpr
 	(::fast_io::freestanding::contiguous_iterator<input_iter>&&
 	::fast_io::freestanding::contiguous_iterator<output_iter>&&
@@ -336,11 +438,49 @@ inline constexpr output_iter my_copy_backward(input_iter first,input_iter last,o
 		std::size_t const count(last-first);
 		d_last-=count;
 		if(count)	//to avoid nullptr UB
-			my_memmove(std::to_address(d_last),std::to_address(first),sizeof(input_value_type)*count);
+			my_memmove(::fast_io::freestanding::to_address(d_last),::fast_io::freestanding::to_address(first),sizeof(input_value_type)*count);
 		return d_last;
 	}
 	else
 		return ::fast_io::freestanding::copy_backward(first,last,d_last);
+	}
+}
+
+
+template<typename range_type>
+inline 
+#if __cpp_lib_is_constant_evaluated >= 201811L && __cpp_lib_bit_cast >= 201806L
+constexpr
+#endif
+void compile_time_type_punning_copy_n(range_type const* first,std::size_t bytes,std::byte* out)
+{
+#if __cpp_lib_is_constant_evaluated >= 201811L && __cpp_lib_bit_cast >= 201806L
+	if(std::is_constant_evaluated())
+	{
+		if constexpr(std::same_as<range_type,std::byte>)
+		{
+			for(auto i{first},e{first+bytes};i!=e;++i)
+			{
+				*out=*i;
+				++out;
+			}
+		}
+		else
+		{
+			auto j{out};
+			auto first_end{first+bytes/sizeof(range_type)};
+			for(auto i{first};i!=first_end;++i)
+			{
+				::fast_io::freestanding::array<std::byte,sizeof(range_type)> arr{std::bit_cast<::fast_io::freestanding::array<std::byte,sizeof(range_type)>>(*i)};
+				j=non_overlapped_copy_n(arr.data(),arr.size(),j);
+			}
+		}
+	}
+	else
+#endif
+	{
+		if(bytes)[[likely]]
+			my_memcpy(out,first,bytes);
 	}
 }
 
@@ -376,53 +516,6 @@ inline constexpr void my_fill(fwd_iter first,fwd_iter last,T value)
 	else
 		::fast_io::freestanding::fill(first,last,value);
 }
-
-template<typename T>
-using my_make_signed_t=
-#ifdef __SIZEOF_INT128__
-std::conditional_t<
-std::same_as<std::remove_cv_t<T>,__int128_t>||std::same_as<std::remove_cv_t<T>,__uint128_t>,
-std::conditional_t<std::same_as<std::remove_cv_t<T>,__int128_t>,T,
-std::conditional_t<std::same_as<T,__uint128_t volatile const>,__int128_t volatile const,
-std::conditional_t<std::same_as<T,__uint128_t const>,__int128_t const,
-std::conditional_t<std::same_as<T,__uint128_t volatile>,__int128_t volatile,
-__int128_t>>>>,
-std::make_signed_t<std::conditional_t<std::same_as<std::remove_cv_t<T>,__int128_t>||std::same_as<std::remove_cv_t<T>,__uint128_t>,int,T>>>;
-#else
-std::make_signed_t<T>;
-#endif
-template<typename T>
-using my_make_unsigned_t=
-#ifdef __SIZEOF_INT128__
-std::conditional_t<
-std::same_as<std::remove_cv_t<T>,__int128_t>||std::same_as<std::remove_cv_t<T>,__uint128_t>,
-std::conditional_t<std::same_as<std::remove_cv_t<T>,__uint128_t>,T,
-std::conditional_t<std::same_as<T,__int128_t volatile const>,__uint128_t volatile const,
-std::conditional_t<std::same_as<T,__int128_t const>,__uint128_t const,
-std::conditional_t<std::same_as<T,__int128_t volatile>,__uint128_t volatile,
-__uint128_t>>>>,
-std::make_unsigned_t<std::conditional_t<std::same_as<std::remove_cv_t<T>,__int128_t>||std::same_as<std::remove_cv_t<T>,__uint128_t>,int,T>>>;
-#else
-std::make_unsigned_t<T>;
-#endif
-
-template<typename T>
-concept my_integral = 
-std::integral<T>
-#ifdef __SIZEOF_INT128__
-||std::same_as<std::remove_cv_t<T>,__uint128_t>||std::same_as<std::remove_cv_t<T>,__int128_t>
-#endif
-;
-
-template<typename T>
-concept my_signed_integral = 
-std::signed_integral<T>
-#ifdef __SIZEOF_INT128__
-||std::same_as<std::remove_cv_t<T>,__int128_t>
-#endif
-;
-template<typename T>
-concept my_unsigned_integral = my_integral<T>&&!my_signed_integral<T>;
 
 template<std::integral char_type,std::size_t n>
 requires(n!=0)
@@ -480,11 +573,7 @@ inline constexpr T compile_time_pow(T base,std::size_t pow) noexcept
 }
 
 template<my_integral T,std::size_t pow>
-inline constexpr auto compile_pow10() noexcept
-{
-	constexpr auto value{compile_time_pow(std::remove_cvref_t<T>(10),pow)};
-	return value;
-}
+inline constexpr T compile_pow10{compile_time_pow(std::remove_cvref_t<T>(10),pow)};
 
 template<my_integral T,std::size_t pow>
 inline constexpr auto compile_pow5() noexcept
@@ -493,28 +582,55 @@ inline constexpr auto compile_pow5() noexcept
 	return value;
 }
 
-template<std::unsigned_integral uint_type>
-inline constexpr auto power10_table_generator() noexcept
-{
-	constexpr std::size_t digits10(std::numeric_limits<uint_type>::digits10+1);
-	::fast_io::freestanding::array<uint_type,digits10> array{};
-	uint_type v{1};
-	for(std::size_t i{1};i!=digits10;++i)
-		array[i]=(v*=static_cast<uint_type>(10));
-	return array;
-}
+#if 0
+inline constexpr std::uint64_t fast_lup_table[]{
+      4294967296,  8589934582,  8589934582,  8589934582,  12884901788,
+      12884901788, 12884901788, 17179868184, 17179868184, 17179868184,
+      21474826480, 21474826480, 21474826480, 21474826480, 25769703776,
+      25769703776, 25769703776, 30063771072, 30063771072, 30063771072,
+      34349738368, 34349738368, 34349738368, 34349738368, 38554705664,
+      38554705664, 38554705664, 41949672960, 41949672960, 41949672960,
+      42949672960, 42949672960};
 
-template<std::unsigned_integral uint_type>
-inline constexpr auto power10table{power10_table_generator<uint_type>()};
+inline constexpr std::uint64_t fast_lup_switch(std::uint32_t value) noexcept
+{
+	switch(value)
+	{
+	case 0:case 1:case 2:case 3:case 4: return 42949672960ULL;
+	case 5:case 6:case 7:return 38554705664ULL;
+	case 8:case 9:case 10:case 11:return 34349738368ULL;
+	case 12:case 13:case 14:return 30063771072ULL;
+	case 15:case 16:case 17:return 25769703776ULL;
+	case 18:case 19:case 20:case 21:return 21474826480ULL;
+	case 22:case 23:case 24:return 17179868184ULL;
+	case 25:case 26:case 27:return 12884901788ULL;
+	case 28:case 29:case 30:return 8589934582ULL;
+	case 31:case 32:return 4294967296ULL;
+	default:
+#if defined(__GNUC__)||defined(__clang__)
+		__builtin_unreachable();
+#endif
+	}
+}
+#endif
 
 template<std::uint32_t base,bool ryu_mode=false,std::size_t mx_size=std::numeric_limits<std::size_t>::max(),my_unsigned_integral U>
 inline constexpr std::uint32_t chars_len(U value) noexcept
 {
 #if 0
-	if constexpr(base==10&&sizeof(U)<=8)
+	if constexpr(base==10&&2<=sizeof(U)&&sizeof(U)<=4&&sizeof(std::size_t)>=8&&!ryu_mode)
 	{
-		std::uint32_t t{static_cast<std::uint32_t>(std::bit_width(static_cast<std::remove_cvref_t<U>>(value|1)))*1233 >> 12};
-		return t-(value<power10table<std::remove_cvref_t<U>>[t]) + 1;
+		return (static_cast<std::uint32_t>(value) + fast_lup_switch(
+#if defined(_MSC_VER) && !defined(__clang__)
+		std::countl_zero(static_cast<std::uint32_t>(value))
+#elif __has_builtin(__builtin_ia32_lzcnt_u32)
+		__builtin_ia32_lzcnt_u32(static_cast<std::uint32_t>(value))
+#elif __has_builtin(__builtin_clz)
+		__builtin_clz(static_cast<std::uint32_t>(value) | 1)
+#else
+		std::countl_zero(static_cast<std::uint32_t>(value))
+#endif
+		)) >> 32;
 	}
 	else
 #endif
@@ -526,62 +642,62 @@ inline constexpr std::uint32_t chars_len(U value) noexcept
 			if constexpr(16<sizeof(M)||!ryu_mode)
 			{
 			if constexpr(39<=mx_size)
-			if(compile_pow10<M,38>()<=value)
+			if(compile_pow10<M,38><=value)
 				return 39;
 			if constexpr(38<=mx_size)
-			if(compile_pow10<M,37>()<=value)
+			if(compile_pow10<M,37><=value)
 				return 38;
 			if constexpr(37<=mx_size)
-			if(compile_pow10<M,36>()<=value)
+			if(compile_pow10<M,36><=value)
 				return 37;
 			}
 			if constexpr(36<=mx_size)
-			if(compile_pow10<M,35>()<=value)
+			if(compile_pow10<M,35><=value)
 				return 36;
 			if constexpr(35<=mx_size)
-			if(compile_pow10<M,34>()<=value)
+			if(compile_pow10<M,34><=value)
 				return 35;
 			if constexpr(34<=mx_size)
-			if(compile_pow10<M,33>()<=value)
+			if(compile_pow10<M,33><=value)
 				return 34;
 			if constexpr(33<=mx_size)
-			if(compile_pow10<M,32>()<=value)
+			if(compile_pow10<M,32><=value)
 				return 33;
 			if constexpr(32<=mx_size)
-			if(compile_pow10<M,31>()<=value)
+			if(compile_pow10<M,31><=value)
 				return 32;
 			if constexpr(31<=mx_size)
-			if(compile_pow10<M,30>()<=value)
+			if(compile_pow10<M,30><=value)
 				return 31;
 			if constexpr(30<=mx_size)
-			if(compile_pow10<M,29>()<=value)
+			if(compile_pow10<M,29><=value)
 				return 30;
 			if constexpr(29<=mx_size)
-			if(compile_pow10<M,28>()<=value)
+			if(compile_pow10<M,28><=value)
 				return 29;
 			if constexpr(28<=mx_size)
-			if(compile_pow10<M,27>()<=value)
+			if(compile_pow10<M,27><=value)
 				return 28;
 			if constexpr(27<=mx_size)
-			if(compile_pow10<M,26>()<=value)
+			if(compile_pow10<M,26><=value)
 				return 27;
 			if constexpr(26<=mx_size)
-			if(compile_pow10<M,25>()<=value)
+			if(compile_pow10<M,25><=value)
 				return 26;
 			if constexpr(25<=mx_size)
-			if(compile_pow10<M,24>()<=value)
+			if(compile_pow10<M,24><=value)
 				return 25;
 			if constexpr(24<=mx_size)
-			if(compile_pow10<M,23>()<=value)
+			if(compile_pow10<M,23><=value)
 				return 24;
 			if constexpr(23<=mx_size)
-			if(compile_pow10<M,22>()<=value)
+			if(compile_pow10<M,22><=value)
 				return 23;
 			if constexpr(22<=mx_size)
-			if(compile_pow10<M,21>()<=value)
+			if(compile_pow10<M,21><=value)
 				return 22;
 			if constexpr(21<=mx_size)
-			if(compile_pow10<M,20>()<=value)
+			if(compile_pow10<M,20><=value)
 				return 21;
 		}
 		if constexpr(7<sizeof(U))
@@ -688,61 +804,61 @@ inline constexpr std::uint32_t chars_len_3_sep(U value) noexcept
 		{
 			using M = std::remove_cvref_t<U>;
 			if constexpr(39<=mx_size)
-			if(compile_pow10<M,38>()<=value)
+			if(compile_pow10<M,38><=value)
 				return 51;
 			if constexpr(38<=mx_size)
-			if(compile_pow10<M,37>()<=value)
+			if(compile_pow10<M,37><=value)
 				return 50;
 			if constexpr(37<=mx_size)
-			if(compile_pow10<M,36>()<=value)
+			if(compile_pow10<M,36><=value)
 				return 49;
 			if constexpr(36<=mx_size)
-			if(compile_pow10<M,35>()<=value)
+			if(compile_pow10<M,35><=value)
 				return 47;
 			if constexpr(35<=mx_size)
-			if(compile_pow10<M,34>()<=value)
+			if(compile_pow10<M,34><=value)
 				return 46;
 			if constexpr(34<=mx_size)
-			if(compile_pow10<M,33>()<=value)
+			if(compile_pow10<M,33><=value)
 				return 45;
 			if constexpr(33<=mx_size)
-			if(compile_pow10<M,32>()<=value)
+			if(compile_pow10<M,32><=value)
 				return 43;
 			if constexpr(32<=mx_size)
-			if(compile_pow10<M,31>()<=value)
+			if(compile_pow10<M,31><=value)
 				return 42;
 			if constexpr(31<=mx_size)
-			if(compile_pow10<M,30>()<=value)
+			if(compile_pow10<M,30><=value)
 				return 41;
 			if constexpr(30<=mx_size)
-			if(compile_pow10<M,29>()<=value)
+			if(compile_pow10<M,29><=value)
 				return 39;
 			if constexpr(29<=mx_size)
-			if(compile_pow10<M,28>()<=value)
+			if(compile_pow10<M,28><=value)
 				return 38;
 			if constexpr(28<=mx_size)
-			if(compile_pow10<M,27>()<=value)
+			if(compile_pow10<M,27><=value)
 				return 37;
 			if constexpr(27<=mx_size)
-			if(compile_pow10<M,26>()<=value)
+			if(compile_pow10<M,26><=value)
 				return 35;
 			if constexpr(26<=mx_size)
-			if(compile_pow10<M,25>()<=value)
+			if(compile_pow10<M,25><=value)
 				return 34;
 			if constexpr(25<=mx_size)
-			if(compile_pow10<M,24>()<=value)
+			if(compile_pow10<M,24><=value)
 				return 33;
 			if constexpr(24<=mx_size)
-			if(compile_pow10<M,23>()<=value)
+			if(compile_pow10<M,23><=value)
 				return 31;
 			if constexpr(23<=mx_size)
-			if(compile_pow10<M,22>()<=value)
+			if(compile_pow10<M,22><=value)
 				return 30;
 			if constexpr(22<=mx_size)
-			if(compile_pow10<M,21>()<=value)
+			if(compile_pow10<M,21><=value)
 				return 29;
 			if constexpr(21<=mx_size)
-			if(compile_pow10<M,20>()<=value)
+			if(compile_pow10<M,20><=value)
 				return 27;
 		}
 		if constexpr(7<sizeof(U))

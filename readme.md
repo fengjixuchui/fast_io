@@ -45,6 +45,7 @@ https://ewindy.gitee.io/fast_io_rst/index.html
 - GCC 11 or GCC 12
 - VS 19.29.29917
 - Clang 13
+- Intel(R) oneAPI DPC++ Compiler 2021.2.0 (2021.2.0.20210317)
 
 ## C++ standard library support
 
@@ -91,6 +92,7 @@ https://ewindy.gitee.io/fast_io_rst/index.html
 - Windows ME
 - Microsoft Neptune
 - Windows NT
+- Windows Odyssey
 - Windows 2000
 - Windows Whistler
 - Windows XP
@@ -98,11 +100,13 @@ https://ewindy.gitee.io/fast_io_rst/index.html
 - Windows Longhorn
 - Windows Vista
 - Windows Server 2008
+- Windows Vienna
 - Windows 7
 - Windows 8
 - Windows 8.1
+- Windows Home Server 2011
 - Windows Server 2012
-- Windows Server 2015
+- Windows Server 2016
 
 ## Windows 95 or 95 Plus! Support
 You can enable -O3 but you cannot not enable -Ofast.
@@ -397,7 +401,6 @@ Notice: I modified libstdc++'s std::filebuf's BUFSIZ to 1048576 due to BUFSIZE i
 
 4. Binary Size
 Just use the benchmark in benchmarks/0014.file_io/file_io.
-That would introduce Ryu floating table for printing time, and I did not compile the code with -DFAST_IO_OPTIMIZE_SIZE. Or it would be nothing.
 Dude, you should avoid stream as plague tbh. It is not healthy.
 
 

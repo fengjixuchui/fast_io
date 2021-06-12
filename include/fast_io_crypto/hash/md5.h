@@ -36,15 +36,32 @@ inline constexpr void uu(auto& a,auto b,auto c,auto d,auto x,auto s,auto ac) noe
 	a=uu_impl<op>(a,b,c,d,x,s,ac);
 }
 
-inline void md5_main(std::uint32_t * __restrict state,std::byte const* __restrict block_start,std::size_t block_bytes) noexcept
+inline
+#if __cpp_lib_is_constant_evaluated >= 201811L
+constexpr
+#endif
+void md5_main(std::uint32_t * __restrict state,std::byte const* __restrict block_start,std::size_t block_bytes) noexcept
 {
-	std::uint32_t at{*state},bt{state[1]},ct{state[2]},dt{state[3]};
 	std::uint32_t x[16];
+	std::uint32_t a{*state},b{state[1]},c{state[2]},d{state[3]};
 	constexpr std::size_t block_size{64};
 	for(auto block(block_start),ed(block_start+block_bytes);block!=ed;block+=block_size)
 	{
-		std::uint32_t a{at},b{bt},c{ct},d{dt};
-		my_memcpy(x,block,block_size);
+#if __cpp_lib_is_constant_evaluated >= 201811L
+		if(std::is_constant_evaluated())
+		{
+			for(std::size_t j{};j!=16;++j)
+			{
+				auto dj{block+j*4};
+				x[j]=(std::to_integer<std::uint32_t>(*dj))|(std::to_integer<std::uint32_t>(dj[1])<<8)|
+					(std::to_integer<std::uint32_t>(dj[2])<<16)|std::to_integer<std::uint32_t>(dj[3]<<24);
+			}
+		}
+		else
+#endif
+		{
+			my_memcpy(x,block,block_size);
+		}
 		uu<operation::F>(a, b, c, d, x[ 0], 7, 0xd76aa478);
 		uu<operation::F>(d, a, b, c, x[ 1], 12, 0xe8c7b756);
 		uu<operation::F>(c, d, a, b, x[ 2], 17, 0x242070db);
@@ -116,17 +133,12 @@ inline void md5_main(std::uint32_t * __restrict state,std::byte const* __restric
 		uu<operation::I>(c, d, a, b, x[ 2], 15, 0x2ad7d2bb);
 		uu<operation::I>(b, c, d, a, x[ 9], 21, 0xeb86d391);
 
-		at+=a;
-		bt+=b;
-		ct+=c;
-		dt+=d;
+		a=(*state+=a);
+		b=(state[1]+=b);
+		c=(state[2]+=c);
+		d=(state[3]+=d);
 	}
-	*state=at;
-	state[1]=bt;
-	state[2]=ct;
-	state[3]=dt;
 }
-
 
 }
 
@@ -136,6 +148,9 @@ public:
 	using digest_type = ::fast_io::freestanding::array<std::uint32_t,4>;
 	static inline constexpr digest_type digest_initial_value{0x67452301,0xefcdab89,0x98badcfe,0x10325476};
 	static inline constexpr std::size_t block_size{64};
+#if __cpp_lib_is_constant_evaluated >= 201811L
+	constexpr
+#endif
 	void operator()(std::uint32_t *state,std::byte const* block_start,std::size_t block_bytes) noexcept
 	{
 		details::md5::md5_main(state,block_start,block_bytes);

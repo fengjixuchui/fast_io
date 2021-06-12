@@ -13,7 +13,7 @@ inline constexpr ::fast_io::freestanding::array<std::uint32_t,256> crc32c_tb{0x0
 template<bool crc32c=false>
 inline constexpr std::uint32_t calculate_crc32(std::uint32_t crc,std::byte const* block_start,std::size_t block_bytes) noexcept
 {
-	for(auto i{block_start},e{block_start+block_bytes};i!=e;++i)
+	for(auto i{block_start},ed{block_start+block_bytes};i!=ed;++i)
 	{
 		if constexpr(crc32c)
 			crc=crc32c_tb[(std::to_integer<std::uint32_t>(*i)^crc)&0xff]^(crc>>8);
@@ -45,13 +45,19 @@ public:
 namespace details::crc32
 {
 
-inline constexpr std::uint32_t do_crc32c_main(std::uint32_t crc,std::byte const* block_start,std::size_t block_bytes) noexcept
+inline
+#if __cpp_lib_is_constant_evaluated >= 201811L
+constexpr
+#endif
+std::uint32_t do_crc32c_main(std::uint32_t crc,std::byte const* block_start,std::size_t block_bytes) noexcept
 {
+#if __cpp_lib_is_constant_evaluated >= 201811L
 	if(std::is_constant_evaluated())
 	{
 		return calculate_crc32<true>(crc,block_start,block_bytes);
 	}
 	else
+#endif
 	{
 		constexpr std::size_t block_size{8};
 		for(auto process_block_end{block_start+block_bytes};block_start!=process_block_end;block_start+=block_size)
@@ -68,13 +74,19 @@ inline constexpr std::uint32_t do_crc32c_main(std::uint32_t crc,std::byte const*
 	}
 }
 
-inline constexpr std::uint32_t do_crc32c_main_digest(std::uint32_t crc,std::byte const* final_block,std::size_t final_block_size) noexcept
+inline
+#if __cpp_lib_is_constant_evaluated >= 201811L
+constexpr
+#endif
+std::uint32_t do_crc32c_main_digest(std::uint32_t crc,std::byte const* final_block,std::size_t final_block_size) noexcept
 {
+#if __cpp_lib_is_constant_evaluated >= 201811L
 	if(std::is_constant_evaluated())
 	{
 		return ~calculate_crc32<true>(crc,final_block,final_block_size);
 	}
 	else
+#endif
 	{
 		switch(final_block_size)
 		{

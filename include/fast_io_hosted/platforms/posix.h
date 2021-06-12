@@ -309,7 +309,12 @@ namespace details
 {
 inline void* my_get_osfile_handle(int fd) noexcept
 {
-	return reinterpret_cast<void*>(noexcept_call(_get_osfhandle,fd));
+	if(fd==-1)
+		return nullptr;
+	std::intptr_t ret{noexcept_call(_get_osfhandle,fd)};
+	if(ret==-1)
+		return nullptr;
+	return reinterpret_cast<void*>(ret);
 }
 }
 #endif

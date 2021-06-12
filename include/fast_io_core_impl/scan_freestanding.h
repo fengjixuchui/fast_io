@@ -3,19 +3,6 @@
 namespace fast_io
 {
 
-template<std::integral char_type,typename T>
-[[nodiscard]] inline constexpr auto io_scan_alias(T&& t)
-{
-	if constexpr(alias_type_scanable<char_type,std::remove_reference_t<T>>)
-		return scan_alias_define(io_alias_type<char_type>,std::forward<T>(t));
-	else if constexpr(alias_scanable<std::remove_reference_t<T>>)
-		return scan_alias_define(io_alias,std::forward<T>(t));
-	else if constexpr(manipulator<std::remove_cvref_t<T>>)
-		return t;
-	else
-		return parameter<std::remove_reference_t<T>&>{t};
-}
-
 template<input_stream T>
 requires std::is_trivially_copyable_v<T>
 struct unget_temp_buffer
@@ -187,6 +174,41 @@ inline constexpr bool scan_single_status_impl(input in,T& state_machine,P arg)
 	}
 	throw_parse_code(state_machine.code);
 }
+
+
+template<buffer_input_stream input,typename P>
+#if __has_cpp_attribute(gnu::cold)
+[[gnu::cold]]
+#endif
+inline constexpr bool scan_context_status2_impl(input in,P arg)
+{
+	using char_type = typename input::char_type;
+	for(typename std::remove_cvref_t<decltype(scan_context_type(io_reserve_type<char_type,P>))>::type state;;)
+	{
+		auto curr{ibuffer_curr(in)};
+		auto end{ibuffer_end(in)};
+		auto [it,ec]=scan_context_define2(io_reserve_type<char_type,P>,state,curr,end,arg);
+		if(ec==parse_code::ok)
+		{
+			ibuffer_set_curr(in,it);
+			return true;
+		}
+		else if(ec!=parse_code::partial)
+			throw_parse_code(ec);
+		ibuffer_set_curr(in,it);
+		if(!ibuffer_underflow(in))[[unlikely]]
+		{
+			ec=scan_context_eof_define(io_reserve_type<char_type,P>,state,arg);
+			if(ec==parse_code::ok)
+				return true;
+			else if(ec==parse_code::end_of_file)
+				break;
+			throw_parse_code(ec);
+		}
+	}
+	return false;
+}
+
 template<buffer_input_stream input,typename T>
 requires (context_scanable<typename input::char_type,T,false>||skipper<typename input::char_type,T>
 ||(contiguous_input_stream<input>&&context_scanable<typename input::char_type,T,true>))
@@ -228,7 +250,17 @@ requires (context_scanable<typename input::char_type,T,false>||skipper<typename 
 	}
 	else
 	{
-		if constexpr(skipper<char_type,T>)
+		if constexpr(contiguous_scanable<char_type,T>&&context_scanable2<char_type,T>)
+		{
+			auto [it,ec] = scan_contiguous_define(io_reserve_type<char_type,T>,curr,end,arg);
+			if(it==end)
+				return scan_context_status2_impl(in,arg);
+			else if(ec!=parse_code::ok)
+				throw_parse_code(ec);
+			ibuffer_set_curr(in,it);
+			return true;
+		}
+		else if constexpr(skipper<char_type,T>)
 		{
 			for(;(curr=skip_define(curr,end,arg))==end;)
 			{
@@ -294,7 +326,7 @@ template<typename input,typename ...Args>
 requires (status_input_stream<input>||input_stream<input>)
 [[nodiscard("scan does not require checking return value but scan_freestanding requires")]] inline constexpr bool scan_freestanding(input&& in,Args&& ...args)
 {
-	return scan_freestanding_decay(io_ref(in),io_scan_alias<typename std::remove_cvref_t<input>::char_type>(args)...);
+	return scan_freestanding_decay(io_ref(in),io_scan_forward<typename std::remove_cvref_t<input>::char_type>(io_scan_alias(args))...);
 }
 
 }
